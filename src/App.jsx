@@ -6,7 +6,8 @@ import {
   Lock, LogOut, ShieldCheck, User, CheckCircle2, ArrowRight,
   PlusCircle, Save, Settings, FileText, UserCheck, CircleDollarSign,
   Activity, Wifi, Edit3, Boxes, Search, MoreHorizontal, Droplets, Bike, ChevronLeft,
-  Upload, Mail, Mic, MicOff, PieChart, CreditCard, Calendar, MessageCircle, Copy, Pencil
+  Upload, Mail, Mic, MicOff, PieChart, CreditCard, Calendar, MessageCircle, Copy, Pencil,
+  Loader2, Image as ImageIcon
 } from 'lucide-react';
 
 // ==========================================
@@ -43,7 +44,7 @@ const diffDays = (dateStr) => {
 const Modal = ({ title, onClose, children }) => (
   <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200 text-left">
     <div className="bg-white w-full max-w-sm rounded-xl shadow-2xl flex flex-col max-h-[85vh] relative animate-in zoom-in-95 duration-300">
-      <div className="sticky top-0 bg-blue-600 flex justify-between items-center p-3 shrink-0 rounded-t-xl z-10 text-left">
+      <div className="sticky top-0 bg-blue-600 flex justify-between items-center p-3.5 shrink-0 rounded-t-xl z-10 text-left">
         <h3 className="font-black text-white uppercase text-[10px] tracking-widest">{title}</h3>
         <button onClick={onClose} className="p-1.5 bg-white/20 rounded-lg text-white active:scale-90 transition-all">
           <X className="w-4 h-4" />
@@ -101,7 +102,7 @@ const AddRoomForm = ({ onSave, editingRoom, sharedHeaters, formatN, parseN }) =>
 const AuthView = ({ isRegistering, setIsRegistering, setIsLoggedIn, showToast }) => (
   <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-left animate-in fade-in duration-700">
     <div className="w-full max-w-sm text-center">
-      <div className="w-20 h-20 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-3xl flex items-center justify-center shadow-2xl mx-auto mb-6 active:scale-95 transition-all">
+      <div className="w-20 h-20 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-3xl flex items-center justify-center shadow-2xl mx-auto mb-6 active:scale-95 transition-all text-left">
         <Building2 className="w-10 h-10 text-white" />
       </div>
       <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 tracking-tighter uppercase mb-2 leading-none text-center drop-shadow-sm">Lucky Home</h1>
@@ -109,22 +110,22 @@ const AuthView = ({ isRegistering, setIsRegistering, setIsLoggedIn, showToast })
 
       {isRegistering ? (
         <form className="space-y-3 text-left animate-in slide-in-from-right duration-500" onSubmit={(e) => { e.preventDefault(); setIsRegistering(false); showToast("Đăng ký thành công!"); }}>
-          <div className="relative"><User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><input type="text" placeholder="Họ và tên" className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-600 shadow-sm" required /></div>
-          <div className="relative"><Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><input type="text" placeholder="Tên đăng nhập (SĐT)" className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-600 shadow-sm" required /></div>
-          <div className="relative"><Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><input type="password" placeholder="Mật khẩu" className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-600 shadow-sm" required /></div>
+          <div className="relative group"><User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" /><input type="text" placeholder="Họ và tên" className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-600 shadow-sm transition-all" required /></div>
+          <div className="relative group"><Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" /><input type="text" placeholder="Tên đăng nhập (SĐT)" className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-600 shadow-sm transition-all" required /></div>
+          <div className="relative group"><Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" /><input type="password" placeholder="Mật khẩu" className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-600 shadow-sm transition-all" required /></div>
           <button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-4 rounded-xl font-black uppercase text-xs shadow-xl active:scale-95 transition-all mt-4 border-b-4 border-indigo-800 text-center">Tạo tài khoản</button>
-          <button type="button" onClick={() => setIsRegistering(false)} className="w-full text-[10px] font-black text-slate-400 uppercase tracking-widest py-3 text-center">Đã có tài khoản? Đăng nhập</button>
+          <button type="button" onClick={() => setIsRegistering(false)} className="w-full text-[10px] font-black text-slate-400 uppercase tracking-widest py-3 text-center hover:text-blue-600 transition-colors">Đã có tài khoản? Đăng nhập</button>
         </form>
       ) : (
-        <form className="space-y-3 text-left animate-in slide-in-from-left duration-500" onSubmit={(e) => { e.preventDefault(); setIsLoggedIn(true); }}>
-          <div className="relative"><User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><input type="text" placeholder="Tên đăng nhập" className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-600 shadow-sm" required /></div>
-          <div className="relative"><Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><input type="password" placeholder="Mật khẩu" className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-600 shadow-sm" required /></div>
-          <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
-            <button type="button" className="flex-1 py-3 bg-white text-blue-600 shadow-sm rounded-lg text-[10px] font-black uppercase text-center">Chủ Trọ</button>
-            <button type="button" className="flex-1 py-3 text-slate-400 rounded-lg text-[10px] font-black uppercase text-center">Nhân Viên</button>
+        <form className="space-y-3 text-left animate-in slide-in-from-left duration-500 text-left" onSubmit={(e) => { e.preventDefault(); setIsLoggedIn(true); }}>
+          <div className="relative group"><User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" /><input type="text" placeholder="Tên đăng nhập" className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-600 shadow-sm transition-all" required /></div>
+          <div className="relative group"><Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" /><input type="password" placeholder="Mật khẩu" className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-600 shadow-sm transition-all" required /></div>
+          <div className="flex gap-2 p-1 bg-slate-100 rounded-xl mt-2">
+            <button type="button" className="flex-1 py-3 bg-white text-blue-600 shadow-sm rounded-lg text-[10px] font-black uppercase text-center transition-all">Chủ Trọ</button>
+            <button type="button" className="flex-1 py-3 text-slate-400 rounded-lg text-[10px] font-black uppercase text-center transition-all hover:text-slate-600">Nhân Viên</button>
           </div>
           <button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-4 rounded-xl font-black uppercase text-xs shadow-xl active:scale-95 transition-all mt-4 border-b-4 border-indigo-800 text-center">Đăng Nhập</button>
-          <button type="button" onClick={() => setIsRegistering(true)} className="w-full text-[10px] font-black text-slate-400 uppercase tracking-widest py-3 text-center">Chưa có tài khoản? Đăng ký ngay</button>
+          <button type="button" onClick={() => setIsRegistering(true)} className="w-full text-[10px] font-black text-slate-400 uppercase tracking-widest py-3 text-center hover:text-blue-600 transition-colors">Chưa có tài khoản? Đăng ký ngay</button>
         </form>
       )}
     </div>
@@ -149,6 +150,7 @@ const App = () => {
   const [qrImage, setQrImage] = useState(null);
   const [isListening, setIsListening] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const fileInputRef = useRef(null);
 
   // --- Modals State ---
@@ -159,6 +161,24 @@ const App = () => {
   const [mappingMeter, setMappingMeter] = useState(null);
   const [isAiCreateHouseOpen, setIsAiCreateHouseOpen] = useState(false);
   const [bottomSheet, setBottomSheet] = useState(null);
+
+  // --- Inject html2canvas library & Branding ---
+  useEffect(() => {
+    document.title = "Lucky Home - Quản lý trọ thông minh";
+    const link = document.querySelector("link[rel~='icon']") || document.createElement('link');
+    link.type = 'image/x-icon';
+    link.rel = 'shortcut icon';
+    link.href = "https://cdn-icons-png.flaticon.com/512/609/609803.png";
+    document.getElementsByTagName('head')[0].appendChild(link);
+
+    // Tải html2canvas
+    if (!window.html2canvas) {
+      const script = document.createElement('script');
+      script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+      script.async = true;
+      document.body.appendChild(script);
+    }
+  }, []);
 
   // --- Dữ liệu 10 cơ sở ---
   const [houses, setHouses] = useState([
@@ -196,7 +216,7 @@ const App = () => {
       id: 'B1', houseId: 'h1', roomId: '101', month: '03/2024', status: 'pending', total: 3950000,
       meter: { old: 1200, new: 1240 },
       heaterMeter: null,
-      details: { rent: 3500000, elec: 152000, water: 100000, service: 98000, heater: 0, ebikes: 0 }
+      details: { rent: 3500000, elec: 152000, water: 100000, service: 98000, heater: 0, ebikes: 50000 }
     },
     {
       id: 'B2', houseId: 'h1', roomId: '201', month: '03/2024', status: 'pending', total: 3740000,
@@ -215,14 +235,6 @@ const App = () => {
   const [aiMessages, setAiMessages] = useState([
     { role: 'assistant', text: 'Chào bạn! Tôi là Lucky AI. Tôi có thể giúp bạn kiểm tra thông tin hợp đồng hoặc tạo nhắc nhở thanh toán.' }
   ]);
-
-  // --- Branding Effect ---
-  useEffect(() => {
-    document.title = "Lucky Home - Quản lý trọ thông minh";
-    const link = document.querySelector("link[rel~='icon']") || document.createElement('link');
-    link.href = "https://cdn-icons-png.flaticon.com/512/609/609803.png";
-    document.getElementsByTagName('head')[0].appendChild(link);
-  }, []);
 
   // --- Logic Helpers ---
   const showToast = (msg) => { setToast(String(msg)); setTimeout(() => setToast(""), 3000); };
@@ -308,52 +320,66 @@ const App = () => {
     }
   };
 
-  const handleCopyZalo = (bill) => {
-    let text = `BIÊN LAI LUCKY HOME\nPHÒNG: ${bill.roomId}\nTHÁNG: ${bill.month}\n-----------\n`;
-    text += `Tiền thuê phòng: ${formatN(bill.details.rent)}đ\n`;
-    text += `Tiền điện: ${formatN(bill.details.elec)}đ\n`;
-    if (bill.details.heater > 0) text += `Điện BNL chung: ${formatN(bill.details.heater)}đ\n`;
-    text += `Tiền nước: ${formatN(bill.details.water)}đ\n`;
-    if (bill.details.service > 0) text += `Phí dịch vụ: ${formatN(bill.details.service)}đ\n`;
-    if (bill.details.ebikes > 0) text += `Phí xe điện: ${formatN(bill.details.ebikes)}đ\n`;
-    text += `-----------\n`;
-    text += `TỔNG CỘNG: ${formatN(bill.total)}đ\nSTK: ${config.bankAcc} (${config.bankName})`;
-
-    const fallbackCopy = (textStr) => {
-      const el = document.createElement('textarea');
-      el.value = textStr;
-      el.style.position = 'fixed';
-      el.style.left = '-9999px';
-      document.body.appendChild(el);
-      el.select();
-      try {
-        document.execCommand('copy');
-        showToast("Đã copy hóa đơn!");
-      } catch (err) {
-        showToast("Lỗi khi copy!");
-      }
-      document.body.removeChild(el);
-      setBottomSheet(null);
-    };
-
-    if (navigator.clipboard && window.isSecureContext) {
-      navigator.clipboard.writeText(text).then(() => {
-        showToast("Đã copy hóa đơn!");
-        setBottomSheet(null);
-      }).catch(() => fallbackCopy(text));
-    } else {
-      fallbackCopy(text);
+  // Hàm xuất ảnh Zalo siêu việt bằng html2canvas
+  const handleShareZaloImage = async (bill) => {
+    if (!window.html2canvas) {
+      showToast("Hệ thống đang tải thư viện ảnh, vui lòng thử lại sau 2 giây!");
+      return;
     }
-  };
 
-  const handleSendZalo = (bill) => {
-    // 1. Thực hiện Copy nội dung
-    handleCopyZalo(bill);
+    setIsGeneratingImage(true);
+    showToast("Đang tạo ảnh biên lai...");
 
-    // 2. Chuyển hướng sang mở app Zalo
-    setTimeout(() => {
-      window.open('https://zalo.me/', '_blank');
-    }, 500);
+    setTimeout(async () => {
+      const element = document.getElementById('receipt-export-template');
+      if (!element) {
+        setIsGeneratingImage(false);
+        showToast("Không tìm thấy mẫu hóa đơn!");
+        return;
+      }
+
+      try {
+        const canvas = await window.html2canvas(element, {
+          scale: 3, // Xuất ảnh sắc nét
+          useCORS: true,
+          backgroundColor: '#f8fafc'
+        });
+
+        canvas.toBlob(async (blob) => {
+          try {
+            // Copy ảnh vào Clipboard
+            const item = new ClipboardItem({ "image/png": blob });
+            await navigator.clipboard.write([item]);
+            showToast("Đã copy ảnh! Đang mở Zalo...");
+
+            setTimeout(() => {
+              window.open('https://zalo.me/', '_blank');
+              setBottomSheet(null);
+              setIsGeneratingImage(false);
+            }, 1000);
+          } catch (err) {
+            // Fallback: Tự động tải ảnh xuống nếu trình duyệt chặn Clipboard
+            console.error(err);
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `HoaDon_P${bill.roomId}_Thang_${bill.month.replace('/', '')}.png`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+
+            showToast("Đã lưu ảnh vào máy! Đang mở Zalo...");
+            setTimeout(() => {
+              window.open('https://zalo.me/', '_blank');
+              setBottomSheet(null);
+              setIsGeneratingImage(false);
+            }, 1500);
+          }
+        }, 'image/png');
+      } catch (err) {
+        showToast("Lỗi khi tạo ảnh!");
+        setIsGeneratingImage(false);
+      }
+    }, 300);
   };
 
   const createHouseQuick = (name) => {
@@ -483,13 +509,13 @@ const App = () => {
           </h2>
         </div>
 
-        {/* LUCKY HOME CĂN GIỮA (ĐÃ ẨN TRÊN MOBILE ĐỂ TỐI GIẢN, CHỈ HIỆN TRÊN MÀN LỚN NẾU CẦN) */}
+        {/* LUCKY HOME CĂN GIỮA - ĐÃ ẨN TRÊN MOBILE ĐỂ TỐI GIẢN KHÔNG GIAN */}
         <div className="absolute left-1/2 -translate-x-1/2 hidden sm:flex items-center space-x-1.5 text-left">
           <Building2 className="w-4 h-4 opacity-80" />
           <h2 className="text-sm font-black uppercase tracking-tighter leading-none mt-0.5 text-left">LUCKY HOME</h2>
         </div>
 
-        <div className="flex items-center space-x-2 text-right">
+        <div className="flex items-center space-x-2 text-right text-right">
           <div className="flex flex-row items-center space-x-1 cursor-pointer active:opacity-80 text-right" onClick={() => setSelectedHouse(null)}>
             <p className="text-[8px] font-light text-blue-100 uppercase tracking-widest leading-none truncate max-w-[100px] mt-0.5 text-right">
               {selectedHouse.name}
@@ -560,13 +586,13 @@ const App = () => {
               </div>
             </div>
 
-            <div className="bg-blue-600 p-5 rounded-xl text-white shadow-xl relative overflow-hidden border-b-6 border-blue-800 text-left">
+            <div className="bg-blue-600 p-5 rounded-xl text-white shadow-xl relative overflow-hidden border-b-6 border-blue-800 text-left text-left">
               <TrendingUp className="w-12 h-12 opacity-10 absolute -right-2 -top-2" />
               <p className="text-[8px] font-black uppercase tracking-widest mb-1 opacity-60 text-left">Thực thu dự kiến tháng này</p>
               <h3 className="text-3xl font-black text-left">{formatN(stats.rev)}đ</h3>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 text-left text-left">
+            <div className="grid grid-cols-2 gap-2 text-left text-left text-left">
               <div className="bg-orange-400 p-4 rounded-xl text-white shadow-md relative overflow-hidden text-left">
                 <Zap className="w-8 h-8 absolute -right-1 -top-1 opacity-20" />
                 <p className="text-[8px] font-black uppercase mb-1 opacity-80 text-left">Điện dự tính</p>
@@ -579,7 +605,7 @@ const App = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 text-left text-left">
+            <div className="grid grid-cols-2 gap-2 text-left text-left text-left">
               <div className="bg-purple-400 p-4 rounded-xl text-white shadow-md relative overflow-hidden text-left">
                 <Activity className="w-8 h-8 absolute -right-1 -top-1 opacity-20" />
                 <p className="text-[8px] font-black uppercase mb-1 opacity-80 text-left">Dịch vụ</p>
@@ -593,10 +619,9 @@ const App = () => {
             </div>
 
             {/* BIỂU ĐỒ DOANH THU COLORFUL */}
-            <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm text-left text-left">
+            <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm text-left text-left text-left">
               <h4 className="font-black text-slate-400 uppercase text-[8px] mb-4 tracking-widest flex items-center text-left"><TrendingUp className="w-3.5 h-3.5 mr-2 text-blue-600 text-left" /> BIỂU ĐỒ DOANH THU</h4>
               <div className="h-28 flex items-end justify-between px-1 gap-2.5 relative text-left">
-                {/* Background lines */}
                 <div className="absolute w-full h-[1px] bg-slate-50 bottom-[33%] text-left"></div>
                 <div className="absolute w-full h-[1px] bg-slate-50 bottom-[66%] text-left"></div>
                 <div className="absolute w-full h-[1px] bg-slate-50 top-0 text-left"></div>
@@ -614,8 +639,8 @@ const App = () => {
 
         {/* --- PHÒNG TRỌ --- */}
         {activeTab === 'rooms' && (
-          <div className="space-y-4 pb-20 text-left animate-in slide-in-from-right">
-            <div className="grid grid-cols-2 gap-2 text-left text-left">
+          <div className="space-y-4 pb-20 text-left animate-in slide-in-from-right text-left">
+            <div className="grid grid-cols-2 gap-3 text-left text-left">
               {currentRooms.map(r => {
                 const today = new Date();
                 const payDate = new Date(today.getFullYear(), today.getMonth(), r.paymentDate);
@@ -626,16 +651,16 @@ const App = () => {
                 const endColor = endDays <= 30 ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-slate-100 text-slate-600 border-slate-200';
 
                 return (
-                  <div key={r.id} className={`bg-white p-3.5 rounded-xl border-2 shadow-lg relative active:scale-95 transition-all text-left flex flex-col ${r.status === 'occupied' ? 'border-blue-100' : 'opacity-70 border-dashed border-slate-200'}`}>
-                    <div className="flex justify-between items-center mb-2 text-left">
-                      <span className={`px-2.5 py-1 rounded-lg font-black text-[10px] shadow-sm ${r.status === 'occupied' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                  <div key={r.id} className={`bg-white p-3.5 rounded-xl border-2 shadow-sm relative transition-all text-left flex flex-col ${r.status === 'occupied' ? 'border-blue-100' : 'opacity-70 border-dashed border-slate-200'}`}>
+                    <div className="flex justify-between items-center mb-1.5 text-left">
+                      <span className={`px-2 py-0.5 rounded-md font-black text-[10px] shadow-sm ${r.status === 'occupied' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
                         {r.status === 'occupied' ? `P.${r.id}` : `P.${r.id} - TRỐNG`}
                       </span>
                       <button onClick={() => { setEditingRoom(r); setIsAddRoomModalOpen(true); }} className="w-6 h-6 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 hover:bg-blue-600 hover:text-white active:scale-95 transition-all shadow-sm">
                         <Pencil className="w-3 h-3" />
                       </button>
                     </div>
-                    <p className="text-[14px] font-black text-slate-800 leading-none mb-3 text-left">{formatN(r.price)}đ</p>
+                    <p className="text-[13px] font-black text-slate-800 leading-none mb-2 text-left">{formatN(r.price)}đ</p>
 
                     {r.status === 'occupied' && (
                       <div className="space-y-1 border-t border-slate-50 pt-1.5 text-left flex-1">
@@ -665,7 +690,7 @@ const App = () => {
         {activeTab === 'bills' && (
           <div className="space-y-2 pb-20 text-left animate-in slide-in-from-bottom">
             {currentBills.map(bill => (
-              <div key={bill.id} onClick={() => setBottomSheet(bill)} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex items-center justify-between active:scale-95 transition-all cursor-pointer text-left">
+              <div key={bill.id} onClick={() => setBottomSheet({ type: 'bill', data: bill })} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex items-center justify-between active:scale-95 transition-all cursor-pointer text-left">
                 <div className="flex items-center space-x-3 text-left">
                   <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-black ${bill.status === 'paid' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
                     {bill.status === 'paid' ? <CheckCircle2 className="w-5 h-5" /> : <Receipt className="w-5 h-5" />}
@@ -683,7 +708,7 @@ const App = () => {
 
         {/* --- CHỐT SỐ --- */}
         {activeTab === 'meters_list' && (
-          <div className="space-y-3 pb-20 text-left animate-in slide-in-from-right">
+          <div className="space-y-3 pb-20 text-left animate-in slide-in-from-right text-left">
             {currentMeters.map(m => (
               <div key={m.id} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm text-left">
                 <div className="flex justify-between items-start mb-4 text-left">
@@ -851,50 +876,125 @@ const App = () => {
       </div>
 
       {/* BIÊN LAI CHI TIẾT */}
-      {bottomSheet && (
-        <div className="fixed inset-0 z-[600] flex items-end justify-center text-left">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm text-left" onClick={() => setBottomSheet(null)} />
-          <div className="bg-white w-full max-w-md rounded-t-xl p-6 pb-12 shadow-2xl animate-in slide-in-from-bottom duration-500 relative max-h-[96vh] flex flex-col no-scrollbar overflow-y-auto text-left">
-            <div className="w-14 h-1.5 bg-slate-100 rounded-full mx-auto mb-6 shrink-0 text-left" />
-            <div className="flex justify-between items-center mb-6 shrink-0 text-left"><h3 className="text-base font-black uppercase text-slate-900 flex items-center tracking-widest text-left"><Receipt className="w-6 h-6 mr-3 text-blue-600 text-left" /> Biên lai thu tiền</h3><button onClick={() => setBottomSheet(null)} className="p-2 bg-slate-100 rounded-full text-slate-400 text-left"><X className="w-5 h-5 text-left" /></button></div>
-            <div className="space-y-6 overflow-y-auto no-scrollbar text-left pb-10">
-              <div className="bg-indigo-600 p-8 rounded-xl text-center text-white shadow-xl relative overflow-hidden text-left">
-                <p className="text-[10px] font-black text-indigo-100 uppercase mb-2 tracking-[0.4em] opacity-80 text-center">Tổng tiền thu</p>
-                <p className="text-5xl font-black tracking-tighter leading-none text-center">{formatN(bottomSheet.total)}đ</p>
-                <p className="text-[10px] mt-4 opacity-90 font-black bg-white/10 px-6 py-2 rounded-full w-fit mx-auto uppercase tracking-widest border border-white/20 text-center">PHÒNG {bottomSheet.roomId} • {bottomSheet.month}</p>
+      {bottomSheet && bottomSheet.type === 'bill' && (
+        <div className="fixed inset-0 z-[600] flex items-end justify-center text-left text-left text-left">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm text-left text-left text-left" onClick={() => setBottomSheet(null)} />
+          <div className="bg-white w-full max-w-md rounded-t-xl p-6 pb-12 shadow-2xl animate-in slide-in-from-bottom duration-500 relative max-h-[96vh] flex flex-col no-scrollbar overflow-y-auto text-left text-left text-left text-left">
+            <div className="w-14 h-1.5 bg-slate-100 rounded-full mx-auto mb-6 shrink-0 text-left text-left text-left" />
+            <div className="flex justify-between items-center mb-6 shrink-0 text-left text-left text-left text-left text-left"><h3 className="text-base font-black uppercase text-slate-900 flex items-center tracking-widest text-left text-left text-left"><Receipt className="w-6 h-6 mr-3 text-blue-600 text-left text-left text-left" /> Biên lai thu tiền</h3><button onClick={() => setBottomSheet(null)} className="p-2 bg-slate-100 rounded-full text-slate-400 text-left text-left text-left"><X className="w-5 h-5 text-left text-left text-left" /></button></div>
+            <div className="space-y-6 overflow-y-auto no-scrollbar text-left pb-10 text-left text-left text-left text-left">
+              <div className="bg-indigo-600 p-8 rounded-xl text-center text-white shadow-xl relative overflow-hidden text-left text-left text-left text-left">
+                <p className="text-[10px] font-black text-indigo-100 uppercase mb-2 tracking-[0.4em] opacity-80 text-center text-left text-left text-left">Tổng tiền thu</p>
+                <p className="text-5xl font-black tracking-tighter leading-none text-center text-left text-left text-left">{formatN(bottomSheet.data.total)}đ</p>
+                <p className="text-[10px] mt-4 opacity-90 font-black bg-white/10 px-6 py-2 rounded-full w-fit mx-auto uppercase tracking-widest border border-white/20 text-left text-left text-left text-center">PHÒNG {bottomSheet.data.roomId} • {bottomSheet.data.month}</p>
               </div>
-              <div className="bg-slate-50 p-6 rounded-xl space-y-4 border-2 border-slate-100 shadow-inner text-left">
-                <div className="flex justify-between items-center text-[12px] font-black text-left"><span className="text-slate-400 uppercase tracking-tighter text-left">Tiền thuê phòng</span><span className="text-slate-900 text-left">{formatN(bottomSheet.details.rent)}đ</span></div>
-                <div className="flex justify-between items-center text-[12px] font-black text-left"><div className="flex flex-col text-left"><span className="text-slate-400 uppercase tracking-tighter text-left">Tiền điện riêng</span><span className="text-[9px] text-blue-600 font-bold italic text-left">Số: {bottomSheet.meter?.old} → {bottomSheet.meter?.new}</span></div><span className="text-slate-900 text-left">{formatN(bottomSheet.details.elec)}đ</span></div>
-                {bottomSheet.heaterMeter && (
-                  <div className="flex justify-between items-center text-[12px] font-black text-left text-left text-left text-left text-left text-left text-left text-left"><div className="flex flex-col text-left text-left text-left text-left text-left text-left"><span className="text-slate-400 uppercase tracking-tighter text-left text-left text-left text-left text-left text-left">Điện BNL Chung</span><span className="text-[9px] text-orange-600 font-bold italic text-left text-left text-left text-left text-left">Số: {bottomSheet.heaterMeter.old} → {bottomSheet.heaterMeter.new}</span></div><span className="text-slate-900 text-left text-left text-left">{formatN(bottomSheet.details.heater)}đ</span></div>
+              <div className="bg-slate-50 p-6 rounded-xl space-y-4 border-2 border-slate-100 shadow-inner text-left text-left text-left text-left text-left text-left">
+                <div className="flex justify-between items-center text-[12px] font-black text-left text-left text-left text-left text-left text-left text-left"><span className="text-slate-400 uppercase tracking-tighter text-left text-left text-left text-left text-left">Tiền thuê phòng</span><span className="text-slate-900 text-left text-left text-left">{formatN(bottomSheet.data.details.rent)}đ</span></div>
+                <div className="flex justify-between items-center text-[12px] font-black text-left text-left text-left text-left text-left text-left text-left text-left"><div className="flex flex-col text-left text-left text-left text-left text-left text-left"><span className="text-slate-400 uppercase tracking-tighter text-left text-left text-left text-left text-left text-left">Tiền điện riêng</span><span className="text-[9px] text-blue-600 font-bold italic text-left text-left text-left text-left text-left">Số: {bottomSheet.data.meter?.old} → {bottomSheet.data.meter?.new}</span></div><span className="text-slate-900 text-left text-left text-left">{formatN(bottomSheet.data.details.elec)}đ</span></div>
+                {bottomSheet.data.heaterMeter && (
+                  <div className="flex justify-between items-center text-[12px] font-black text-left text-left text-left text-left text-left text-left text-left text-left"><div className="flex flex-col text-left text-left text-left text-left text-left text-left"><span className="text-slate-400 uppercase tracking-tighter text-left text-left text-left text-left text-left text-left">Điện BNL Chung</span><span className="text-[9px] text-orange-600 font-bold italic text-left text-left text-left text-left text-left">Số: {bottomSheet.data.heaterMeter.old} → {bottomSheet.data.heaterMeter.new}</span></div><span className="text-slate-900 text-left text-left text-left">{formatN(bottomSheet.data.details.heater)}đ</span></div>
                 )}
-                <div className="flex justify-between items-center text-[12px] font-black"><span className="text-slate-400 uppercase tracking-tighter">Tiền nước</span><span className="text-slate-900">{formatN(bottomSheet.details.water)}đ</span></div>
-                <div className="flex justify-between items-center text-[12px] font-black"><span className="text-slate-400 uppercase tracking-tighter">Phí dịch vụ</span><span className="text-slate-900">{formatN(bottomSheet.details.service || 0)}đ</span></div>
-                {(bottomSheet.details.ebikes > 0) && (
-                  <div className="flex justify-between items-center text-[12px] font-black"><span className="text-slate-400 uppercase tracking-tighter">Phí xe điện</span><span className="text-slate-900">{formatN(bottomSheet.details.ebikes)}đ</span></div>
-                )}
-                <div className="border-t-2 border-dashed border-slate-200 pt-4 flex justify-between items-center text-xs font-black uppercase text-indigo-600 tracking-widest text-left text-left text-left text-left text-left text-left text-left text-left"><span>Tổng cộng</span><span className="text-2xl text-left text-left text-left">{formatN(bottomSheet.total)}đ</span></div>
+                <div className="flex justify-between items-center text-[12px] font-black text-left text-left text-left text-left text-left text-left text-left text-left text-left"><span className="text-slate-400 uppercase tracking-tighter text-left text-left text-left text-left text-left text-left text-left">Nước & Dịch vụ & Xe</span><span className="text-slate-900 text-left text-left text-left">{formatN(bottomSheet.data.details.water + (bottomSheet.data.details.service || 0) + (bottomSheet.data.details.ebikes || 0))}đ</span></div>
+                <div className="border-t-2 border-dashed border-slate-200 pt-4 flex justify-between items-center text-xs font-black uppercase text-indigo-600 tracking-widest text-left text-left text-left text-left text-left text-left text-left text-left"><span>Tổng cộng</span><span className="text-2xl text-left text-left text-left">{formatN(bottomSheet.data.total)}đ</span></div>
               </div>
-              <div className="space-y-3">
-                <div className="flex gap-3">
-                  <button onClick={() => handleCopyZalo(bottomSheet)} className="w-14 h-14 bg-slate-100 text-slate-600 rounded-xl flex items-center justify-center active:scale-95 shadow-sm border border-slate-200 transition-all">
-                    <Copy className="w-6 h-6" />
-                  </button>
-                  <button onClick={() => handleSendZalo(bottomSheet)} className="flex-1 bg-[#0068FF] text-white rounded-xl font-black text-[13px] uppercase shadow-lg active:scale-95 border-b-4 border-[#004BBF] flex items-center justify-center gap-2 transition-all">
-                    <MessageCircle className="w-5 h-5" /> Mở Zalo Gửi
-                  </button>
-                </div>
-                {bottomSheet.status === 'pending' && (
+
+              <div className="grid grid-cols-1 gap-4 text-left">
+                <button
+                  disabled={isGeneratingImage}
+                  onClick={() => handleShareZaloImage(bottomSheet.data)}
+                  className="w-full bg-[#0068FF] text-white py-4 rounded-xl font-black text-[12px] uppercase shadow-xl active:scale-95 border-b-4 border-[#004BBF] flex items-center justify-center gap-2 transition-all disabled:opacity-70"
+                >
+                  {isGeneratingImage ? <Loader2 className="w-5 h-5 animate-spin" /> : <ImageIcon className="w-5 h-5" />}
+                  {isGeneratingImage ? 'ĐANG TẠO ẢNH...' : 'COPY ẢNH & MỞ ZALO'}
+                </button>
+
+                {bottomSheet.data.status === 'pending' && (
                   <button onClick={() => {
-                    setBills(prev => prev.map(b => b.id === bottomSheet.id ? { ...b, status: 'paid' } : b));
-                    setTransactions(prev => [{ id: 't-' + Date.now(), houseId: selectedHouse.id, type: 'in', amount: bottomSheet.total, category: `Thu P.${bottomSheet.roomId}`, date: new Date().toLocaleDateString('vi-VN') }, ...prev]);
+                    setBills(prev => prev.map(b => b.id === bottomSheet.data.id ? { ...b, status: 'paid' } : b));
+                    setTransactions(prev => [{ id: 't-' + Date.now(), houseId: selectedHouse.id, type: 'in', amount: bottomSheet.data.total, category: `Thu P.${bottomSheet.data.roomId}`, date: new Date().toLocaleDateString('vi-VN') }, ...prev]);
                     setBottomSheet(null);
                     showToast("Đã thu tiền!");
-                  }} className="w-full bg-emerald-600 text-white py-4 rounded-xl font-black text-[13px] uppercase active:scale-95 shadow-xl border-b-4 border-emerald-800 flex items-center justify-center gap-2 transition-all">
-                    <CheckCircle2 className="w-5 h-5" /> Xác nhận đã thu tiền
+                  }} className="w-full bg-emerald-600 text-white py-4 rounded-xl font-black text-[12px] uppercase active:scale-95 shadow-xl border-b-4 border-emerald-800 text-center flex items-center justify-center gap-2">
+                    <CheckCircle2 className="w-5 h-5" /> Gạch nợ &radic;
                   </button>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- TEMPLATE ẨN: RENDER ẢNH HÓA ĐƠN Y HỆT THIẾT KẾ ĐỂ XUẤT RA CLIPBOARD --- */}
+      {bottomSheet && bottomSheet.type === 'bill' && (
+        <div style={{ position: 'fixed', top: '-9999px', left: '-9999px', pointerEvents: 'none' }}>
+          <div id="receipt-export-template" className="w-[400px] bg-[#f8fafc] font-sans text-[#1e293b]">
+            {/* Header Xanh */}
+            <div className="bg-[#2563eb] text-white p-6 pb-6">
+              <h1 className="text-2xl font-black mb-1 tracking-tight">LUCKY HOME</h1>
+              <p className="text-xs tracking-wide uppercase opacity-90">Biên lai tiền phòng</p>
+            </div>
+
+            {/* Nội dung chính */}
+            <div className="p-6 bg-[#f8fafc]">
+              <div className="mb-6">
+                <p className="text-lg font-black text-slate-900">PHÒNG: {bottomSheet.data.roomId}</p>
+                <p className="text-sm text-slate-600">Tháng: {bottomSheet.data.month}</p>
+              </div>
+
+              <div className="space-y-4 text-sm mb-6">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-600">Tiền thuê nhà</span>
+                  <span className="font-black text-slate-900">{formatN(bottomSheet.data.details.rent)}đ</span>
+                </div>
+
+                <div className="flex justify-between items-start">
+                  <div className="flex flex-col">
+                    <span className="text-slate-600">Tiền điện riêng</span>
+                    <span className="text-[11px] text-slate-400 italic mt-0.5">
+                      {bottomSheet.data.meter?.old} &rarr; {bottomSheet.data.meter?.new} ({bottomSheet.data.meter?.new - bottomSheet.data.meter?.old}kWh)
+                    </span>
+                  </div>
+                  <span className="font-black text-slate-900">{formatN(bottomSheet.data.details.elec)}đ</span>
+                </div>
+
+                {bottomSheet.data.heaterMeter && (
+                  <div className="flex justify-between items-start">
+                    <div className="flex flex-col">
+                      <span className="text-slate-600">Bình nóng lạnh</span>
+                      <span className="text-[11px] text-slate-400 italic mt-0.5">Dùng chung tầng</span>
+                    </div>
+                    <span className="font-black text-slate-900">{formatN(bottomSheet.data.details.heater)}đ</span>
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-600">Nước & Dịch vụ</span>
+                  <span className="font-black text-slate-900">{formatN(bottomSheet.data.details.water + (bottomSheet.data.details.service || 0))}đ</span>
+                </div>
+
+                {(bottomSheet.data.details.ebikes > 0) && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-600">Gửi xe</span>
+                    <span className="font-black text-slate-900">{formatN(bottomSheet.data.details.ebikes)}đ</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t border-slate-200/80 pt-5 flex justify-between items-center">
+                <span className="text-[#2563eb] text-xl font-black uppercase tracking-tight">Tổng cộng</span>
+                <span className="text-[#2563eb] text-2xl font-black">{formatN(bottomSheet.data.total)}đ</span>
+              </div>
+            </div>
+
+            {/* Footer thanh toán & QR */}
+            <div className="bg-white p-6 flex justify-between items-center border-t border-slate-100">
+              <div>
+                <p className="font-black text-slate-900 text-xs uppercase mb-3">Thanh toán chuyển khoản</p>
+                <p className="text-xs text-slate-600 mb-1 uppercase">{config.bankName}</p>
+                <p className="text-xl font-black text-[#2563eb] tracking-wider">{config.bankAcc}</p>
+              </div>
+              <div className="w-24 h-24 p-1 border-4 border-slate-900 bg-white flex items-center justify-center">
+                <img src={`https://api.vietqr.io/image/${config.bankBin || '970422'}-${config.bankAcc}-compact2.jpg?amount=${bottomSheet.data.total}&addInfo=P${bottomSheet.data.roomId}%20${bottomSheet.data.month.replace('/', '')}`} className="w-full h-full object-contain" alt="QR" crossOrigin="anonymous" />
               </div>
             </div>
           </div>
