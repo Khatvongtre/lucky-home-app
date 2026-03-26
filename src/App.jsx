@@ -6,7 +6,7 @@ import {
   Lock, LogOut, ShieldCheck, User, CheckCircle2, ArrowRight,
   PlusCircle, Save, Settings, FileText, UserCheck, CircleDollarSign,
   Activity, Wifi, Edit3, Boxes, Search, MoreHorizontal, Droplets, Bike, ChevronLeft,
-  Upload, Mail, Mic, MicOff, PieChart, CreditCard, Calendar
+  Upload, Mail, Mic, MicOff, PieChart, CreditCard, Calendar, MessageCircle, Copy, Pencil
 } from 'lucide-react';
 
 // ==========================================
@@ -328,7 +328,7 @@ const App = () => {
       el.select();
       try {
         document.execCommand('copy');
-        showToast("Đã copy nội dung Zalo!");
+        showToast("Đã copy hóa đơn!");
       } catch (err) {
         showToast("Lỗi khi copy!");
       }
@@ -338,12 +338,22 @@ const App = () => {
 
     if (navigator.clipboard && window.isSecureContext) {
       navigator.clipboard.writeText(text).then(() => {
-        showToast("Đã copy nội dung Zalo!");
+        showToast("Đã copy hóa đơn!");
         setBottomSheet(null);
       }).catch(() => fallbackCopy(text));
     } else {
       fallbackCopy(text);
     }
+  };
+
+  const handleSendZalo = (bill) => {
+    // 1. Thực hiện Copy nội dung
+    handleCopyZalo(bill);
+
+    // 2. Chuyển hướng sang mở app Zalo
+    setTimeout(() => {
+      window.open('https://zalo.me/', '_blank');
+    }, 500);
   };
 
   const createHouseQuick = (name) => {
@@ -473,13 +483,13 @@ const App = () => {
           </h2>
         </div>
 
-        {/* LUCKY HOME CĂN GIỮA */}
-        <div className="absolute left-1/2 -translate-x-1/2 flex items-center space-x-1.5 text-left">
+        {/* LUCKY HOME CĂN GIỮA (ĐÃ ẨN TRÊN MOBILE ĐỂ TỐI GIẢN, CHỈ HIỆN TRÊN MÀN LỚN NẾU CẦN) */}
+        <div className="absolute left-1/2 -translate-x-1/2 hidden sm:flex items-center space-x-1.5 text-left">
           <Building2 className="w-4 h-4 opacity-80" />
           <h2 className="text-sm font-black uppercase tracking-tighter leading-none mt-0.5 text-left">LUCKY HOME</h2>
         </div>
 
-        <div className="flex items-center space-x-2 text-right text-right">
+        <div className="flex items-center space-x-2 text-right">
           <div className="flex flex-row items-center space-x-1 cursor-pointer active:opacity-80 text-right" onClick={() => setSelectedHouse(null)}>
             <p className="text-[8px] font-light text-blue-100 uppercase tracking-widest leading-none truncate max-w-[100px] mt-0.5 text-right">
               {selectedHouse.name}
@@ -605,7 +615,7 @@ const App = () => {
         {/* --- PHÒNG TRỌ --- */}
         {activeTab === 'rooms' && (
           <div className="space-y-4 pb-20 text-left animate-in slide-in-from-right">
-            <div className="grid grid-cols-2 gap-3 text-left text-left">
+            <div className="grid grid-cols-2 gap-2 text-left text-left">
               {currentRooms.map(r => {
                 const today = new Date();
                 const payDate = new Date(today.getFullYear(), today.getMonth(), r.paymentDate);
@@ -616,31 +626,33 @@ const App = () => {
                 const endColor = endDays <= 30 ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-slate-100 text-slate-600 border-slate-200';
 
                 return (
-                  <div key={r.id} className={`bg-white p-3.5 rounded-xl border-2 shadow-lg relative active:scale-95 transition-all text-left ${r.status === 'occupied' ? 'border-blue-600 shadow-blue-500/5' : 'opacity-60 border-dashed border-slate-200'}`}>
+                  <div key={r.id} className={`bg-white p-3.5 rounded-xl border-2 shadow-lg relative active:scale-95 transition-all text-left flex flex-col ${r.status === 'occupied' ? 'border-blue-100' : 'opacity-70 border-dashed border-slate-200'}`}>
                     <div className="flex justify-between items-center mb-2 text-left">
                       <span className={`px-2.5 py-1 rounded-lg font-black text-[10px] shadow-sm ${r.status === 'occupied' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
                         {r.status === 'occupied' ? `P.${r.id}` : `P.${r.id} - TRỐNG`}
                       </span>
-                      <Edit3 onClick={() => { setEditingRoom(r); setIsAddRoomModalOpen(true); }} className="w-3.5 h-3.5 text-slate-300 hover:text-blue-600 cursor-pointer text-left" />
+                      <button onClick={() => { setEditingRoom(r); setIsAddRoomModalOpen(true); }} className="w-6 h-6 bg-slate-100 rounded-full flex items-center justify-center text-slate-400 hover:bg-blue-600 hover:text-white active:scale-95 transition-all shadow-sm">
+                        <Pencil className="w-3 h-3" />
+                      </button>
                     </div>
                     <p className="text-[14px] font-black text-slate-800 leading-none mb-3 text-left">{formatN(r.price)}đ</p>
 
                     {r.status === 'occupied' && (
-                      <div className="space-y-2 border-t border-slate-50 pt-3 text-left">
+                      <div className="space-y-1 border-t border-slate-50 pt-1.5 text-left flex-1">
                         <div className="flex justify-between items-center text-[8px] font-bold uppercase text-left">
                           <span className="text-slate-400 flex items-center text-left"><CreditCard className="w-3 h-3 mr-1 text-left" /> Đóng tiền:</span>
-                          <span className={`px-2 py-0.5 rounded border text-center ${payColor}`}>{payDays >= 0 ? payDays : 30 + payDays} ngày</span>
+                          <span className={`px-1.5 py-0.5 rounded border text-center ${payColor}`}>{payDays >= 0 ? payDays : 30 + payDays} ngày</span>
                         </div>
                         <div className="flex justify-between items-center text-[8px] font-bold uppercase text-left text-left">
                           <span className="text-slate-400 flex items-center text-left"><Calendar className="w-3 h-3 mr-1 text-left" /> Hợp đồng:</span>
-                          <span className={`px-2 py-0.5 rounded border text-center ${endColor}`}>{endDays || 0} ngày</span>
+                          <span className={`px-1.5 py-0.5 rounded border text-center ${endColor}`}>{endDays || 0} ngày</span>
                         </div>
                       </div>
                     )}
 
-                    <div className="mt-3 flex items-center space-x-2 text-left border-t border-slate-50 pt-2 text-left">
-                      <div className="flex items-center text-blue-600 font-bold text-[9px] text-left"><Users2 className="w-3 h-3 mr-1" />{r.people}</div>
-                      <div className="flex items-center text-orange-600 font-bold text-[9px] text-left"><Bike className="w-3 h-3 mr-1" />{r.eBikes}</div>
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5 text-left border-t border-slate-50 pt-2 text-left">
+                      <div className="flex items-center text-blue-600 font-bold text-[9px] text-left bg-blue-50 px-1.5 py-0.5 rounded-md"><Users2 className="w-3 h-3 mr-1" />{r.people} người</div>
+                      {r.eBikes > 0 && <div className="flex items-center text-orange-600 font-bold text-[9px] text-left bg-orange-50 px-1.5 py-0.5 rounded-md"><Bike className="w-3 h-3 mr-1" />{r.eBikes} xe điện</div>}
                     </div>
                   </div>
                 )
@@ -724,7 +736,7 @@ const App = () => {
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50 no-scrollbar pb-10 text-left text-left">
               {aiMessages.map((msg, i) => (
                 <div key={i} className={`flex text-left ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[85%] p-3 rounded-xl text-sm text-left ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-br-none shadow-md shadow-blue-200' : 'bg-white text-slate-800 rounded-bl-none border border-slate-200 shadow-sm'}`}>
+                  <div className={`max-w-[85%] p-3 rounded-xl text-sm text-left ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-br-none shadow-md shadow-blue-200' : 'bg-white text-slate-800 rounded-bl-none border border-slate-200 shadow-sm'} text-left`}>
                     {msg.text}
                   </div>
                 </div>
@@ -840,35 +852,48 @@ const App = () => {
 
       {/* BIÊN LAI CHI TIẾT */}
       {bottomSheet && (
-        <div className="fixed inset-0 z-[600] flex items-end justify-center text-left text-left text-left">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm text-left text-left text-left" onClick={() => setBottomSheet(null)} />
-          <div className="bg-white w-full max-w-md rounded-t-xl p-6 pb-12 shadow-2xl animate-in slide-in-from-bottom duration-500 relative max-h-[96vh] flex flex-col no-scrollbar overflow-y-auto text-left text-left text-left text-left">
-            <div className="w-14 h-1.5 bg-slate-100 rounded-full mx-auto mb-6 shrink-0 text-left text-left text-left" />
-            <div className="flex justify-between items-center mb-6 shrink-0 text-left text-left text-left text-left text-left"><h3 className="text-base font-black uppercase text-slate-900 flex items-center tracking-widest text-left text-left text-left"><Receipt className="w-6 h-6 mr-3 text-blue-600 text-left text-left text-left" /> Biên lai thu tiền</h3><button onClick={() => setBottomSheet(null)} className="p-2 bg-slate-100 rounded-full text-slate-400 text-left text-left text-left"><X className="w-5 h-5 text-left text-left text-left" /></button></div>
-            <div className="space-y-6 overflow-y-auto no-scrollbar text-left pb-10 text-left text-left text-left text-left">
-              <div className="bg-indigo-600 p-8 rounded-xl text-center text-white shadow-xl relative overflow-hidden text-left text-left text-left text-left">
-                <p className="text-[10px] font-black text-indigo-100 uppercase mb-2 tracking-[0.4em] opacity-80 text-center text-left text-left text-left">Tổng tiền thu</p>
-                <p className="text-5xl font-black tracking-tighter leading-none text-center text-left text-left text-left">{formatN(bottomSheet.total)}đ</p>
-                <p className="text-[10px] mt-4 opacity-90 font-black bg-white/10 px-6 py-2 rounded-full w-fit mx-auto uppercase tracking-widest border border-white/20 text-left text-left text-left text-center">PHÒNG {bottomSheet.roomId} • {bottomSheet.month}</p>
+        <div className="fixed inset-0 z-[600] flex items-end justify-center text-left">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm text-left" onClick={() => setBottomSheet(null)} />
+          <div className="bg-white w-full max-w-md rounded-t-xl p-6 pb-12 shadow-2xl animate-in slide-in-from-bottom duration-500 relative max-h-[96vh] flex flex-col no-scrollbar overflow-y-auto text-left">
+            <div className="w-14 h-1.5 bg-slate-100 rounded-full mx-auto mb-6 shrink-0 text-left" />
+            <div className="flex justify-between items-center mb-6 shrink-0 text-left"><h3 className="text-base font-black uppercase text-slate-900 flex items-center tracking-widest text-left"><Receipt className="w-6 h-6 mr-3 text-blue-600 text-left" /> Biên lai thu tiền</h3><button onClick={() => setBottomSheet(null)} className="p-2 bg-slate-100 rounded-full text-slate-400 text-left"><X className="w-5 h-5 text-left" /></button></div>
+            <div className="space-y-6 overflow-y-auto no-scrollbar text-left pb-10">
+              <div className="bg-indigo-600 p-8 rounded-xl text-center text-white shadow-xl relative overflow-hidden text-left">
+                <p className="text-[10px] font-black text-indigo-100 uppercase mb-2 tracking-[0.4em] opacity-80 text-center">Tổng tiền thu</p>
+                <p className="text-5xl font-black tracking-tighter leading-none text-center">{formatN(bottomSheet.total)}đ</p>
+                <p className="text-[10px] mt-4 opacity-90 font-black bg-white/10 px-6 py-2 rounded-full w-fit mx-auto uppercase tracking-widest border border-white/20 text-center">PHÒNG {bottomSheet.roomId} • {bottomSheet.month}</p>
               </div>
-              <div className="bg-slate-50 p-6 rounded-xl space-y-4 border-2 border-slate-100 shadow-inner text-left text-left text-left text-left text-left text-left">
-                <div className="flex justify-between items-center text-[12px] font-black text-left text-left text-left text-left text-left text-left text-left"><span className="text-slate-400 uppercase tracking-tighter text-left text-left text-left text-left text-left">Tiền thuê phòng</span><span className="text-slate-900 text-left text-left text-left">{formatN(bottomSheet.details.rent)}đ</span></div>
-                <div className="flex justify-between items-center text-[12px] font-black text-left text-left text-left text-left text-left text-left text-left text-left"><div className="flex flex-col text-left text-left text-left text-left text-left text-left"><span className="text-slate-400 uppercase tracking-tighter text-left text-left text-left text-left text-left text-left">Tiền điện riêng</span><span className="text-[9px] text-blue-600 font-bold italic text-left text-left text-left text-left text-left">Số: {bottomSheet.meter?.old} → {bottomSheet.meter?.new}</span></div><span className="text-slate-900 text-left text-left text-left">{formatN(bottomSheet.details.elec)}đ</span></div>
+              <div className="bg-slate-50 p-6 rounded-xl space-y-4 border-2 border-slate-100 shadow-inner text-left">
+                <div className="flex justify-between items-center text-[12px] font-black text-left"><span className="text-slate-400 uppercase tracking-tighter text-left">Tiền thuê phòng</span><span className="text-slate-900 text-left">{formatN(bottomSheet.details.rent)}đ</span></div>
+                <div className="flex justify-between items-center text-[12px] font-black text-left"><div className="flex flex-col text-left"><span className="text-slate-400 uppercase tracking-tighter text-left">Tiền điện riêng</span><span className="text-[9px] text-blue-600 font-bold italic text-left">Số: {bottomSheet.meter?.old} → {bottomSheet.meter?.new}</span></div><span className="text-slate-900 text-left">{formatN(bottomSheet.details.elec)}đ</span></div>
                 {bottomSheet.heaterMeter && (
                   <div className="flex justify-between items-center text-[12px] font-black text-left text-left text-left text-left text-left text-left text-left text-left"><div className="flex flex-col text-left text-left text-left text-left text-left text-left"><span className="text-slate-400 uppercase tracking-tighter text-left text-left text-left text-left text-left text-left">Điện BNL Chung</span><span className="text-[9px] text-orange-600 font-bold italic text-left text-left text-left text-left text-left">Số: {bottomSheet.heaterMeter.old} → {bottomSheet.heaterMeter.new}</span></div><span className="text-slate-900 text-left text-left text-left">{formatN(bottomSheet.details.heater)}đ</span></div>
                 )}
-                <div className="flex justify-between items-center text-[12px] font-black text-left text-left text-left text-left text-left text-left text-left text-left text-left"><span className="text-slate-400 uppercase tracking-tighter text-left text-left text-left text-left text-left text-left text-left">Nước & Dịch vụ & Xe</span><span className="text-slate-900 text-left text-left text-left">{formatN(bottomSheet.details.water + (bottomSheet.details.service || 0) + (bottomSheet.details.ebikes || 0))}đ</span></div>
+                <div className="flex justify-between items-center text-[12px] font-black"><span className="text-slate-400 uppercase tracking-tighter">Tiền nước</span><span className="text-slate-900">{formatN(bottomSheet.details.water)}đ</span></div>
+                <div className="flex justify-between items-center text-[12px] font-black"><span className="text-slate-400 uppercase tracking-tighter">Phí dịch vụ</span><span className="text-slate-900">{formatN(bottomSheet.details.service || 0)}đ</span></div>
+                {(bottomSheet.details.ebikes > 0) && (
+                  <div className="flex justify-between items-center text-[12px] font-black"><span className="text-slate-400 uppercase tracking-tighter">Phí xe điện</span><span className="text-slate-900">{formatN(bottomSheet.details.ebikes)}đ</span></div>
+                )}
                 <div className="border-t-2 border-dashed border-slate-200 pt-4 flex justify-between items-center text-xs font-black uppercase text-indigo-600 tracking-widest text-left text-left text-left text-left text-left text-left text-left text-left"><span>Tổng cộng</span><span className="text-2xl text-left text-left text-left">{formatN(bottomSheet.total)}đ</span></div>
               </div>
-              <div className="grid grid-cols-2 gap-4 text-left text-left text-left text-left text-left text-left text-left text-left">
-                <button onClick={() => handleCopyZalo(bottomSheet)} className="flex-1 bg-slate-900 text-white py-4 rounded-xl font-black text-[12px] uppercase shadow-xl active:scale-95 border-b-4 border-black text-left text-left text-left text-center">Copy Zalo</button>
+              <div className="space-y-3">
+                <div className="flex gap-3">
+                  <button onClick={() => handleCopyZalo(bottomSheet)} className="w-14 h-14 bg-slate-100 text-slate-600 rounded-xl flex items-center justify-center active:scale-95 shadow-sm border border-slate-200 transition-all">
+                    <Copy className="w-6 h-6" />
+                  </button>
+                  <button onClick={() => handleSendZalo(bottomSheet)} className="flex-1 bg-[#0068FF] text-white rounded-xl font-black text-[13px] uppercase shadow-lg active:scale-95 border-b-4 border-[#004BBF] flex items-center justify-center gap-2 transition-all">
+                    <MessageCircle className="w-5 h-5" /> Mở Zalo Gửi
+                  </button>
+                </div>
                 {bottomSheet.status === 'pending' && (
                   <button onClick={() => {
                     setBills(prev => prev.map(b => b.id === bottomSheet.id ? { ...b, status: 'paid' } : b));
                     setTransactions(prev => [{ id: 't-' + Date.now(), houseId: selectedHouse.id, type: 'in', amount: bottomSheet.total, category: `Thu P.${bottomSheet.roomId}`, date: new Date().toLocaleDateString('vi-VN') }, ...prev]);
                     setBottomSheet(null);
                     showToast("Đã thu tiền!");
-                  }} className="flex-1 bg-emerald-600 text-white py-4 rounded-xl font-black text-[12px] uppercase active:scale-95 shadow-xl border-b-4 border-emerald-800 text-left text-left text-left text-center text-center">Gạch nợ &radic;</button>
+                  }} className="w-full bg-emerald-600 text-white py-4 rounded-xl font-black text-[13px] uppercase active:scale-95 shadow-xl border-b-4 border-emerald-800 flex items-center justify-center gap-2 transition-all">
+                    <CheckCircle2 className="w-5 h-5" /> Xác nhận đã thu tiền
+                  </button>
                 )}
               </div>
             </div>
