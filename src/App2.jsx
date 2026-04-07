@@ -7,8 +7,7 @@ import {
   PlusCircle, Save, Settings, FileText, UserCheck, CircleDollarSign,
   Activity, Wifi, Boxes, Search, MoreHorizontal, Droplets, Bike, ChevronLeft,
   Upload, Mail, Mic, MicOff, CreditCard, Calendar, Image as ImageIcon, Pencil, Loader2, AlertCircle,
-  ChevronDown, Check, LucideEdit, Flame, AlertTriangle, Share2,
-  Edit
+  ChevronDown, Check, LucideEdit, Flame, AlertTriangle
 } from 'lucide-react';
 
 import { toPng } from 'html-to-image';
@@ -16,7 +15,7 @@ import { toPng } from 'html-to-image';
 // ==========================================
 // CẤU HÌNH API BACKEND (.NET 8)
 // ==========================================
-const API_URL = 'http://118.69.108.41:2331/api';
+const API_URL = 'http://localhost:5000/api';
 
 // ==========================================
 // UTILS
@@ -138,7 +137,7 @@ const ToastNotification = ({ toast }) => {
 
 const AuthView = ({ fetchApi, setIsLoggedIn, setUser, showToast }) => {
   const [isRegistering, setIsRegistering] = useState(false);
-  const [authForm, setAuthForm] = useState({ fullName: '', username: '', password: '' });
+  const [authForm, setAuthForm] = useState({ fullName: '', username: '', password: '', role: 'Owner' });
 
   const handleAuth = async (e, type) => {
     e.preventDefault();
@@ -176,6 +175,13 @@ const AuthView = ({ fetchApi, setIsLoggedIn, setUser, showToast }) => {
         <div className="relative group"><Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" /><input type="text" placeholder="SĐT / Tên đăng nhập" className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-600 shadow-sm" value={authForm.username} onChange={e => setAuthForm({ ...authForm, username: e.target.value })} required /></div>
         <div className="relative group"><Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" /><input type="password" placeholder="Mật khẩu" className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-600 shadow-sm" value={authForm.password} onChange={e => setAuthForm({ ...authForm, password: e.target.value })} required /></div>
 
+        {isRegistering && (
+          <div className="flex gap-2 p-1 bg-slate-100 rounded-xl mt-2">
+            <button type="button" onClick={() => setAuthForm({ ...authForm, role: 'Owner' })} className={`flex-1 py-3 rounded-lg text-[10px] font-black uppercase transition-all ${authForm.role === 'Owner' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>Chủ Trọ</button>
+            <button type="button" onClick={() => setAuthForm({ ...authForm, role: 'Staff' })} className={`flex-1 py-3 rounded-lg text-[10px] font-black uppercase transition-all ${authForm.role === 'Staff' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>Nhân Viên</button>
+          </div>
+        )}
+
         <button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-4 rounded-xl font-black uppercase text-xs shadow-xl active:scale-95 transition-all mt-4 border-b-4 border-indigo-800 text-center">
           {isRegistering ? "Tạo Tài Khoản" : "Đăng Nhập"}
         </button>
@@ -189,57 +195,19 @@ const AuthView = ({ fetchApi, setIsLoggedIn, setUser, showToast }) => {
 
 const AddRoomForm = ({ onSave, editingRoom, sharedHeaters, formatN, parseN }) => {
   const [heaterType, setHeaterType] = useState(editingRoom?.heaterMeterId ? 'shared' : 'private');
-  // Khởi tạo trạng thái dựa trên dữ liệu cũ, mặc định là 'full' nếu là phòng mới
-  const [status, setStatus] = useState(editingRoom?.status || 'full');
 
   return (
     <form onSubmit={onSave} className="space-y-4 text-left">
-      {/* Nút Switch Trạng thái Phòng */}
-      <div className="space-y-2">
-        <label className="text-[8px] font-black text-slate-400 uppercase px-1">Trạng thái phòng</label>
-        <div className="flex p-1 bg-slate-100 rounded-xl gap-1">
-          <button
-            type="button"
-            onClick={() => setStatus('full')}
-            className={`flex-1 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all ${status === 'full'
-              ? 'bg-blue-600 text-white shadow-md'
-              : 'text-slate-400 hover:text-slate-600'
-              }`}
-          >
-            Đã chốt
-          </button>
-          <button
-            type="button"
-            onClick={() => setStatus('empty')}
-            className={`flex-1 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all ${status === 'empty'
-              ? 'bg-red-500 text-white shadow-md'
-              : 'text-slate-400 hover:text-slate-600'
-              }`}
-          >
-            Đang trống
-          </button>
-        </div>
-        {/* Input ẩn để truyền giá trị status vào FormData */}
-        <input type="hidden" name="status" value={status} />
-      </div>
-
       <div className="grid grid-cols-2 gap-3 text-left">
         <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Mã phòng</label><input name="rid" defaultValue={editingRoom?.roomCode || editingRoom?.id || ''} placeholder="VD: 101" required className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
         <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Giá thuê</label><input name="price" type="text" defaultValue={formatN(editingRoom?.price || 0)} required className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-black text-xs outline-none focus:border-blue-600" onInput={(e) => e.target.value = formatN(parseN(e.target.value))} /></div>
       </div>
-
-      {/* Hiển thị thông tin cư dân chỉ khi trạng thái là Đã chốt */}
-      <div className={`grid grid-cols-2 gap-3 text-left transition-all duration-300 ${status === 'empty' ? 'opacity-40 grayscale pointer-events-none' : ''}`}>
+      <div className="grid grid-cols-2 gap-3 text-left">
         <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Số cư dân</label><input name="people" type="number" defaultValue={editingRoom?.peopleCount ?? editingRoom?.people ?? 2} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
         <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Xe điện</label><input name="ebikes" type="number" defaultValue={editingRoom?.eBikeCount ?? editingRoom?.eBikes ?? 0} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
       </div>
-
-      <div className={`space-y-1 text-left transition-all duration-300 ${status === 'empty' ? 'opacity-40 grayscale pointer-events-none' : ''}`}>
-        <label className="text-[8px] font-black text-slate-400 uppercase px-1">Ngày ký HĐ</label>
-        <input name="start" type="date" defaultValue={getSafeDate(editingRoom?.contractStart)} required={status === 'full'} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" />
-      </div>
-
-      <div className={`grid grid-cols-2 gap-3 text-left transition-all duration-300 ${status === 'empty' ? 'opacity-40 grayscale pointer-events-none' : ''}`}>
+      <div className="space-y-1 text-left"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Ngày ký HĐ</label><input name="start" type="date" defaultValue={getSafeDate(editingRoom?.contractStart)} required className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
+      <div className="grid grid-cols-2 gap-3 text-left">
         <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Hạn đóng (Ngày)</label><input name="payDay" type="number" defaultValue={editingRoom?.paymentDate || 5} min="1" max="31" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
         <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Thời hạn (Tháng)</label><input name="months" type="number" defaultValue={editingRoom?.months || 12} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
       </div>
@@ -263,7 +231,7 @@ const AddRoomForm = ({ onSave, editingRoom, sharedHeaters, formatN, parseN }) =>
       )}
 
       <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl mt-4 border-b-4 border-blue-800 active:translate-y-1 transition-all text-center">
-        {status === 'full' ? 'Kích hoạt & Lưu phòng' : 'Lưu trạng thái trống'}
+        Kích hoạt & Lưu phòng
       </button>
     </form>
   );
@@ -301,9 +269,6 @@ const App = () => {
   const [aiPrompt, setAiPrompt] = useState("");
   const [isListening, setIsListening] = useState(false);
   const [aiFeedback, setAiFeedback] = useState("");
-  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-  const [sharingHouse, setSharingHouse] = useState(null);
-  const [assignForm, setAssignForm] = useState({ username: '', role: 'Manager' });
 
   // --- Real Data State ---
   const [houses, setHouses] = useState([]);
@@ -324,12 +289,6 @@ const App = () => {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), 3000);
   }, []);
-
-  // --- Logic phân quyền dựa trên từng Nhà được chọn ---
-  // Các quyền: 'SuperAdmin', 'Owner', 'Manager', 'Staff'
-  const currentRole = selectedHouse?.userRole;
-  const isOwnerOrAdmin = ['SuperAdmin', 'Owner'].includes(currentRole);
-  const isManagerOrAbove = ['SuperAdmin', 'Owner', 'Manager'].includes(currentRole);
 
   // ==========================================
   // HÀM GỌI API CHUNG VÀ TẤT CẢ CÁC HANDLER KHÁC
@@ -389,6 +348,7 @@ const App = () => {
         .then(data => setHouses(data))
         .catch(err => {
           showToast(err.message, 'error');
+          setHouses([{ id: 'h1', name: 'Lucky Home Demo', address: 'Dữ liệu đang chạy Offline' }]);
         });
     }
   }, [isLoggedIn, fetchApi, showToast]);
@@ -413,7 +373,7 @@ const App = () => {
         ...b, roomId: b.roomCode, details: JSON.parse(b.detailsJson || '{}'), meter: JSON.parse(b.meterInfoJson || '{}'), heaterMeter: b.heaterInfoJson ? JSON.parse(b.heaterInfoJson) : null
       })));
 
-      if (isOwnerOrAdmin) {
+      if (user?.role === 'Owner') {
         const txData = await fetchApi(`/management/transactions/${houseId}?type=all`);
         setTransactions(txData);
       }
@@ -425,25 +385,6 @@ const App = () => {
   useEffect(() => {
     if (selectedHouse) loadHouseData(selectedHouse.id);
   }, [selectedHouse, loadHouseData]);
-
-
-  const handleOpenShare = (e, house) => {
-    e.stopPropagation();
-    setSharingHouse(house);
-    setAssignForm({ username: '', role: 'Manager' });
-    setIsShareModalOpen(true);
-  };
-
-  const handleAssignRole = async (e) => {
-    e.preventDefault();
-    try {
-      await fetchApi(`/houses/${sharingHouse.id}/assign`, 'POST', assignForm);
-      showToast(`Đã cấp quyền ${assignForm.role} cho ${assignForm.username} thành công!`, "success");
-      setIsShareModalOpen(false);
-    } catch (err) {
-      showToast(err.message || "Lỗi cấp quyền. Kiểm tra lại tài khoản.", "error");
-    }
-  };
 
   const handleAddHouse = async (e) => {
     e.preventDefault();
@@ -476,16 +417,20 @@ const App = () => {
         setHouses([...houses, res]);
         showToast("Tạo cơ sở thành công!", "success");
       }
-      // [QUAN TRỌNG]: Thay vì tự setHouses thủ công, hãy gọi lại API lấy danh sách mới nhất
-      // Điều này đảm bảo house mới có đầy đủ UserRole và các trường thống kê từ Backend
-      const updatedHouses = await fetchApi('/houses', 'GET');
-      setHouses(updatedHouses);
-
       setIsAiCreateHouseOpen(false);
       setEditingHouse(null);
     }
-    catch (e) {
-      showToast("Lỗi: " + e.message, "error");
+    catch (err) {
+      // Logic chạy Offline (Dự phòng)
+      if (editingHouse) {
+        setHouses(houses.map(h => h.id === editingHouse.id ? { ...h, ...houseData } : h));
+        showToast("Đã cập nhật (Local)!", "success");
+      } else {
+        setHouses([...houses, { id: 'h-' + Date.now(), ...houseData }]);
+        showToast("Đã tạo cơ sở (Local)!", "success");
+      }
+      setIsAiCreateHouseOpen(false);
+      setEditingHouse(null);
     }
   };
   // --- HÀM XỬ LÝ NHẬN DIỆN GIỌNG NÓI ---
@@ -553,7 +498,7 @@ const App = () => {
       people: Number(fd.get('people')),
       eBikeCount: Number(fd.get('ebikes')),
       eBikes: Number(fd.get('ebikes')),
-      status: fd.get('status'),
+      status: 'full',
       contractStart: start,
       contractEnd: endDateStr,
       months,
@@ -568,7 +513,15 @@ const App = () => {
       setIsAddRoomModalOpen(false);
       setEditingRoom(null);
     } catch (e) {
-      showToast("Lỗi: " + e.message, "error");
+      showToast(e.message, 'error');
+      if (editingRoom) {
+        setRooms(prev => prev.map(r => r.id === editingRoom.id ? { ...r, ...payload } : r));
+      } else {
+        setRooms(prev => [...prev, payload]);
+        setMeters(prev => [...prev, { houseId: selectedHouse?.id, type: 'electric', name: `Điện P.${payload.roomCode}`, oldVal: 0, newVal: '', roomIds: [payload.id] }]);
+      }
+      setIsAddRoomModalOpen(false);
+      setEditingRoom(null);
     }
   };
 
@@ -1214,93 +1167,44 @@ const App = () => {
             )}
 
             {filteredHouses.map(h => {
+              // GỌI HÀM TÍNH TOÁN NGÀY NÂNG CAO MỚI TẠO Ở TRÊN
               const payInfo = getAdvancedDueInfo(h.startDate, h.paymentDay, h.paymentPeriod);
-
-              const isUrgentPay = payInfo.daysLeft <= 3;
-              const isWarningPay = payInfo.daysLeft <= 7;
-              const shouldShowPayInfo = payInfo.daysLeft <= 30; // Chỉ hiện nếu hạn đóng tiền <= 10 ngày
-              const isFull = h.emptyRooms === 0;
-
-              // Xác định màu nền của toàn bộ Card dựa trên mức độ ưu tiên
-              const cardStyle = isUrgentPay
-                ? 'bg-red-50/50 border-red-100'
-                : isFull
-                  ? 'bg-emerald-50/30 border-emerald-100'
-                  : 'bg-white border-slate-100';
-
-              // Chuyển đổi vai trò sang Tiếng Việt và màu sắc tương ứng
-              const getRoleDisplay = (role) => {
-                switch (role) {
-                  case 'SuperAdmin': return { text: 'Quản trị viên', class: 'bg-purple-100 text-purple-600' };
-                  case 'Owner': return { text: 'Chủ nhà', class: 'bg-blue-100 text-blue-600' };
-                  case 'Manager': return { text: 'Quản lý', class: 'bg-indigo-100 text-indigo-600' };
-                  default: return { text: 'Nhân viên', class: 'bg-slate-100 text-slate-500' };
-                }
-              };
-              const roleInfo = getRoleDisplay(h.userRole);
-
-              const getRoomStatusColor = () => {
-                if (isFull) return 'bg-emerald-500';
-                const emptyRatio = h.emptyRooms / h.totalRooms;
-                return emptyRatio <= 0.3 ? 'bg-amber-500' : 'bg-red-500';
-              };
+              const payColor = payInfo.daysLeft <= 3 ? 'text-red-700 bg-red-100 border-red-200' : payInfo.daysLeft <= 7 ? 'text-orange-700 bg-orange-100 border-orange-200' : 'text-slate-600 bg-slate-100 border-slate-200';
 
               return (
-                <div key={h.id} className={`w-full p-2.5 rounded-xl border shadow-sm active:scale-[0.99] transition-all text-left relative mb-2 ${cardStyle}`}>
+                <div key={h.id} className="w-full bg-white p-3 rounded-xl border border-slate-100 shadow-sm flex flex-col active:scale-[0.98] transition-all text-left relative group">
                   <div className="flex items-start justify-between mb-2">
-                    <button
-                      onClick={() => { setSelectedHouse(h); setActiveTab('dashboard'); setSearchQuery(''); }}
-                      className="flex-1 flex items-center space-x-2 text-left overflow-hidden"
-                    >
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 shadow-inner ${isUrgentPay ? 'bg-red-100 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
+                    <button onClick={() => { setSelectedHouse(h); setActiveTab('dashboard'); setSearchQuery(''); }} className="flex-1 flex items-center space-x-2.5 text-left">
+                      <div className="w-9 h-9 bg-indigo-50 rounded-lg flex items-center justify-center text-blue-600 shrink-0">
                         <Building2 className="w-4 h-4" />
                       </div>
-                      <div className="overflow-hidden">
-                        <div className="flex items-center gap-1.5">
-                          <h3 className={`font-black text-[13px] uppercase tracking-tight leading-tight truncate ${isUrgentPay ? 'text-red-700' : 'text-slate-800'}`}>
-                            {h.name}
-                          </h3>
-                          <span className={`text-[7px] font-black px-1.5 py-0.5 rounded uppercase shrink-0 ${roleInfo.class}`}>
-                            {roleInfo.text}
-                          </span>
-                        </div>
-                        <p className="text-[9px] font-medium text-slate-400 mt-0.5 flex items-center truncate">
-                          <MapPin className="w-2.5 h-2.5 mr-1 shrink-0 opacity-60" />
-                          {h.address || "Chưa cập nhật địa chỉ"}
+                      <div>
+                        <h3 className="font-black text-slate-800 text-[13px] uppercase leading-tight">{h.name}</h3>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase mt-0.5 flex items-center truncate max-w-[190px]">
+                          <MapPin className="w-3 h-3 mr-1 shrink-0" />{h.address || "Chưa cập nhật"}
                         </p>
                       </div>
                     </button>
 
-                    {['SuperAdmin', 'Owner'].includes(h.userRole || user?.role) && (
-                      <div className="flex items-center ml-1">
-                        <button onClick={(e) => handleOpenShare(e, h)} className="p-1.5 text-slate-400 hover:text-blue-600 transition-colors">
-                          <Share2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button onClick={(e) => { e.stopPropagation(); setEditingHouse(h); setIsAiCreateHouseOpen(true); }} className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors">
-                          <Edit className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                    {user?.role === 'Owner' && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setEditingHouse(h); setIsAiCreateHouseOpen(true); }}
+                        className="p-1.5 ml-2 bg-slate-50 text-slate-400 rounded-lg hover:text-blue-600 hover:bg-blue-50 transition-colors shrink-0"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
                     )}
                   </div>
 
-                  <div className="pt-2 border-t border-black/5 flex items-center justify-between gap-2">
-                    <div className="flex items-center">
-                      <div className={`flex items-center text-[10px] font-bold px-2 py-1 rounded-md ${isFull ? 'text-emerald-700 bg-emerald-100/50' : 'text-slate-500 bg-slate-100/50'}`}>
-                        <div className={`w-1.5 h-1.5 rounded-full mr-2 ${isFull ? '' : 'animate-pulse'} ${getRoomStatusColor()}`} />
-                        {isFull ? `Đã lấp đầy (${h.totalRooms} phòng)` : `Trống ${h.emptyRooms} / ${h.totalRooms} phòng`}
-                      </div>
+                  <div className="pt-2.5 border-t border-dashed border-slate-100 flex flex-wrap items-center gap-1.5">
+                    <div className="flex items-center text-[9px] font-bold text-slate-600 bg-slate-50 border border-slate-100 px-2 py-1 rounded-md">
+                      Trống: <span className="text-orange-600 ml-1 font-black">{h.emptyRooms || 0}</span>/{h.totalRooms || 0} phòng
                     </div>
 
-                    {/* LOGIC MỚI: Chỉ hiển thị nếu hạn đóng tiền <= 10 ngày */}
-                    {shouldShowPayInfo && (
-                      <div className={`flex items-center text-[10px] font-bold px-2 py-1 rounded-md ${isUrgentPay ? 'text-red-700 bg-red-100/50' :
-                        isWarningPay ? 'text-amber-700 bg-amber-100/50' :
-                          'text-emerald-700 bg-emerald-100/50'
-                        }`}>
-                        <Calendar className={`w-3 h-3 mr-1.5 ${isUrgentPay ? 'text-red-600' : isWarningPay ? 'text-amber-500' : 'text-emerald-500'}`} />
-                        Hạn đóng tiền: {payInfo.daysLeft} ngày
-                      </div>
-                    )}
+                    {/* HIỂN THỊ KẾT QUẢ NGÀY ĐÓNG TIỀN */}
+                    <div className={`flex items-center text-[9px] font-bold border px-2 py-1 rounded-md ${payColor}`}>
+                      Hạn đóng: Còn {payInfo.daysLeft} ngày
+                    </div>
                   </div>
                 </div>
               );
@@ -1308,62 +1212,29 @@ const App = () => {
           </div>
 
           {/* VÙNG NÚT CỐ ĐỊNH Ở ĐÁY */}
-          <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-slate-50 via-slate-50 to-transparent z-30 pointer-events-none">
-            <div className="flex flex-col gap-2 pointer-events-auto">
-              <button
-                onClick={() => { setEditingHouse(null); setIsAiCreateHouseOpen(true); }}
-                className="w-full bg-blue-600 text-white py-2.5 rounded-xl flex items-center justify-center shadow-lg active:scale-95 border-b-[3px] border-blue-800 transition-all gap-2"
-              >
-                <PlusCircle className="w-4 h-4 text-white" />
-                <span className="font-black text-[10px] uppercase tracking-widest mt-0.5">Thêm cơ sở mới</span>
-              </button>
-
-              <button
-                onClick={() => { setIsAiPromptModalOpen(true); setAiPrompt(""); setIsListening(false); }}
-                className="w-full bg-slate-800 text-white py-2.5 rounded-xl flex items-center justify-center shadow-lg active:scale-95 border-b-[3px] border-slate-900 transition-all gap-2"
-              >
-                <Sparkles className="w-4 h-4 text-indigo-300" />
-                <span className="font-black text-[10px] uppercase tracking-widest mt-0.5">Tạo nhanh bằng AI</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* MODAL PHÂN QUYỀN VÀ CHIA SẺ CƠ SỞ */}
-        {isShareModalOpen && (
-          <Modal title="PHÂN QUYỀN & CHIA SẺ CƠ SỞ" onClose={() => { setIsShareModalOpen(false); setSharingHouse(null); }}>
-            <form onSubmit={handleAssignRole} className="space-y-4 text-left">
-              <p className="text-[10px] font-bold text-slate-500 mb-2">Thêm tài khoản quản lý cho cơ sở <span className="text-blue-600 font-black">{sharingHouse?.name}</span></p>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Tài khoản (SĐT/Username)</label>
-                <div className="relative">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input
-                    type="text" required value={assignForm.username} onChange={(e) => setAssignForm({ ...assignForm, username: e.target.value })}
-                    placeholder="Nhập SĐT hoặc tên đăng nhập..."
-                    className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-600 transition-all"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Vai trò (Role)</label>
-                <select
-                  value={assignForm.role} onChange={(e) => setAssignForm({ ...assignForm, role: e.target.value })}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-600 transition-all appearance-none"
+          {user?.role === 'Owner' && (
+            <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-slate-50 via-slate-50 to-transparent z-30 pointer-events-none">
+              <div className="flex flex-col gap-2 pointer-events-auto">
+                <button
+                  onClick={() => { setEditingHouse(null); setIsAiCreateHouseOpen(true); }}
+                  className="w-full bg-blue-600 text-white py-2.5 rounded-xl flex items-center justify-center shadow-lg active:scale-95 border-b-[3px] border-blue-800 transition-all gap-2"
                 >
-                  <option value="Manager">Quản lý (Manager)</option>
-                  <option value="Staff">Nhân viên (Staff)</option>
-                </select>
-              </div>
+                  <PlusCircle className="w-4 h-4 text-white" />
+                  <span className="font-black text-[10px] uppercase tracking-widest mt-0.5">Thêm cơ sở mới</span>
+                </button>
 
-              <button type="submit" className="w-full bg-blue-600 text-white py-3.5 rounded-xl font-black uppercase text-[11px] shadow-lg flex items-center justify-center gap-2 border-b-4 border-blue-800 text-center mt-4 active:scale-95 transition-all">
-                <UserCheck className="w-4 h-4" /> Xác nhận cấp quyền
-              </button>
-            </form>
-          </Modal>
-        )}
+                <button
+                  onClick={() => { setIsAiPromptModalOpen(true); setAiPrompt(""); setIsListening(false); }}
+                  className="w-full bg-slate-800 text-white py-2.5 rounded-xl flex items-center justify-center shadow-lg active:scale-95 border-b-[3px] border-slate-900 transition-all gap-2"
+                >
+                  <Sparkles className="w-4 h-4 text-indigo-300" />
+                  <span className="font-black text-[10px] uppercase tracking-widest mt-0.5">Tạo nhanh bằng AI</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+        </div>
 
         {/* MODAL THÊM/SỬA NHÀ (FORM GIỮ NGUYÊN) */}
         {isAiCreateHouseOpen && (
@@ -1545,7 +1416,7 @@ const App = () => {
             <p className="text-[8px] font-light text-blue-100 uppercase tracking-widest truncate max-w-[100px] mt-0.5">{selectedHouse.name}</p>
             <MoreHorizontal className="w-3.5 h-3.5 opacity-60" />
           </div>
-          {isOwnerOrAdmin && (
+          {user?.role === 'Owner' && (
             <div onClick={() => setActiveTab('settings')} className="w-8 h-8 rounded-full border border-white/30 overflow-hidden cursor-pointer active:scale-90 shadow-sm bg-white flex items-center justify-center">
               <User className="w-5 h-5 text-blue-600" />
             </div>
@@ -1595,7 +1466,7 @@ const App = () => {
               <div className="bg-white p-2 rounded-xl border border-slate-100 shadow-sm flex flex-col items-center"><p className="text-[13px] font-black text-orange-600">{stats.ebikes}</p><p className="text-[7px] font-bold text-slate-400 uppercase mt-1">Xe điện</p></div>
             </div>
 
-            {isOwnerOrAdmin && (
+            {user?.role === 'Owner' && (
               <div className="bg-blue-600 p-5 rounded-xl text-white shadow-xl relative overflow-hidden border-b-6 border-blue-800">
                 <TrendingUp className="w-12 h-12 opacity-10 absolute -right-2 -top-2" />
                 <p className="text-[8px] font-black uppercase tracking-widest mb-1 opacity-60">Doanh thu dự kiến tháng này</p>
@@ -1610,7 +1481,7 @@ const App = () => {
               <div className="bg-emerald-500 p-4 rounded-xl text-white shadow-md relative overflow-hidden"><Wifi className="w-8 h-8 absolute -right-1 -top-1 opacity-20" /><p className="text-[8px] font-black uppercase mb-1 opacity-80">Internet</p><p className="text-sm font-black">{formatN((stats.total - stats.empty) * (config.priceNet || 0))}</p></div>
             </div>
 
-            {isOwnerOrAdmin && (
+            {user?.role === 'Owner' && (
               <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm">
                 <h4 className="font-black text-slate-400 uppercase text-[8px] mb-4 tracking-widest flex items-center"><TrendingUp className="w-3.5 h-3.5 mr-2 text-blue-600" /> BIỂU ĐỒ DOANH THU</h4>
                 <div className="h-28 flex items-end justify-between px-1 gap-2.5 relative">
@@ -1643,7 +1514,7 @@ const App = () => {
                 return (
                   <div key={r.id} className={`bg-white p-2.5 rounded-xl border-2 shadow-sm relative transition-all flex flex-col ${r.status === 'full' ? 'border-blue-100' : 'opacity-70 border-dashed border-slate-200'}`}>
                     <div className="flex justify-between items-center mb-1.5">
-                      <span className={`px-2 py-0.5 rounded-md font-black text-[10px] shadow-sm ${r.status === 'full' ? 'bg-blue-600 text-white' : 'bg-red-600 text-white'}`}>
+                      <span className={`px-2 py-0.5 rounded-md font-black text-[10px] shadow-sm ${r.status === 'full' ? 'bg-blue-600 text-white' : 'bg-emerald-100 text-emerald-700'}`}>
                         {r.status === 'full' ? `P.${r.roomCode || r.id}` : `P.${r.roomCode || r.id} - TRỐNG`}
                       </span>
                       <button onClick={() => { setEditingRoom(r); setIsAddRoomModalOpen(true); }} className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-white hover:bg-blue-300 hover:text-white active:scale-95 transition-all shadow-sm"><LucideEdit className="w-3 h-3" /></button>
@@ -1666,7 +1537,7 @@ const App = () => {
             </div>
 
             {/* NÚT THÊM PHÒNG CHO NGƯỜI DÙNG */}
-            {isManagerOrAbove && (
+            {user?.role === 'Owner' && (
               <button onClick={() => { setEditingRoom(null); setIsAddRoomModalOpen(true); }} className="w-full mt-6 bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all">
                 <PlusCircle className="w-4 h-4 text-white" /> Thêm Phòng Mới
               </button>
@@ -1719,7 +1590,7 @@ const App = () => {
         {activeTab === 'bills' && (
           <div className="space-y-4 pb-20 animate-in slide-in-from-bottom">
             {/* NÚT TẠO HÓA ĐƠN */}
-            {isManagerOrAbove && (
+            {user?.role === 'Owner' && (
               <button onClick={handleGenerateClick} className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all">
                 <Receipt className="w-4 h-4 text-white" /> Lập Hóa Đơn Tháng Này
               </button>
@@ -1867,7 +1738,7 @@ const App = () => {
         )}
 
         {/* --- THU CHI --- */}
-        {activeTab === 'finance' && isManagerOrAbove && (
+        {activeTab === 'finance' && user?.role === 'Owner' && (
           <div className="animate-in fade-in pb-20">
             {/* BOX TỔNG HỢP - STICKY */}
             <div className="sticky top-0 z-30 bg-slate-50/80 backdrop-blur-md pt-2 pb-4 px-1">
@@ -2100,7 +1971,7 @@ const App = () => {
         )}
 
         {/* --- CÀI ĐẶT --- */}
-        {activeTab === 'settings' && isOwnerOrAdmin && (
+        {activeTab === 'settings' && user?.role === 'Owner' && (
           <div className="space-y-4 animate-in fade-in pb-20">
             <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm flex items-center space-x-4 mb-2">
               <div className="w-12 h-12 rounded-full bg-blue-600 border-4 border-white shadow-lg flex items-center justify-center text-white"><User className="w-6 h-6" /></div>
@@ -2155,8 +2026,8 @@ const App = () => {
             { id: 'rooms', icon: Home, label: 'Phòng' },
             { id: 'spacer', icon: null, label: '' },
             { id: 'bills', icon: FileText, label: 'Hóa đơn' },
-            { id: 'finance', icon: Wallet, label: 'Thu Chi', hidden: !isManagerOrAbove },
-            { id: 'ai', icon: Sparkles, label: 'AI Chat', hidden: isManagerOrAbove }
+            { id: 'finance', icon: Wallet, label: 'Thu Chi', hidden: user?.role !== 'Owner' },
+            { id: 'ai', icon: Sparkles, label: 'AI Chat', hidden: user?.role === 'Owner' }
           ].filter(i => !i.hidden).map((item, i) => (
             item.id === 'spacer' ? <div key={i} className="w-12" /> : (
               <button key={item.id} onClick={() => { setActiveTab(item.id); setSearchQuery(""); }} className={`flex flex-col items-center justify-center px-1 transition-all ${activeTab === item.id ? 'text-blue-600 scale-105' : 'text-slate-400 opacity-60'}`}>
@@ -2227,7 +2098,7 @@ const App = () => {
                 {/* DÒNG NHẬP GIẢM GIÁ (CHỈ CHỦ TRỌ MỚI SỬA ĐƯỢC KHI HÓA ĐƠN PENDING) */}
                 <div className="flex justify-between items-center text-[12px] font-black">
                   <span className="text-slate-400 uppercase tracking-tighter">Giảm giá</span>
-                  {bottomSheet.data.status === 'pending' && isManagerOrAbove ? (
+                  {bottomSheet.data.status === 'pending' && user?.role === 'Owner' ? (
                     <div className="flex items-center space-x-1 border-b border-dashed border-red-300">
                       <span className="text-red-500">-</span>
                       <input
@@ -2254,7 +2125,7 @@ const App = () => {
                   {isGeneratingImage ? 'ĐANG TẠO ẢNH...' : 'COPY ẢNH CHO ZALO'}
                 </button>
 
-                {bottomSheet.data.status === 'pending' && isManagerOrAbove && (
+                {bottomSheet.data.status === 'pending' && user?.role === 'Owner' && (
                   <button onClick={() => handlePayBill(bottomSheet.data.id)} className="w-full bg-emerald-600 text-white py-4 rounded-xl font-black text-[12px] uppercase active:scale-95 shadow-xl border-b-4 border-emerald-800 flex items-center justify-center gap-2">
                     <CheckCircle2 className="w-5 h-5" /> Xác Nhận Đã Thu Tiền
                   </button>
