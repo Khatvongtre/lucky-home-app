@@ -8,7 +8,7 @@ import {
   Activity, Wifi, Boxes, Search, MoreHorizontal, Droplets, Bike, ChevronLeft,
   Upload, Mail, Mic, MicOff, CreditCard, Calendar, Image as ImageIcon, Pencil, Loader2, AlertCircle,
   ChevronDown, Check, LucideEdit, Flame, AlertTriangle, Share2,
-  Edit
+  Edit, Trash2
 } from 'lucide-react';
 
 import { toPng } from 'html-to-image';
@@ -18,7 +18,6 @@ import { toPng } from 'html-to-image';
 // ==========================================
 const API_URL = import.meta.env.VITE_API_URL;
 console.log("API URL:", API_URL);
-//const API_URL = 'http://127.0.0.1:2331/api';
 
 // ==========================================
 // UTILS
@@ -188,48 +187,43 @@ const AuthView = ({ fetchApi, setIsLoggedIn, setUser, showToast }) => {
   );
 };
 
-const AddRoomForm = ({ onSave, editingRoom, sharedHeaters, formatN, parseN }) => {
+const AddRoomForm = ({ onSave, onDelete, editingRoom, sharedHeaters, formatN, parseN }) => {
   const [heaterType, setHeaterType] = useState(editingRoom?.heaterMeterId ? 'shared' : 'private');
-  // Khởi tạo trạng thái dựa trên dữ liệu cũ, mặc định là 'full' nếu là phòng mới
   const [status, setStatus] = useState(editingRoom?.status || 'full');
+  const [roomType, setRoomType] = useState(editingRoom?.roomType || 'room');
 
   return (
     <form onSubmit={onSave} className="space-y-4 text-left">
-      {/* Nút Switch Trạng thái Phòng */}
       <div className="space-y-2">
         <label className="text-[8px] font-black text-slate-400 uppercase px-1">Trạng thái phòng</label>
         <div className="flex p-1 bg-slate-100 rounded-xl gap-1">
-          <button
-            type="button"
-            onClick={() => setStatus('full')}
-            className={`flex-1 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all ${status === 'full'
-              ? 'bg-blue-600 text-white shadow-md'
-              : 'text-slate-400 hover:text-slate-600'
-              }`}
-          >
-            Đã chốt
-          </button>
-          <button
-            type="button"
-            onClick={() => setStatus('empty')}
-            className={`flex-1 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all ${status === 'empty'
-              ? 'bg-red-500 text-white shadow-md'
-              : 'text-slate-400 hover:text-slate-600'
-              }`}
-          >
-            Đang trống
-          </button>
+          <button type="button" onClick={() => setStatus('full')} className={`flex-1 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all ${status === 'full' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>Đã chốt</button>
+          <button type="button" onClick={() => setStatus('empty')} className={`flex-1 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all ${status === 'empty' ? 'bg-red-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>Đang trống</button>
         </div>
-        {/* Input ẩn để truyền giá trị status vào FormData */}
         <input type="hidden" name="status" value={status} />
       </div>
 
       <div className="grid grid-cols-2 gap-3 text-left">
-        <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Mã phòng</label><input name="rid" defaultValue={editingRoom?.roomCode || editingRoom?.id || ''} placeholder="VD: 101" required className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
+        <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Mã phòng / Tên MB</label><input name="rid" defaultValue={editingRoom?.roomCode || editingRoom?.id || ''} required className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
         <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Giá thuê</label><input name="price" type="text" defaultValue={formatN(editingRoom?.price || 0)} required className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-black text-xs outline-none focus:border-blue-600" onInput={(e) => e.target.value = formatN(parseN(e.target.value))} /></div>
       </div>
 
-      {/* Hiển thị thông tin cư dân chỉ khi trạng thái là Đã chốt */}
+      <div className="grid grid-cols-2 gap-3 text-left">
+        <div className="space-y-1">
+          <label className="text-[8px] font-black text-slate-400 uppercase px-1">Loại hình</label>
+          <select name="roomType" value={roomType} onChange={(e) => setRoomType(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600 appearance-none">
+            <option value="room">Phòng trọ</option>
+            <option value="mbkd">Mặt bằng kinh doanh</option>
+          </select>
+        </div>
+        {roomType === 'mbkd' && (
+          <div className="space-y-1 animate-in zoom-in-95">
+            <label className="text-[8px] font-black text-slate-400 uppercase px-1">Phí DV hàng tháng</label>
+            <input name="monthlyFee" type="text" defaultValue={formatN(editingRoom?.monthlyFee || 0)} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-black text-xs outline-none focus:border-blue-600 text-blue-700" onInput={(e) => e.target.value = formatN(parseN(e.target.value))} placeholder="Thu hàng tháng" />
+          </div>
+        )}
+      </div>
+
       <div className={`grid grid-cols-2 gap-3 text-left transition-all duration-300 ${status === 'empty' ? 'opacity-40 grayscale pointer-events-none' : ''}`}>
         <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Số cư dân</label><input name="people" type="number" defaultValue={editingRoom?.peopleCount ?? editingRoom?.people ?? 2} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
         <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Xe điện</label><input name="ebikes" type="number" defaultValue={editingRoom?.eBikeCount ?? editingRoom?.eBikes ?? 0} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
@@ -263,9 +257,16 @@ const AddRoomForm = ({ onSave, editingRoom, sharedHeaters, formatN, parseN }) =>
         </div>
       )}
 
-      <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl mt-4 border-b-4 border-blue-800 active:translate-y-1 transition-all text-center">
-        {status === 'full' ? 'Kích hoạt & Lưu phòng' : 'Lưu trạng thái trống'}
-      </button>
+      <div className="flex gap-2 mt-4">
+        {editingRoom && (
+          <button type="button" onClick={() => onDelete(editingRoom.id, editingRoom.roomCode)} className="flex-1 bg-red-50 text-red-600 py-4 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-sm border-b-4 border-red-200 active:translate-y-1 transition-all text-center">
+            Xóa
+          </button>
+        )}
+        <button type="submit" className="flex-[2] bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl border-b-4 border-blue-800 active:translate-y-1 transition-all text-center">
+          {status === 'full' ? 'Lưu phòng' : 'Lưu phòng trống'}
+        </button>
+      </div>
     </form>
   );
 };
@@ -292,6 +293,7 @@ const App = () => {
   const [isAddRoomModalOpen, setIsAddRoomModalOpen] = useState(false);
   const [editingRoom, setEditingRoom] = useState(null);
   const [isAddTransactionModalOpen, setIsAddTransactionModalOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState(null);
   const [isAddMeterModalOpen, setIsAddMeterModalOpen] = useState(false);
   const [mappingMeter, setMappingMeter] = useState(null);
   const [bottomSheet, setBottomSheet] = useState(null);
@@ -549,6 +551,8 @@ const App = () => {
     const payload = {
       houseId: selectedHouse?.id,
       roomCode: fd.get('rid'),
+      roomType: fd.get('roomType') || 'room', // <-- THÊM MỚI
+      monthlyFee: parseN(fd.get('monthlyFee') || '0'), // <-- THÊM MỚI
       price: parseN(fd.get('price')),
       peopleCount: Number(fd.get('people')),
       people: Number(fd.get('people')),
@@ -571,6 +575,38 @@ const App = () => {
     } catch (e) {
       showToast("Lỗi: " + e.message, "error");
     }
+  };
+
+  const handleDeleteHouse = async (houseId, houseName) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa cơ sở "${houseName}" và TOÀN BỘ dữ liệu liên quan không?`)) return;
+    try {
+      await fetchApi(`/houses/${houseId}`, 'DELETE');
+      setHouses(houses.filter(h => h.id !== houseId));
+      if (selectedHouse?.id === houseId) setSelectedHouse(null);
+      showToast("Đã xóa cơ sở thành công!", "success");
+    } catch (e) { showToast("Lỗi xóa: " + e.message, "error"); }
+  };
+
+  const handleDeleteRoom = async (roomId, roomCode) => {
+    if (!window.confirm(`Bạn có chắc muốn xóa phòng/MBKD "${roomCode}" không?`)) return;
+    try {
+      await fetchApi(`/management/rooms/${roomId}`, 'DELETE');
+      await loadHouseData(selectedHouse?.id);
+      setIsAddRoomModalOpen(false);
+      setEditingRoom(null);
+      showToast("Đã xóa phòng thành công!", "success");
+    } catch (e) { showToast("Lỗi xóa phòng: " + e.message, "error"); }
+  };
+
+  const handleDeleteTransaction = async (txId) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa phiếu thu chi này không?`)) return;
+    try {
+      await fetchApi(`/management/transactions/${txId}`, 'DELETE');
+      await loadHouseData(selectedHouse?.id);
+      setIsAddTransactionModalOpen(false);
+      setEditingTransaction(null);
+      showToast("Đã xóa phiếu thu chi!", "success");
+    } catch (e) { showToast("Lỗi: " + e.message, "error"); }
   };
 
   const handleSaveMeters = async () => {
@@ -646,7 +682,8 @@ const App = () => {
       const bikeCost = (room.eBikeCount ?? room.ebikes ?? 0) * (config.priceEBike || 50000);
       const discount = 0;
 
-      const total = room.price + meterAll.elecRoomCost + meterAll.elecHeaterCost + waterCost + serviceCost + netCost + bikeCost - discount;
+      const monthlyFeeCost = room.roomType === 'mbkd' ? (room.monthlyFee || 0) : 0;
+      const total = room.price + meterAll.elecRoomCost + meterAll.elecHeaterCost + waterCost + serviceCost + netCost + bikeCost + monthlyFeeCost - discount;
 
       return {
         id: 'b-' + Date.now() + Math.random().toString(36).substr(2, 4),
@@ -667,6 +704,7 @@ const App = () => {
           internet: netCost,
           service: serviceCost,
           ebikes: bikeCost,
+          monthlyFee: monthlyFeeCost,
           discount: discount
         }
       };
@@ -780,21 +818,29 @@ const App = () => {
   const handleAddTx = async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
+    const payload = {
+      houseId: selectedHouse?.id,
+      type: fd.get('type'),
+      amount: parseN(fd.get('amount')),
+      category: parseInt(fd.get('category')),
+      note: fd.get('note')
+    };
+
     try {
-      await fetchApi('/management/transactions', 'POST', {
-        id: crypto.randomUUID(),
-        houseId: selectedHouse?.id,
-        type: fd.get('type'),
-        amount: parseN(fd.get('amount')),
-        category: parseInt(fd.get('category')),
-        note: fd.get('note')
-      });
+      if (editingTransaction) {
+        await fetchApi(`/management/transactions/${editingTransaction.id}`, 'PUT', payload);
+        showToast("Đã cập nhật phiếu thu chi!", "success");
+      } else {
+        payload.id = crypto.randomUUID();
+        await fetchApi('/management/transactions', 'POST', payload);
+        showToast("Đã ghi sổ thu chi!", "success");
+      }
       await loadHouseData(selectedHouse?.id);
-      showToast("Đã ghi sổ thu chi!", "success");
       setIsAddTransactionModalOpen(false);
+      setEditingTransaction(null);
     }
     catch (e) {
-      showToast("Đã có lỗi xảy ra ! (" + e.message + ")", "error");
+      showToast("Lỗi: " + e.message, "error");
     }
   };
 
@@ -1282,6 +1328,9 @@ const App = () => {
                         <button onClick={(e) => { e.stopPropagation(); setEditingHouse(h); setIsAiCreateHouseOpen(true); }} className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors">
                           <Edit className="w-3.5 h-3.5" />
                         </button>
+                        <button onClick={(e) => { e.stopPropagation(); handleDeleteHouse(h.id, h.name); }} className="p-1.5 text-slate-400 hover:text-red-600 transition-colors">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     )}
                   </div>
@@ -1648,7 +1697,7 @@ const App = () => {
                   <div key={r.id} className={`bg-white p-2.5 rounded-xl border-2 shadow-sm relative transition-all flex flex-col ${r.status === 'full' ? 'border-blue-100' : 'opacity-70 border-dashed border-slate-200'}`}>
                     <div className="flex justify-between items-center mb-1.5">
                       <span className={`px-2 py-0.5 rounded-md font-black text-[10px] shadow-sm ${r.status === 'full' ? 'bg-blue-600 text-white' : 'bg-red-600 text-white'}`}>
-                        {r.status === 'full' ? `P.${r.roomCode || r.id}` : `P.${r.roomCode || r.id} - TRỐNG`}
+                        {r.roomType === 'mbkd' ? 'MBKD ' : 'P.'}{r.roomCode || r.id} {r.status === 'empty' ? '- TRỐNG' : ''}
                       </span>
                       <button onClick={() => { setEditingRoom(r); setIsAddRoomModalOpen(true); }} className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-white hover:bg-blue-300 hover:text-white active:scale-95 transition-all shadow-sm"><LucideEdit className="w-3 h-3" /></button>
                     </div>
@@ -1957,9 +2006,20 @@ const App = () => {
                       </p>
                     </div>
                   </div>
-                  <p className={`font-black text-sm text-right tabular-nums ${t.type === 'in' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                    {t.type === 'in' ? '+' : '-'}{formatN(t.amount)}
-                  </p>
+                  <div className="flex items-center gap-3">
+                    <p className={`font-black text-sm text-right tabular-nums ${t.type === 'in' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                      {t.type === 'in' ? '+' : '-'}{formatN(t.amount)}
+                    </p>
+                    <button onClick={() => {
+                      setEditingTransaction(t);
+                      setTxType(t.type);
+                      const catKey = Object.keys(TRANSACTION_CATEGORIES).find(k => TRANSACTION_CATEGORIES[k].id === t.category) || 'OTHER';
+                      setSelectedCat(catKey);
+                      setIsAddTransactionModalOpen(true);
+                    }} className="p-1.5 bg-slate-50 text-slate-400 rounded-md hover:text-blue-600 transition-colors">
+                      <Edit className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1998,8 +2058,8 @@ const App = () => {
                 <div className="relative">
                   <input
                     type="text" name="amount" required placeholder="0"
-                    className={`w-full p-4 bg-slate-50 rounded-xl font-black text-2xl outline-none border-2 transition-all shadow-inner tabular-nums ${txType === 'in' ? 'focus:border-emerald-500/30 text-emerald-700' : 'focus:border-rose-500/30 text-rose-700'
-                      }`}
+                    defaultValue={editingTransaction ? formatN(editingTransaction.amount) : ''}
+                    className={`w-full p-4 bg-slate-50 rounded-xl font-black text-2xl outline-none border-2 transition-all shadow-inner tabular-nums ... (giữ nguyên style cũ)`}
                     onInput={(e) => { e.target.value = formatN(parseN(e.target.value)); }}
                   />
                   <span className="absolute right-5 top-1/2 -translate-y-1/2 font-black text-slate-300 text-sm">đ</span>
@@ -2061,18 +2121,20 @@ const App = () => {
                 <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Nội dung chi tiết</label>
                 <textarea
                   name="note" rows="2" placeholder="Ghi chú thêm..."
+                  defaultValue={editingTransaction?.note || ''}
                   className="w-full p-4 bg-slate-50 rounded-xl font-bold text-sm outline-none border-2 border-transparent focus:border-blue-600/20 shadow-inner resize-none"
                 />
               </div>
 
               {/* 5. NÚT XÁC NHẬN */}
-              <div className="pt-3">
-                <button
-                  type="submit"
-                  className={`w-full text-white py-4 rounded-xl font-black uppercase text-[11px] shadow-lg transition-all active:scale-95 border-b-4 ${txType === 'in' ? 'bg-emerald-600 border-emerald-800' : 'bg-rose-600 border-rose-800'
-                    }`}
-                >
-                  Xác nhận
+              <div className="flex gap-2 pt-3">
+                {editingTransaction && (
+                  <button type="button" onClick={() => handleDeleteTransaction(editingTransaction.id)} className="flex-1 bg-red-50 text-red-600 py-4 rounded-xl font-black uppercase text-[11px] shadow-sm active:scale-95 border-b-4 border-red-200">
+                    Xóa
+                  </button>
+                )}
+                <button type="submit" className={`flex-[2] text-white py-4 rounded-xl font-black uppercase text-[11px] shadow-lg transition-all active:scale-95 border-b-4 ${txType === 'in' ? 'bg-emerald-600 border-emerald-800' : 'bg-rose-600 border-rose-800'}`}>
+                  {editingTransaction ? 'Lưu thay đổi' : 'Xác nhận'}
                 </button>
               </div>
 
@@ -2228,6 +2290,9 @@ const App = () => {
                 <div className="flex justify-between items-center text-[12px] font-black"><span className="text-slate-400 uppercase tracking-tighter">Phí dịch vụ</span><span className="text-slate-900">{formatN(bottomSheet.data.details.service || 0)}</span></div>
                 <div className="flex justify-between items-center text-[12px] font-black"><span className="text-slate-400 uppercase tracking-tighter">Internet</span><span className="text-slate-900">{formatN(bottomSheet.data.details.internet)}</span></div>
                 <div className="flex justify-between items-center text-[12px] font-black"><span className="text-slate-400 uppercase tracking-tighter">Phí xe điện</span><span className="text-slate-900">{formatN(bottomSheet.data.details.ebikes)}</span></div>
+                {bottomSheet.data.details.monthlyFee > 0 && (
+                  <div className="flex justify-between items-center text-[12px] font-black"><span className="text-slate-400 uppercase tracking-tighter">Phí DV Hàng tháng (MBKD)</span><span className="text-slate-900">{formatN(bottomSheet.data.details.monthlyFee)}</span></div>
+                )}
                 {/* DÒNG NHẬP GIẢM GIÁ (CHỈ CHỦ TRỌ MỚI SỬA ĐƯỢC KHI HÓA ĐƠN PENDING) */}
                 <div className="flex justify-between items-center text-[12px] font-black">
                   <span className="text-slate-400 uppercase tracking-tighter">Giảm giá</span>
@@ -2366,7 +2431,12 @@ const App = () => {
                       <span className="text-sm font-black text-slate-800">{formatN(item.val)}</span>
                     </div>
                   ))}
-
+                  {bottomSheet.data.details.monthlyFee > 0 && (
+                    <div className="flex justify-between items-center py-3 border-b border-dashed border-slate-200">
+                      <span className="text-[12px] font-bold text-slate-500 uppercase">Phí DV Hàng tháng (MBKD)</span>
+                      <span className="text-sm font-black text-slate-800">{formatN(bottomSheet.data.details.monthlyFee)}</span>
+                    </div>
+                  )}
                   {bottomSheet.data.details.discount > 0 && (
                     <div className="flex justify-between items-center py-3 border-t border-dashed border-slate-200">
                       <span className="text-[12px] font-bold text-red-600 uppercase">Giảm giá</span>
@@ -2409,7 +2479,7 @@ const App = () => {
       {/* MODALS PHỤ TRỢ (Mở bằng nút + ở Quick Menu hoặc Search Bar) */}
       {isAddRoomModalOpen && (
         <Modal title={editingRoom ? "Cập nhật phòng" : "Thêm phòng mới"} onClose={() => setIsAddRoomModalOpen(false)}>
-          <AddRoomForm onSave={handleAddRoom} editingRoom={editingRoom} sharedHeaters={meters.filter(m => m.type === 'heater' && m.houseId === selectedHouse?.id)} formatN={formatN} parseN={parseN} />
+          <AddRoomForm onSave={handleAddRoom} onDelete={handleDeleteRoom} editingRoom={editingRoom} sharedHeaters={meters.filter(m => m.type === 'heater' && m.houseId === selectedHouse?.id)} formatN={formatN} parseN={parseN} />
         </Modal>
       )}
 
