@@ -16,7 +16,9 @@ import { toPng } from 'html-to-image';
 // ==========================================
 // CẤU HÌNH API BACKEND (.NET 8)
 // ==========================================
-const API_URL = 'https://118.69.108.41:2331/api';
+const API_URL = import.meta.env.VITE_API_URL;
+console.log("API URL:", API_URL);
+//const API_URL = 'http://127.0.0.1:2331/api';
 
 // ==========================================
 // UTILS
@@ -149,7 +151,6 @@ const AuthView = ({ fetchApi, setIsLoggedIn, setUser, showToast }) => {
         setIsRegistering(false);
       } else {
         const res = await fetchApi('/auth/login', 'POST', authForm);
-        console.log("Login response:", res);
         localStorage.setItem('smartstay_token', res.token);
         localStorage.setItem('smartstay_user', JSON.stringify(res.user));
         setUser(res.user);
@@ -768,6 +769,8 @@ const App = () => {
           total: billToUpdate.total,
           details: billToUpdate.details
         });
+
+        await loadHouseData(selectedHouse?.id);
       }
     } catch (e) {
       showToast("Đã có lỗi xảy ra ! (" + e.message + ")", "error");
@@ -1498,7 +1501,8 @@ const App = () => {
                       showToast("AI cần thêm thông tin!", "error");
                     } else {
                       // Tạo thành công
-                      setHouses([...houses, res.house]);
+                      const updatedHouses = await fetchApi('/houses', 'GET');
+                      setHouses(updatedHouses);
                       showToast("Phép màu đã xảy ra! Nhà đã được tạo.", "success");
                       setIsAiPromptModalOpen(false);
                       setAiPrompt("");
@@ -2137,7 +2141,7 @@ const App = () => {
         )}
 
         {/* LỖI PHÂN QUYỀN */}
-        {(activeTab === 'finance' || activeTab === 'settings') && user?.role !== 'Owner' && (
+        {(activeTab === 'finance' || activeTab === 'settings') && !isManagerOrAbove && (
           <div className="flex flex-col items-center justify-center h-64 text-center">
             <ShieldCheck className="w-16 h-16 text-slate-300 mb-4" />
             <h3 className="text-lg font-black text-slate-800 uppercase">Không có quyền truy cập</h3>
