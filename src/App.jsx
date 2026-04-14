@@ -8,7 +8,7 @@ import {
   Activity, Wifi, Boxes, Search, MoreHorizontal, Droplets, Bike, ChevronLeft,
   Upload, Mail, Mic, MicOff, CreditCard, Calendar, Image as ImageIcon, Pencil, Loader2, AlertCircle,
   ChevronDown, Check, LucideEdit, Flame, AlertTriangle, Share2,
-  Edit, Trash2
+  Edit, Trash2, ZapOff
 } from 'lucide-react';
 
 import { toPng } from 'html-to-image';
@@ -320,6 +320,13 @@ const App = () => {
 
   // --- OTHER
   const [isOverwriteModalOpen, setIsOverwriteModalOpen] = useState(false);
+  // --- A. STATE QUẢN LÝ ---
+  const [viewDate, setViewDate] = useState(new Date());
+  const [txType, setTxType] = useState('in'); // 'in' hoặc 'out'
+  const [selectedCat, setSelectedCat] = useState('OTHER'); // Lưu KEY
+  const [isCatOpen, setIsCatOpen] = useState(false);
+  const [isMonthOpen, setIsMonthOpen] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState('this-month');
 
   // Hàm hiển thị thông báo với Type (success/error)
   const showToast = useCallback((text, type = 'success') => {
@@ -421,8 +428,11 @@ const App = () => {
   const loadHouseData = useCallback(async (houseId) => {
     try {
       const now = new Date();
-      const month = now.getMonth() + 1;
-      const year = now.getFullYear();
+      const month = viewDate.getMonth() + 1;
+      const year = viewDate.getFullYear();
+
+      setMeters([]);
+      setBills([]);
 
       const h = houses.find(x => x.id === houseId);
       if (h) setConfig({ ...h });
@@ -433,7 +443,7 @@ const App = () => {
       const metersData = await fetchApi(`/management/meters/${houseId}?year=${year}&month=${month}`);
       setMeters(metersData.map(m => ({ ...m, roomIds: JSON.parse(m.roomIdsJson || '[]') })));
 
-      const billsData = await fetchApi(`/management/bills/${houseId}`);
+      const billsData = await fetchApi(`/management/bills/${houseId}?year=${year}&month=${month}`);
       setBills(billsData.map(b => ({
         ...b, roomId: b.roomCode, details: JSON.parse(b.detailsJson || '{}'), meter: JSON.parse(b.meterInfoJson || '{}'), heaterMeter: b.heaterInfoJson ? JSON.parse(b.heaterInfoJson) : null
       })));
@@ -445,12 +455,14 @@ const App = () => {
     } catch (e) {
       showToast(e.message, 'error');
     }
-  }, [houses, fetchApi, user, rooms.length, showToast]);
+  }, [houses, fetchApi, user, rooms.length, showToast, viewDate]);
 
   useEffect(() => {
-    if (selectedHouse) loadHouseData(selectedHouse.id);
-  }, [selectedHouse, loadHouseData]);
-
+    if (selectedHouse) {
+      loadHouseData(selectedHouse.id);
+    }
+  }, [activeTab, selectedHouse?.id, viewDate]);
+  // Thêm activeTab vào dependency để mỗi khi bấm chuyển Tab nó sẽ refresh lại dữ liệu mới nhất từ DB
 
   const handleOpenShare = (e, house) => {
     e.stopPropagation();
@@ -631,15 +643,15 @@ const App = () => {
     } catch (e) { showToast("Lỗi: " + e.message, "error"); }
   };
 
-  const handleSaveMeters = async () => {
+  const handleSaveMetersAndGenerateBills = async () => {
     try {
-      // 1. Lấy thông tin tháng/năm từ state viewDate
+      debugger
       const monthSelected = viewDate.getMonth() + 1;
       const yearSelected = viewDate.getFullYear();
 
-      // 2. Lọc và đóng gói dữ liệu gửi đi
+      // 1. Lọc và đóng gói dữ liệu công tơ để lưu
       const updates = meters
-        .filter(m => (m.newVal !== null && m.newVal !== undefined && m.newVal !== "") || m.type !== 'electric')
+        .filter(m => (m.newVal !== null && m.newVal !== "" && m.newVal !== undefined))
         .map(m => ({
           id: m.id,
           houseId: m.houseId,
@@ -648,20 +660,73 @@ const App = () => {
           oldVal: parseN(String(m.oldVal)),
           newVal: parseN(String(m.newVal)),
           roomIdsJson: JSON.stringify(m.roomIds || []),
-          // TRUYỀN THÊM YEAR/MONTH VÀO ĐÂY
           year: yearSelected,
           month: monthSelected
         }));
 
-      if (updates.length === 0) return showToast("Chưa nhập số mới nào cho " + monthDisplay + "!", "error");
+      if (updates.length === 0) return showToast("Chưa nhập số mới nào!", "error");
 
-      // 3. Gửi lên hệ thống
+      // 2. Gửi lệnh lưu chỉ số công tơ
       await fetchApi('/management/meters/update', 'POST', updates);
 
-      // Tải lại dữ liệu để cập nhật UI
+      // 3. TỰ ĐỘNG LẬP HÓA ĐƠN cho các phòng đã có số mới
+      // Lọc những phòng mà công tơ điện (electric) vừa được cập nhật newVal
+      const updatedMeterIds = updates.map(u => u.id);
+      const roomsToGenerate = rooms.filter(r =>
+        r.status === 'full' &&
+        meters.some(m => m.type === 'electric' && m.roomIds?.includes(r.id) && (m.newVal !== null && m.newVal !== ""))
+      );
+
+      if (roomsToGenerate.length > 0) {
+        const currentMonthFull = viewDate.toLocaleDateString('vi-VN', { month: '2-digit', year: 'numeric' });
+
+        const newBills = roomsToGenerate.map(room => {
+          const meterAll = calcMeterAll(room, meters, rooms, config);
+          const isPerson = config.waterCalcMethod === 'person';
+          const waterCost = isPerson ? (config.priceWaterPerson || 0) * (room.peopleCount || 1) : 0;
+          const serviceCost = (config.priceService || 0) * (room.peopleCount || 1);
+          const netCost = config.priceNet || 0;
+          const bikeCost = (room.eBikeCount || 0) * (config.priceEBike || 0);
+          const monthlyFeeCost = room.roomType === 'mbkd' ? (room.monthlyFee || 0) : 0;
+
+          const total = room.price + meterAll.elecRoomCost + meterAll.elecHeaterCost +
+            waterCost + serviceCost + netCost + bikeCost + monthlyFeeCost;
+
+          return {
+            id: 'b-' + Date.now() + Math.random().toString(36).substr(2, 4),
+            houseId: selectedHouse?.id,
+            roomId: room.roomCode || room.id,
+            month: monthSelected,
+            year: yearSelected,
+            currentMonthFull: currentMonthFull,
+            status: 'pending',
+            total: total,
+            meter: { old: meterAll.meterRoomOld, new: meterAll.meterRoomNew },
+            meterHeater: { old: meterAll.meterHeaterOld, new: meterAll.meterHeaterNew },
+            details: {
+              rent: room.price,
+              elec: meterAll.elecRoomCost,
+              heater: meterAll.elecHeaterCost,
+              water: waterCost,
+              internet: netCost,
+              service: serviceCost,
+              ebikes: bikeCost,
+              monthlyFee: monthlyFeeCost,
+              discount: 0
+            }
+          };
+        });
+
+        // Gửi lệnh tạo hóa đơn hàng loạt (Bulk Update/Insert)
+        await fetchApi('/management/bills/generate-bulk', 'POST', newBills);
+        showToast(`Đã lưu chỉ số & tự động lập ${roomsToGenerate.length} hóa đơn!`, "success");
+      } else {
+        showToast(`Đã lưu chỉ số ${monthDisplay}!`, "success");
+      }
+
+      // 4. Reload dữ liệu để đảm bảo quay lại là có thông tin mới nhất
       await loadHouseData(selectedHouse?.id);
 
-      showToast(`Đã lưu chỉ số ${monthDisplay} lên hệ thống!`, "success");
     } catch (e) {
       showToast("Lỗi: " + e.message, "error");
     }
@@ -1014,8 +1079,7 @@ const App = () => {
     }
   };
 
-  const [isMonthOpen, setIsMonthOpen] = useState(false);
-  const [selectedMonth, setSelectedMonth] = useState('this-month');
+
 
   const monthLabels = {
     'this-month': 'Tháng này',
@@ -1035,11 +1099,7 @@ const App = () => {
     return { rev: totalRev, exp: totalExp, total: rooms.length, empty: rooms.length - full.length, people: full.reduce((s, r) => s + (r.peopleCount ?? r.people ?? 0), 0), ebikes: full.reduce((s, r) => s + (r.eBikeCount ?? r.ebikes ?? 0), 0) };
   }, [rooms, transactions]);
 
-  // --- A. STATE QUẢN LÝ ---
-  const [viewDate, setViewDate] = useState(new Date());
-  const [txType, setTxType] = useState('in'); // 'in' hoặc 'out'
-  const [selectedCat, setSelectedCat] = useState('OTHER'); // Lưu KEY
-  const [isCatOpen, setIsCatOpen] = useState(false);
+
 
   // --- B. LOGIC CHỌN THÁNG ---
 
@@ -1062,33 +1122,33 @@ const App = () => {
   };
 
   // TỰ ĐỘNG tải lại dữ liệu khi viewDate hoặc selectedHouse thay đổi
-  useEffect(() => {
-    const fetchMetersByDate = async () => {
-      if (!selectedHouse?.id) return;
+  // useEffect(() => {
+  //   const fetchMetersByDate = async () => {
+  //     if (!selectedHouse?.id) return;
 
-      const monthSelected = viewDate.getMonth() + 1;
-      const yearSelected = viewDate.getFullYear();
-      const houseIdSelected = selectedHouse.id;
+  //     const monthSelected = viewDate.getMonth() + 1;
+  //     const yearSelected = viewDate.getFullYear();
+  //     const houseIdSelected = selectedHouse.id;
 
-      try {
-        // Gọi API lấy dữ liệu theo tháng/năm đã chọn
-        const metersData = await fetchApi(
-          `/management/meters/${houseIdSelected}?year=${yearSelected}&month=${monthSelected}`
-        );
+  //     try {
+  //       // Gọi API lấy dữ liệu theo tháng/năm đã chọn
+  //       const metersData = await fetchApi(
+  //         `/management/meters/${houseIdSelected}?year=${yearSelected}&month=${monthSelected}`
+  //       );
 
-        // Cập nhật State meters
-        setMeters(metersData.map(m => ({
-          ...m,
-          roomIds: JSON.parse(m.roomIdsJson || '[]')
-        })));
-      } catch (error) {
-        console.error("Lỗi khi tải dữ liệu công tơ:", error);
-        // showToast("Không thể tải dữ liệu tháng này", "error");
-      }
-    };
+  //       // Cập nhật State meters
+  //       setMeters(metersData.map(m => ({
+  //         ...m,
+  //         roomIds: JSON.parse(m.roomIdsJson || '[]')
+  //       })));
+  //     } catch (error) {
+  //       console.error("Lỗi khi tải dữ liệu công tơ:", error);
+  //       // showToast("Không thể tải dữ liệu tháng này", "error");
+  //     }
+  //   };
 
-    fetchMetersByDate();
-  }, [viewDate, selectedHouse?.id]); // Chạy lại mỗi khi đổi tháng hoặc đổi nhà
+  //   fetchMetersByDate();
+  // }, [viewDate, selectedHouse?.id]); // Chạy lại mỗi khi đổi tháng hoặc đổi nhà
 
   // Biến hiển thị
   const monthDisplay = `Tháng ${viewDate.getMonth() + 1}, ${viewDate.getFullYear()}`;
@@ -1792,30 +1852,78 @@ const App = () => {
         )}
 
         {activeTab === 'bills' && (
-          <div className="space-y-4 pb-20 animate-in slide-in-from-bottom">
-            {/* NÚT TẠO HÓA ĐƠN */}
-            {isManagerOrAbove && (
-              <button onClick={handleGenerateClick} className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all">
-                <Receipt className="w-4 h-4 text-white" /> Lập Hóa Đơn Tháng Này
-              </button>
-            )}
+          <div className="space-y-4 pb-20 animate-in fade-in">
 
+            {/* STICKY HEADER: CHỌN THÁNG & THỐNG KÊ */}
+            <div className="sticky top-0 z-30 bg-indigo-600 rounded-xl p-4 space-y-4 shadow-lg">
+              {/* Bộ chọn tháng */}
+              <div className="bg-white p-1 rounded-xl flex items-center">
+                <button onClick={handlePrevMonth} className="p-3 text-indigo-600"><ChevronLeft /></button>
+                <div className="flex-1 text-center font-black uppercase text-xs">Hóa đơn {monthDisplay}</div>
+                <button onClick={handleNextMonth} className="p-3 text-indigo-600"><ChevronRight /></button>
+              </div>
+
+              {/* Box thông số */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="bg-white p-3 rounded-xl text-center">
+                  <p className="text-[7px] font-black text-slate-400 uppercase">Đã lập</p>
+                  <p className="text-sm font-black text-emerald-600">{currentBills.length}/{rooms.filter(r => r.status === 'full').length}</p>
+                </div>
+                <div className="bg-white p-3 rounded-xl text-center">
+                  <p className="text-[7px] font-black text-slate-400 uppercase">Chưa thu</p>
+                  <p className="text-sm font-black text-rose-600">{currentBills.filter(b => b.status !== 'paid').length}</p>
+                </div>
+                <div className="bg-white p-3 rounded-xl text-center">
+                  <p className="text-[7px] font-black text-slate-400 uppercase">Tổng tiền</p>
+                  <p className="text-sm font-black text-indigo-600">{formatN(currentBills.reduce((s, b) => s + b.total, 0))}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* DANH SÁCH HÓA ĐƠN */}
             <div className="space-y-2">
-              {currentBills.length === 0 && <p className="text-xs text-slate-400 italic text-center mt-8">Chưa có hóa đơn nào. Bấm nút phía trên để tự động lập.</p>}
-              {currentBills.map(bill => (
-                <div key={bill.id} onClick={() => setBottomSheet({ type: 'bill', data: bill })} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex items-center justify-between active:scale-95 transition-all cursor-pointer">
-                  <div className="flex items-center space-x-3">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-black ${bill.status === 'paid' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
-                      {bill.status === 'paid' ? <CheckCircle2 className="w-5 h-5" /> : <Receipt className="w-5 h-5" />}
+              {currentBills.length === 0 ? (
+                <div className="py-20 text-center text-slate-400 italic text-xs">
+                  Chưa có hóa đơn nào trong tháng này.
+                </div>
+              ) : (
+                currentBills.map(bill => (
+                  <div
+                    key={bill.id}
+                    onClick={() => setBottomSheet({ type: 'bill', data: bill })}
+                    className={`bg-white p-3.5 rounded-xl border-2 shadow-sm flex items-center justify-between active:scale-[0.98] transition-all cursor-pointer ${bill.status === 'paid' ? 'border-emerald-100/60' : 'border-rose-100'
+                      }`}
+                  >
+                    {/* Box bên trái: Icon + Thông tin phòng */}
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-inner shrink-0 ${bill.status === 'paid' ? 'bg-emerald-50 text-emerald-500' : 'bg-rose-50 text-rose-500'
+                        }`}>
+                        <Receipt className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="text-[12px] font-black uppercase text-slate-800 leading-none mb-1.5">
+                          Phòng {bill.roomId}
+                        </p>
+                        <div className={`text-[8px] font-black px-2 py-0.5 rounded uppercase tracking-wider inline-flex items-center ${bill.status === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                          }`}>
+                          {bill.status === 'paid' ? 'Đã thu tiền' : 'Chưa thu'}
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <p className={`text-sm font-black  uppercase leading-none mb-1 ${bill.status === 'paid' ? 'text-emerald-800' : 'text-red-800'}`}>Phòng {bill.roomId}</p>
-                      <p className={`text-[10px] font-bold uppercase tracking-widest ${bill.status === 'paid' ? 'text-emerald-700' : 'text-red-700'}`}>{formatN(bill.total)} • {bill.status === 'paid' ? 'Đã thu' : 'Chưa thu'}</p>
+
+                    {/* Box bên phải: Tổng tiền */}
+                    <div className="text-right">
+                      <p className={`font-black text-[15px] tracking-tight tabular-nums ${bill.status === 'paid' ? 'text-emerald-600' : 'text-rose-600'
+                        }`}>
+                        {formatN(bill.total)}
+                      </p>
+                      <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                        Tổng cộng
+                      </p>
                     </div>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-slate-200" />
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         )}
@@ -1933,8 +2041,11 @@ const App = () => {
             {/* NÚT LƯU CỐ ĐỊNH Ở DƯỚI */}
             {currentMeters?.length > 0 && (
               <div className="fixed bottom-[4.5rem] left-1/2 -translate-x-1/2 w-full max-w-lg px-4 z-40">
-                <button onClick={handleSaveMeters} className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-[11px] shadow-xl shadow-blue-200 border-b-4 border-blue-800 active:translate-y-1 transition-all">
-                  Xác nhận lưu chỉ số {monthDisplay}
+                <button
+                  onClick={handleSaveMetersAndGenerateBills}
+                  className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-[11px] shadow-xl border-b-4 border-blue-800 active:translate-y-1 transition-all flex items-center justify-center gap-2"
+                >
+                  <Receipt className="w-4 h-4" /> Xác nhận lưu & Lập hóa đơn {monthDisplay}
                 </button>
               </div>
             )}
@@ -2482,7 +2593,7 @@ const App = () => {
                   </div>
                   <div className="w-20 h-20 bg-white rounded-lg border border-slate-200 flex items-center justify-center">
                     <img
-                      src={`https://api.vietqr.io/image/${config.bankBin || '970422'}-${config.bankAcc || '0'}-compact2.jpg?amount=${bottomSheet.data.total}&addInfo=P${bottomSheet.data.roomId}${bottomSheet.data.month}`}
+                      src={`https://api.vietqr.io/image/${config.bankBin || '970422'}-${config.bankAcc || '0'}-compact2.jpg?amount=${bottomSheet.data.total}&addInfo=P${bottomSheet.data.roomId} ${bottomSheet.data.currentMonthFull}`}
                       className="w-full h-full object-contain"
                       crossOrigin="anonymous"
                     />
