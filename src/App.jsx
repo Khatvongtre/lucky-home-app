@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 
 import { toPng } from 'html-to-image';
+import jsQR from 'jsqr';
 
 // ==========================================
 // CẤU HÌNH API BACKEND (.NET 8)
@@ -109,6 +110,59 @@ const TRANSACTION_CATEGORIES = {
   OTHER: { id: 5, label: 'Khác' },
 };
 
+// ==========================================
+// BỘ GIẢI MÃ VIETQR (EMVCo Parser)
+// ==========================================
+const parseVietQR = (qrString) => {
+  let bin = '';
+  let acc = '';
+  try {
+    let idx = 0;
+    while (idx < qrString.length) {
+      const tag = qrString.substring(idx, idx + 2);
+      const len = parseInt(qrString.substring(idx + 2, idx + 4), 10);
+      const val = qrString.substring(idx + 4, idx + 4 + len);
+
+      // Thẻ 38 là Thông tin Tài khoản (Merchant Account Information)
+      if (tag === '38') {
+        let subIdx = 0;
+        while (subIdx < val.length) {
+          const subTag = val.substring(subIdx, subIdx + 2);
+          const subLen = parseInt(val.substring(subIdx + 2, subIdx + 4), 10);
+          const subVal = val.substring(subIdx + 4, subIdx + 4 + subLen);
+
+          // Thẻ 01 bên trong 38 là Tổ chức thụ hưởng (Beneficiary Organization)
+          if (subTag === '01') {
+            let innerIdx = 0;
+            while (innerIdx < subVal.length) {
+              const innerTag = subVal.substring(innerIdx, innerIdx + 2);
+              const innerLen = parseInt(subVal.substring(innerIdx + 2, innerIdx + 4), 10);
+              const innerVal = subVal.substring(innerIdx + 4, innerIdx + 4 + innerLen);
+
+              if (innerTag === '00') bin = innerVal; // Mã BIN Ngân hàng
+              if (innerTag === '01') acc = innerVal; // Số tài khoản
+              innerIdx += 4 + innerLen;
+            }
+          }
+          subIdx += 4 + subLen;
+        }
+      }
+      idx += 4 + len;
+    }
+  } catch (err) { console.error("Lỗi giải mã QR", err); }
+  return { bin, acc };
+};
+
+const getBankNameFromBin = (bin) => {
+  const banks = {
+    '970422': 'MB BANK', '970436': 'VIETCOMBANK', '970407': 'TECHCOMBANK',
+    '970415': 'VIETINBANK', '970418': 'BIDV', '970432': 'VPBANK',
+    '970423': 'TPBANK', '970416': 'ACB', '970403': 'SACOMBANK',
+    '970405': 'AGRIBANK', '970448': 'OCB', '970429': 'SCB',
+    '970414': 'OCEANBANK', '970437': 'HDBANK', '970425': 'ABBANK'
+  };
+  return banks[bin] || 'Ngân hàng khác';
+};
 
 // ==========================================
 // COMPONENTS CON
@@ -340,6 +394,10 @@ const App = () => {
   const currentRole = selectedHouse?.userRole;
   const isOwnerOrAdmin = ['SuperAdmin', 'Owner'].includes(currentRole);
   const isManagerOrAbove = ['SuperAdmin', 'Owner', 'Manager'].includes(currentRole);
+
+  // --- STATE QUÉT QR ---
+  const qrFileRef = useRef(null);
+  const [isScanningQR, setIsScanningQR] = useState(false);
 
   // ==========================================
   // HÀM GỌI API CHUNG VÀ TẤT CẢ CÁC HANDLER KHÁC
@@ -1079,7 +1137,50 @@ const App = () => {
     }
   };
 
+  // --- HÀM XỬ LÝ NHẬN DIỆN ẢNH QR MỚI ---
+  const handleUploadQR = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
+    setIsScanningQR(true);
+    const reader = new FileReader();
+
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        // Vẽ ảnh lên canvas tạm để lấy dữ liệu pixel
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0, img.width, img.height);
+        const imageData = ctx.getImageData(0, 0, img.width, img.height);
+
+        // Quét mã QR
+        const code = jsQR(imageData.data, imageData.width, imageData.height);
+        if (code) {
+          const { bin, acc } = parseVietQR(code.data);
+          if (bin && acc) {
+            setConfig(prev => ({
+              ...prev,
+              bankBin: bin,
+              bankAcc: acc,
+              bankName: getBankNameFromBin(bin)
+            }));
+            showToast("Tuyệt vời! Đã nhận diện thành công mã VietQR.", "success");
+          } else {
+            showToast("QR không đúng chuẩn VietQR hoặc không có số tài khoản.", "error");
+          }
+        } else {
+          showToast("Không thể đọc mã QR. Vui lòng chọn ảnh rõ nét hơn.", "error");
+        }
+        setIsScanningQR(false);
+      };
+      img.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = null; // Reset để có thể up lại cùng 1 ảnh
+  };
 
   const monthLabels = {
     'this-month': 'Tháng này',
@@ -2324,12 +2425,29 @@ const App = () => {
             </div>
 
             <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm space-y-4 text-center">
-              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Thông tin VietQR</h4>
-              <div className="space-y-3 pt-3 border-t border-slate-50 text-left">
-                <div className="flex justify-between items-center"><p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Ngân hàng</p><input type="text" value={config.bankName || ""} onChange={e => setConfig({ ...config, bankName: e.target.value })} placeholder="VD: MB BANK" className="font-black text-slate-700 text-[11px] text-right bg-transparent border-b border-dashed border-slate-300 focus:border-blue-500 outline-none w-1/2" /></div>
-                <div className="flex justify-between items-center"><p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Mã BIN (Tùy chọn)</p><input type="text" value={config.bankBin || "970422"} onChange={e => setConfig({ ...config, bankBin: e.target.value })} className="font-black text-slate-700 text-[11px] text-right bg-transparent border-b border-dashed border-slate-300 focus:border-blue-500 outline-none w-1/2" /></div>
-                <div className="flex justify-between items-center"><p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Số tài khoản</p><input type="text" value={config.bankAcc || ""} onChange={e => setConfig({ ...config, bankAcc: e.target.value })} placeholder="9999..." className="font-black text-blue-600 text-sm tracking-widest text-right bg-transparent border-b border-dashed border-blue-300 focus:border-blue-600 outline-none w-2/3" /></div>
+              {/* HEADER CÓ THÊM NÚT TẢI ẢNH */}
+              <div className="flex items-center justify-between">
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Thông tin VietQR</h4>
+
+                {/* Input file ẩn đi */}
+                <input type="file" accept="image/*" ref={qrFileRef} className="hidden" onChange={handleUploadQR} />
+
+                <button
+                  onClick={() => qrFileRef.current?.click()}
+                  disabled={isScanningQR}
+                  className="bg-indigo-50 text-indigo-600 px-3 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 active:scale-95 transition-all disabled:opacity-50 border border-indigo-100 shadow-sm"
+                >
+                  {isScanningQR ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <QrCode className="w-3.5 h-3.5" />}
+                  {isScanningQR ? "Đang quét..." : "Upload ảnh QR để tự điền"}
+                </button>
               </div>
+
+              <div className="space-y-3 pt-3 border-t border-slate-50 text-left">
+                <div className="flex justify-between items-center"><p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Ngân hàng</p><input type="text" value={config.bankName || ""} onChange={e => setConfig({ ...config, bankName: e.target.value })} placeholder="VD: MB BANK" className="font-black text-slate-700 text-[11px] text-right bg-transparent border-b border-dashed border-slate-300 focus:border-blue-500 outline-none w-1/2 transition-all" /></div>
+                <div className="flex justify-between items-center"><p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Mã BIN</p><input type="text" value={config.bankBin || "970422"} onChange={e => setConfig({ ...config, bankBin: e.target.value })} className="font-black text-slate-700 text-[11px] text-right bg-transparent border-b border-dashed border-slate-300 focus:border-blue-500 outline-none w-1/2 transition-all" /></div>
+                <div className="flex justify-between items-center"><p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Số tài khoản</p><input type="text" value={config.bankAcc || ""} onChange={e => setConfig({ ...config, bankAcc: e.target.value })} placeholder="9999..." className="font-black text-blue-600 text-sm tracking-widest text-right bg-transparent border-b border-dashed border-blue-300 focus:border-blue-600 outline-none w-2/3 transition-all" /></div>
+              </div>
+
               <button onClick={handleSaveConfig} className="w-full bg-blue-600 text-white py-3.5 rounded-lg font-black uppercase text-[9px] shadow-lg flex items-center justify-center gap-2 border-b-4 border-blue-800 active:translate-y-1 transition-all"><Save className="w-3.5 h-3.5" /> Lưu STK VietQR</button>
             </div>
           </div>
