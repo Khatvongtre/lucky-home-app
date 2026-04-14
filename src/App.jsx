@@ -343,6 +343,10 @@ const App = () => {
     setIsLoggedIn(false);
     setUser(null);
     setSelectedHouse(null);
+    // Reset thêm các state dữ liệu để bảo mật
+    setHouses([]);
+    setRooms([]);
+    setBills([]);
   }, []);
 
   const fetchApi = useCallback(async (endpoint, method = 'GET', body = null) => {
@@ -351,21 +355,21 @@ const App = () => {
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
     try {
-      const res = (await fetch(`${API_URL}${endpoint}`, { method, headers, body: body ? JSON.stringify(body) : null }));
-      const result = await res.json();
+      const res = await fetch(`${API_URL}${endpoint}`, { method, headers, body: body ? JSON.stringify(body) : null });
 
+      // Nếu lỗi 401 (Unauthorized) hoặc 403 (Forbidden) - Thường là do hết hạn hoặc token fake
       if (res.status === 401 || res.status === 403) {
-        handleLogout();
-        throw new Error(result.message || "Hết phiên đăng nhập hoặc bạn không có quyền thao tác!");
+        handleLogout(); // Xóa sạch localStorage và reset state
+        const result = await res.json().catch(() => ({}));
+        throw new Error(result.message || "Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.");
       }
 
-      if (!res.ok) {
-        throw new Error(result.message || `Lỗi máy chủ (${res.status})`);
-      }
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.message || `Lỗi máy chủ (${res.status})`);
 
       return result;
     } catch (error) {
-      if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+      if (error.message.includes('Failed to fetch')) {
         throw new Error("Không thể kết nối Backend. Vui lòng kiểm tra Server .NET.");
       }
       throw error;
@@ -376,14 +380,32 @@ const App = () => {
   useEffect(() => {
     const token = localStorage.getItem('smartstay_token');
     const savedUser = localStorage.getItem('smartstay_user');
+
     if (token && savedUser) {
+      // 1. Tạm thời set login từ local
       setUser(JSON.parse(savedUser));
       setIsLoggedIn(true);
+
+      // 2. Kiểm tra "sức khỏe" của token với backend (Tùy chọn nhưng nên có)
+      // Bạn có thể tạo 1 endpoint /auth/me hoặc đơn giản là gọi /houses
+      fetchApi('/houses')
+        .then(data => setHouses(data))
+        .catch(err => {
+          // Nếu lỗi ở đây (thường là 401), fetchApi sẽ tự gọi handleLogout()
+          console.error("Session expired on load");
+        });
+    } else {
+      handleLogout();
     }
+
+    // Load html2canvas...
     if (!window.html2canvas) {
-      const script = document.createElement('script'); script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"; script.async = true; document.body.appendChild(script);
+      const script = document.createElement('script');
+      script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+      script.async = true;
+      document.body.appendChild(script);
     }
-  }, []);
+  }, [fetchApi, handleLogout]); // Thêm các phụ thuộc vào đây
 
   // Lấy danh sách nhà
   useEffect(() => {
