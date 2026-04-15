@@ -1025,25 +1025,29 @@ const App = () => {
   const handleUpdateOldMeterUI = (id, val) => setMeters(prev => prev.map(m => m.id === id ? { ...m, oldVal: val } : m));
   const handleUpdateMeterUI = (id, val) => setMeters(prev => prev.map(m => m.id === id ? { ...m, newVal: val } : m));
 
-  const handleShareZaloImage = async () => {
-    const el = document.getElementById(`receipt-export-template-${bottomSheet.data.id}`);
-    if (!el) return;
+  const handleShareZaloImage = async (billData) => {
+    if (!billData) return;
+    // 2. DÙNG MỘT ID CỐ ĐỊNH DUY NHẤT
+    const el = document.getElementById('hidden-receipt-export');
+
+    if (!el) {
+      showToast("Giao diện chưa sẵn sàng, vui lòng thử lại sau 1 giây", "error");
+      return;
+    }
 
     setIsGeneratingImage(true);
 
     try {
-      await document.fonts.ready;
-      // 1. ÉP BROWSER CHỜ ẢNH QR LOAD XONG 100%
+      // Đợi ảnh QR load xong
       const qrImg = el.querySelector('img');
       if (qrImg && !qrImg.complete) {
         await new Promise((resolve) => {
           qrImg.onload = resolve;
-          qrImg.onerror = resolve; // Lỗi cũng cho đi tiếp để ko bị treo app
+          qrImg.onerror = resolve;
         });
       }
 
-      // 2. Chờ thêm 300ms để DOM ổn định hoàn toàn
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise(r => setTimeout(r, 400)); // Nghỉ 400ms cho DOM ổn định
 
       let canvas = null;
 
@@ -2582,7 +2586,7 @@ const App = () => {
               </div>
 
               <div className="grid grid-cols-1 gap-4">
-                <button disabled={isGeneratingImage} onClick={() => handleShareZaloImage()} className="w-full bg-[#0068FF] text-white py-4 rounded-xl font-black text-[12px] uppercase shadow-xl active:scale-95 border-b-4 border-[#004BBF] flex items-center justify-center gap-2 transition-all disabled:opacity-70">
+                <button disabled={isGeneratingImage} onClick={() => handleShareZaloImage(bottomSheet.data)} className="w-full bg-[#0068FF] text-white py-4 rounded-xl font-black text-[12px] uppercase shadow-xl active:scale-95 border-b-4 border-[#004BBF] flex items-center justify-center gap-2 transition-all disabled:opacity-70">
                   {isGeneratingImage ? <Loader2 className="w-5 h-5 animate-spin" /> : <ImageIcon className="w-5 h-5" />}
                   {isGeneratingImage ? 'ĐANG TẠO ẢNH...' : 'COPY ẢNH CHO ZALO'}
                 </button>
@@ -2601,21 +2605,23 @@ const App = () => {
       {/* --- TEMPLATE ẨN: RENDER ẢNH HÓA ĐƠN Y HỆT THIẾT KẾ ĐỂ XUẤT RA CLIPBOARD --- */}
       {bottomSheet && bottomSheet.type === 'bill' && (
         <div
-          key={`wrapper-${bottomSheet.data.id}`}
+          // 🔥 KEY CỰC KỲ QUAN TRỌNG: Ép React xóa sạch HTML cũ khi đổi phòng
+          key={bottomSheet.data.id}
+
           style={{
-            position: 'absolute', // Thay vì fixed
+            position: 'absolute',
             top: 0,
             left: 0,
-            zIndex: -100, // Nằm chìm dưới giao diện hiện tại
-            opacity: 0.01, // Gần như trong suốt nhưng trình duyệt vẫn bắt buộc phải vẽ
+            zIndex: -100,
+            opacity: 0.01,
             pointerEvents: 'none',
           }}
         >
           <div
-            id={`receipt-export-template-${bottomSheet.data.id}`}
+            id="hidden-receipt-export"
             style={{
               width: 420,
-              background: '#ffffff', // Ép nền trắng
+              background: '#ffffff',
               fontFamily: 'Arial, Helvetica, sans-serif',
               WebkitFontSmoothing: 'antialiased',
             }}
