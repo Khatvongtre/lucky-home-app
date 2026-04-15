@@ -1033,7 +1033,7 @@ const App = () => {
 
     try {
       await document.fonts.ready;
-      await new Promise(r => setTimeout(r, 150)); // 🔥 fix font
+      await new Promise(r => setTimeout(r, 800)); // 🔥 fix font
 
       let canvas = null;
 
@@ -2588,6 +2588,7 @@ const App = () => {
       {/* --- TEMPLATE ẨN: RENDER ẢNH HÓA ĐƠN Y HỆT THIẾT KẾ ĐỂ XUẤT RA CLIPBOARD --- */}
       {bottomSheet && bottomSheet.type === 'bill' && (
         <div
+          key={`wrapper-${bottomSheet.data.id}`}
           style={{
             position: 'fixed',
             top: '-9999px',
@@ -2711,11 +2712,9 @@ const App = () => {
                   </div>
                   <div className="w-20 h-20 bg-white rounded-lg border border-slate-200 flex items-center justify-center">
                     <img
-                      // 1. Thêm key để React XÓA NGAY ảnh cũ khi bạn chuyển phòng
-                      key={bottomSheet.data.id}
-
-                      // 2. Thêm encodeURIComponent để bọc các dấu cách, dấu tiếng Việt lại (nếu có)
-                      src={`https://api.vietqr.io/image/${config.bankBin || '970422'}-${config.bankAcc || '0'}-compact2.jpg?amount=${bottomSheet.data.total}&addInfo=${encodeURIComponent(`P${bottomSheet.data.roomCode} ${bottomSheet.data.currentMonthFull}`)}`}
+                      key={`qr-${bottomSheet.data.id}`}
+                      // 🔴 ĐÃ THÊM: &time=${Date.now()} vào cuối đường link
+                      src={`https://api.vietqr.io/image/${config.bankBin || '970422'}-${config.bankAcc || '0'}-compact2.jpg?amount=${bottomSheet.data.total}&addInfo=${encodeURIComponent(`P${bottomSheet.data.roomCode} ${bottomSheet.data.currentMonthFull}`)}&time=${Date.now()}`}
 
                       className="w-full h-full object-contain"
                       crossOrigin="anonymous"
