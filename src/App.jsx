@@ -1026,7 +1026,7 @@ const App = () => {
   const handleUpdateMeterUI = (id, val) => setMeters(prev => prev.map(m => m.id === id ? { ...m, newVal: val } : m));
 
   const handleShareZaloImage = async () => {
-    const el = document.getElementById('receipt-export-template');
+    const el = document.getElementById(`receipt-export-template-${bottomSheet.data.id}`);
     if (!el) return;
 
     setIsGeneratingImage(true);
@@ -2596,7 +2596,7 @@ const App = () => {
           }}
         >
           <div
-            id="receipt-export-template"
+            id={`receipt-export-template-${bottomSheet.data.id}`}
             style={{
               width: 420,
               background: 'transparent',
@@ -2711,7 +2711,12 @@ const App = () => {
                   </div>
                   <div className="w-20 h-20 bg-white rounded-lg border border-slate-200 flex items-center justify-center">
                     <img
-                      src={`https://api.vietqr.io/image/${config.bankBin || '970422'}-${config.bankAcc || '0'}-compact2.jpg?amount=${bottomSheet.data.total}&addInfo=P${bottomSheet.data.roomId} ${bottomSheet.data.currentMonthFull}`}
+                      // 1. Thêm key để React XÓA NGAY ảnh cũ khi bạn chuyển phòng
+                      key={bottomSheet.data.id}
+
+                      // 2. Thêm encodeURIComponent để bọc các dấu cách, dấu tiếng Việt lại (nếu có)
+                      src={`https://api.vietqr.io/image/${config.bankBin || '970422'}-${config.bankAcc || '0'}-compact2.jpg?amount=${bottomSheet.data.total}&addInfo=${encodeURIComponent(`P${bottomSheet.data.roomCode} ${bottomSheet.data.currentMonthFull}`)}`}
+
                       className="w-full h-full object-contain"
                       crossOrigin="anonymous"
                     />
