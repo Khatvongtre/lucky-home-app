@@ -1033,16 +1033,29 @@ const App = () => {
 
     try {
       await document.fonts.ready;
-      await new Promise(r => setTimeout(r, 800)); // 🔥 fix font
+      // 1. ÉP BROWSER CHỜ ẢNH QR LOAD XONG 100%
+      const qrImg = el.querySelector('img');
+      if (qrImg && !qrImg.complete) {
+        await new Promise((resolve) => {
+          qrImg.onload = resolve;
+          qrImg.onerror = resolve; // Lỗi cũng cho đi tiếp để ko bị treo app
+        });
+      }
+
+      // 2. Chờ thêm 300ms để DOM ổn định hoàn toàn
+      await new Promise(r => setTimeout(r, 300));
 
       let canvas = null;
 
-      // ===== ƯU TIÊN: toPng =====
+      // 3. ƯU TIÊN: toPng với cấu hình ép nền trắng và bật sáng
       try {
         const dataUrl = await toPng(el, {
-          pixelRatio: 2.5, // 🔥 giảm xuống
+          pixelRatio: 2.5,
           cacheBust: true,
-          backgroundColor: null, // 🔥 trong suốt
+          backgroundColor: '#ffffff', // Bắt buộc để tránh viền đen
+          style: {
+            opacity: '1' // Trả lại độ sáng cho ảnh được chụp
+          }
         });
 
         const img = new Image();
@@ -2590,9 +2603,11 @@ const App = () => {
         <div
           key={`wrapper-${bottomSheet.data.id}`}
           style={{
-            position: 'fixed',
-            top: '-9999px',
-            left: '-9999px',
+            position: 'absolute', // Thay vì fixed
+            top: 0,
+            left: 0,
+            zIndex: -100, // Nằm chìm dưới giao diện hiện tại
+            opacity: 0.01, // Gần như trong suốt nhưng trình duyệt vẫn bắt buộc phải vẽ
             pointerEvents: 'none',
           }}
         >
@@ -2600,7 +2615,7 @@ const App = () => {
             id={`receipt-export-template-${bottomSheet.data.id}`}
             style={{
               width: 420,
-              background: 'transparent',
+              background: '#ffffff', // Ép nền trắng
               fontFamily: 'Arial, Helvetica, sans-serif',
               WebkitFontSmoothing: 'antialiased',
             }}
@@ -2713,9 +2728,7 @@ const App = () => {
                   <div className="w-20 h-20 bg-white rounded-lg border border-slate-200 flex items-center justify-center">
                     <img
                       key={`qr-${bottomSheet.data.id}`}
-                      // 🔴 ĐÃ THÊM: &time=${Date.now()} vào cuối đường link
-                      src={`https://api.vietqr.io/image/${config.bankBin || '970422'}-${config.bankAcc || '0'}-compact2.jpg?amount=${bottomSheet.data.total}&addInfo=${encodeURIComponent(`P${bottomSheet.data.roomCode} ${bottomSheet.data.currentMonthFull}`)}&time=${Date.now()}`}
-
+                      src={`https://api.vietqr.io/image/${config.bankBin || '970422'}-${config.bankAcc || '0'}-compact2.jpg?amount=${bottomSheet.data.total}&addInfo=${encodeURIComponent(`P${bottomSheet.data.roomCode} ${bottomSheet.data.currentMonthFull}`)}&nocache=${Math.random()}`}
                       className="w-full h-full object-contain"
                       crossOrigin="anonymous"
                     />
