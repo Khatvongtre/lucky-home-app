@@ -1027,8 +1027,8 @@ const App = () => {
 
   const handleShareZaloImage = async (billData) => {
     if (!billData) return;
-    // 2. DÙNG MỘT ID CỐ ĐỊNH DUY NHẤT
-    const el = document.getElementById('hidden-receipt-export');
+    // Dùng ID động theo id hóa đơn để tránh trùng lặp DOM khi chụp ảnh
+    const el = document.getElementById(`hidden-receipt-export-${billData.id}`);
 
     if (!el) {
       showToast("Giao diện chưa sẵn sàng, vui lòng thử lại sau 1 giây", "error");
@@ -2618,7 +2618,7 @@ const App = () => {
           }}
         >
           <div
-            id="hidden-receipt-export"
+            id={`hidden-receipt-export-${bottomSheet.data.id}`}
             style={{
               width: 420,
               background: '#ffffff',
