@@ -1217,6 +1217,29 @@ const App = () => {
     return { rev: totalRev, exp: totalExp, total: rooms.length, empty: rooms.length - full.length, people: full.reduce((s, r) => s + (r.peopleCount ?? r.people ?? 0), 0), ebikes: full.reduce((s, r) => s + (r.eBikeCount ?? r.ebikes ?? 0), 0) };
   }, [rooms, transactions]);
 
+  const shouldShowMeterBanner = useMemo(() => {
+    if (!rooms || rooms.length === 0) return false;
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+
+    return rooms.some(r => {
+      if (r.status !== 'full' || !r.paymentDate) return false;
+      const pd = Number(r.paymentDate);
+      if (isNaN(pd)) return false;
+
+      const dates = [
+        new Date(now.getFullYear(), now.getMonth() - 1, pd),
+        new Date(now.getFullYear(), now.getMonth(), pd),
+        new Date(now.getFullYear(), now.getMonth() + 1, pd)
+      ];
+
+      return dates.some(d => {
+        const diffDays = Math.round((now - d) / (1000 * 60 * 60 * 24));
+        return diffDays >= -1 && diffDays <= 3;
+      });
+    });
+  }, [rooms]);
+
 
 
   // --- B. LOGIC CHỌN THÁNG ---
@@ -1833,13 +1856,15 @@ const App = () => {
         {/* --- TỔNG QUAN --- */}
         {activeTab === 'dashboard' && (
           <div className="space-y-4 animate-in fade-in duration-500 pb-10">
-            <div className="bg-gradient-to-r from-orange-500 to-red-500 p-4 rounded-xl text-white shadow-lg flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="p-2 bg-white/20 rounded-lg"><Zap className="w-5 h-5" /></div>
-                <div><p className="font-black text-sm uppercase">Đến hạn chốt điện</p><p className="text-[9px] font-bold opacity-90">Kỳ chốt công tơ điện tháng này</p></div>
+            {shouldShowMeterBanner && (
+              <div className="bg-gradient-to-r from-orange-500 to-red-500 p-4 rounded-xl text-white shadow-lg flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-white/20 rounded-lg"><Zap className="w-5 h-5" /></div>
+                  <div><p className="font-black text-sm uppercase">Đến hạn chốt điện</p><p className="text-[9px] font-bold opacity-90">Kỳ chốt công tơ điện tháng này</p></div>
+                </div>
+                <button onClick={() => setActiveTab('meters_list')} className="px-4 py-2 bg-white text-orange-600 rounded-lg font-black text-[10px] active:scale-95 shadow-md">Ghi Số</button>
               </div>
-              <button onClick={() => setActiveTab('meters_list')} className="px-4 py-2 bg-white text-orange-600 rounded-lg font-black text-[10px] active:scale-95 shadow-md">Ghi Số</button>
-            </div>
+            )}
 
             <div className="grid grid-cols-4 gap-2 text-center">
               <div className="bg-white p-2 rounded-xl border border-slate-100 shadow-sm flex flex-col items-center"><p className="text-[13px] font-black text-blue-600">{stats.total}</p><p className="text-[7px] font-bold text-slate-400 uppercase mt-1">Phòng</p></div>
@@ -2486,7 +2511,9 @@ const App = () => {
         <div className="bg-white border-t border-slate-100 h-14 flex items-center justify-around px-2 pointer-events-auto shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
           {[
             { id: 'dashboard', icon: LayoutDashboard, label: 'Trang chủ' },
-            { id: 'rooms', icon: Home, label: 'Phòng' },
+            shouldShowMeterBanner 
+              ? { id: 'meters_list', icon: Boxes, label: 'Chốt số' } 
+              : { id: 'rooms', icon: Home, label: 'Phòng' },
             { id: 'spacer', icon: null, label: '' },
             { id: 'bills', icon: FileText, label: 'Hóa đơn' },
             { id: 'finance', icon: Wallet, label: 'Thu Chi', hidden: !isManagerOrAbove },
@@ -2510,8 +2537,11 @@ const App = () => {
           <div className="grid grid-cols-3 gap-6">
             {[
               { label: 'Thêm Phòng', icon: UserCheck, color: 'text-emerald-600 bg-emerald-50', action: () => { setEditingRoom(null); setIsAddRoomModalOpen(true); setShowQuickMenu(false); } },
-              { label: 'Chốt số điện', icon: Boxes, color: 'text-orange-600 bg-orange-50', action: () => { setActiveTab('meters_list'); setShowQuickMenu(false); } },
+              shouldShowMeterBanner
+                ? { label: 'Phòng', icon: Home, color: 'text-blue-600 bg-blue-50', action: () => { setActiveTab('rooms'); setShowQuickMenu(false); } }
+                : { label: 'Chốt số điện', icon: Boxes, color: 'text-orange-600 bg-orange-50', action: () => { setActiveTab('meters_list'); setShowQuickMenu(false); } },
               { label: 'Hóa Đơn', icon: Receipt, color: 'text-purple-600 bg-purple-50', action: () => { setActiveTab('bills'); setShowQuickMenu(false); } },
+              { label: 'AI Chat', icon: Sparkles, color: 'text-indigo-600 bg-indigo-50', action: () => { setActiveTab('ai'); setShowQuickMenu(false); } },
               { label: 'Thu chi', icon: CircleDollarSign, color: 'text-rose-600 bg-rose-50', action: () => { setIsAddTransactionModalOpen(true); setShowQuickMenu(false); }, hidden: user?.role !== 'Owner' },
               { label: 'Cài Đặt', icon: Settings, color: 'text-slate-600 bg-slate-50', action: () => { setActiveTab('settings'); setShowQuickMenu(false); }, hidden: user?.role !== 'Owner' },
               { label: 'Đăng Xuất', icon: LogOut, color: 'text-red-600 bg-red-50', action: () => handleLogout() }
