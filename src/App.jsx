@@ -2620,7 +2620,10 @@ const App = () => {
           <div
             id={`hidden-receipt-export-${bottomSheet.data.id}`}
             style={{
-              width: 420,
+              // 🔥 HACK: Thêm một số thập phân siêu nhỏ ngẫu nhiên vào width
+              // Để bẻ khóa (bust) lỗi cache SVG/Canvas cực kỳ cứng đầu của trình duyệt (đặc biệt Safari/iOS và Chrome)
+              // Lỗi này khiến html-to-image trả về ảnh cũ nếu kích thước DOM hoàn toàn giống nhau!
+              width: 420 + Math.random() * 0.01,
               background: '#ffffff',
               fontFamily: 'Arial, Helvetica, sans-serif',
               WebkitFontSmoothing: 'antialiased',
