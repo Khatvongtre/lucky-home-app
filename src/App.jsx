@@ -193,6 +193,7 @@ const ToastNotification = ({ toast }) => {
 
 const AuthView = ({ fetchApi, setIsLoggedIn, setUser, showToast }) => {
   const [isRegistering, setIsRegistering] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [authForm, setAuthForm] = useState({ fullName: '', username: '', password: '' });
 
   const handleAuth = async (e, type) => {
@@ -202,6 +203,10 @@ const AuthView = ({ fetchApi, setIsLoggedIn, setUser, showToast }) => {
         await fetchApi('/auth/register', 'POST', authForm);
         showToast("Đăng ký thành công! Vui lòng đăng nhập.", "success");
         setIsRegistering(false);
+      } else if (type === 'forgot') {
+        await fetchApi('/auth/forgot-password', 'POST', { username: authForm.username });
+        showToast("Đã gửi yêu cầu khôi phục mật khẩu. Vui lòng kiểm tra email/SĐT.", "success");
+        setIsForgotPassword(false);
       } else {
         const res = await fetchApi('/auth/login', 'POST', authForm);
         localStorage.setItem('smartstay_token', res.token);
@@ -211,7 +216,7 @@ const AuthView = ({ fetchApi, setIsLoggedIn, setUser, showToast }) => {
       }
     } catch (error) {
       console.log("Auth error:", error);
-      showToast(error.message || "Lỗi đăng nhập/đăng ký", "error");
+      showToast(error.message || "Lỗi xác thực", "error");
     }
   };
 
@@ -223,20 +228,42 @@ const AuthView = ({ fetchApi, setIsLoggedIn, setUser, showToast }) => {
       <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 tracking-tighter uppercase mb-2">Lucky Home</h1>
       <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-10">Quản lý trọ toàn diện</p>
 
-      <form className="space-y-3 text-left animate-in slide-in-from-bottom" onSubmit={(e) => handleAuth(e, isRegistering ? 'register' : 'login')}>
-        {isRegistering && (
-          <div className="relative group"><User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" /><input type="text" placeholder="Họ và tên" className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-600 shadow-sm" value={authForm.fullName} onChange={e => setAuthForm({ ...authForm, fullName: e.target.value })} required /></div>
-        )}
-        <div className="relative group"><Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" /><input type="text" placeholder="SĐT / Tên đăng nhập" className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-600 shadow-sm" value={authForm.username} onChange={e => setAuthForm({ ...authForm, username: e.target.value })} required /></div>
-        <div className="relative group"><Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" /><input type="password" placeholder="Mật khẩu" className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-600 shadow-sm" value={authForm.password} onChange={e => setAuthForm({ ...authForm, password: e.target.value })} required /></div>
+      {isForgotPassword ? (
+        <form className="space-y-3 text-left animate-in slide-in-from-bottom" onSubmit={(e) => handleAuth(e, 'forgot')}>
+          <p className="text-xs text-slate-500 mb-4 font-medium text-center">Vui lòng nhập SĐT/Tên đăng nhập để nhận lại mật khẩu.</p>
+          <div className="relative group"><Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" /><input type="text" placeholder="SĐT / Tên đăng nhập" className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-600 shadow-sm" value={authForm.username} onChange={e => setAuthForm({ ...authForm, username: e.target.value })} required /></div>
 
-        <button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-4 rounded-xl font-black uppercase text-xs shadow-xl active:scale-95 transition-all mt-4 border-b-4 border-indigo-800 text-center">
-          {isRegistering ? "Tạo Tài Khoản" : "Đăng Nhập"}
-        </button>
-        <button type="button" onClick={() => setIsRegistering(!isRegistering)} className="w-full text-[10px] font-black text-slate-400 uppercase tracking-widest py-3 text-center hover:text-blue-600 transition-colors">
-          {isRegistering ? "Đã có tài khoản? Đăng nhập" : "Chưa có tài khoản? Đăng ký"}
-        </button>
-      </form>
+          <button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-4 rounded-xl font-black uppercase text-xs shadow-xl active:scale-95 transition-all mt-4 border-b-4 border-indigo-800 text-center">
+            Gửi yêu cầu
+          </button>
+          <button type="button" onClick={() => setIsForgotPassword(false)} className="w-full text-[10px] font-black text-slate-400 uppercase tracking-widest py-3 text-center hover:text-blue-600 transition-colors">
+            Quay lại Đăng nhập
+          </button>
+        </form>
+      ) : (
+        <form className="space-y-3 text-left animate-in slide-in-from-bottom" onSubmit={(e) => handleAuth(e, isRegistering ? 'register' : 'login')}>
+          {isRegistering && (
+            <div className="relative group"><User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" /><input type="text" placeholder="Họ và tên" className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-600 shadow-sm" value={authForm.fullName} onChange={e => setAuthForm({ ...authForm, fullName: e.target.value })} required /></div>
+          )}
+          <div className="relative group"><Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" /><input type="text" placeholder="SĐT / Tên đăng nhập" className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-600 shadow-sm" value={authForm.username} onChange={e => setAuthForm({ ...authForm, username: e.target.value })} required /></div>
+          <div className="relative group"><Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" /><input type="password" placeholder="Mật khẩu" className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-600 shadow-sm" value={authForm.password} onChange={e => setAuthForm({ ...authForm, password: e.target.value })} required /></div>
+
+          {!isRegistering && (
+            <div className="text-right">
+              <button type="button" onClick={() => setIsForgotPassword(true)} className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:underline transition-all">
+                Quên mật khẩu?
+              </button>
+            </div>
+          )}
+
+          <button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-4 rounded-xl font-black uppercase text-xs shadow-xl active:scale-95 transition-all mt-4 border-b-4 border-indigo-800 text-center">
+            {isRegistering ? "Tạo Tài Khoản" : "Đăng Nhập"}
+          </button>
+          <button type="button" onClick={() => setIsRegistering(!isRegistering)} className="w-full text-[10px] font-black text-slate-400 uppercase tracking-widest py-3 text-center hover:text-blue-600 transition-colors">
+            {isRegistering ? "Đã có tài khoản? Đăng nhập" : "Chưa có tài khoản? Đăng ký"}
+          </button>
+        </form>
+      )}
     </div>
   );
 };
@@ -332,6 +359,7 @@ const App = () => {
   // --- Auth State ---
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
+  const [changePasswordForm, setChangePasswordForm] = useState({ oldPassword: '', newPassword: '' });
 
   // --- App State ---
   const [selectedHouse, setSelectedHouse] = useState(null);
@@ -413,6 +441,31 @@ const App = () => {
     setRooms([]);
     setBills([]);
   }, []);
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    if (changePasswordForm.newPassword !== changePasswordForm.confirmNewPassword) {
+      showToast("Mật khẩu mới không khớp!", "error");
+      return;
+    }
+    try {
+      const currentUsername = user?.username || user?.userName || user?.Username;
+      if (!currentUsername) {
+        showToast("Lỗi: Không tìm thấy Username trong phiên đăng nhập. Vui lòng đăng nhập lại!", "error");
+        return;
+      }
+
+      await fetchApi('/auth/change-password', 'POST', {
+        username: currentUsername,
+        oldPassword: changePasswordForm.oldPassword,
+        newPassword: changePasswordForm.newPassword
+      });
+      showToast("Đổi mật khẩu thành công!", "success");
+      setChangePasswordForm({ oldPassword: '', newPassword: '', confirmNewPassword: '' });
+    } catch (error) {
+      showToast(error.message || "Lỗi khi đổi mật khẩu", "error");
+    }
+  };
 
   const fetchApi = useCallback(async (endpoint, method = 'GET', body = null) => {
     const token = localStorage.getItem('smartstay_token');
@@ -1521,7 +1574,7 @@ const App = () => {
                 <div key={h.id} className={`w-full p-2.5 rounded-xl border shadow-sm active:scale-[0.99] transition-all text-left relative mb-2 ${cardStyle}`}>
                   <div className="flex items-start justify-between mb-2">
                     <button
-                      onClick={() => { setSelectedHouse(h); setActiveTab('dashboard'); setSearchQuery(''); }}
+                      onClick={() => { setSelectedHouse(h); setSearchQuery(''); }}
                       className="flex-1 flex items-center space-x-2 text-left overflow-hidden"
                     >
                       <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 shadow-inner ${isUrgentPay ? 'bg-red-100 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
@@ -2492,6 +2545,25 @@ const App = () => {
 
               <button onClick={handleSaveConfig} className="w-full bg-blue-600 text-white py-3.5 rounded-lg font-black uppercase text-[9px] shadow-lg flex items-center justify-center gap-2 border-b-4 border-blue-800 active:translate-y-1 transition-all"><Save className="w-3.5 h-3.5" /> Lưu STK VietQR</button>
             </div>
+
+            <form onSubmit={handleChangePassword} className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm space-y-4">
+              <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-widest decoration-rose-600 decoration-2 mb-2">Đổi Mật Khẩu</h4>
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <label className="text-[8px] font-black text-slate-400 uppercase px-1">Mật khẩu cũ</label>
+                  <input type="password" value={changePasswordForm.oldPassword || ''} onChange={e => setChangePasswordForm({ ...changePasswordForm, oldPassword: e.target.value })} className="w-full bg-slate-50 p-2.5 rounded-lg font-bold text-xs outline-none focus:border-rose-600 border border-transparent" required />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[8px] font-black text-slate-400 uppercase px-1">Mật khẩu mới</label>
+                  <input type="password" value={changePasswordForm.newPassword || ''} onChange={e => setChangePasswordForm({ ...changePasswordForm, newPassword: e.target.value })} className="w-full bg-slate-50 p-2.5 rounded-lg font-bold text-xs outline-none focus:border-rose-600 border border-transparent" required />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[8px] font-black text-slate-400 uppercase px-1">Xác nhận mật khẩu mới</label>
+                  <input type="password" value={changePasswordForm.confirmNewPassword || ''} onChange={e => setChangePasswordForm({ ...changePasswordForm, confirmNewPassword: e.target.value })} className="w-full bg-slate-50 p-2.5 rounded-lg font-bold text-xs outline-none focus:border-rose-600 border border-transparent" required />
+                </div>
+              </div>
+              <button type="submit" className="w-full bg-rose-600 text-white py-3.5 rounded-lg font-black uppercase text-[9px] shadow-lg flex items-center justify-center gap-2 border-b-4 border-rose-800 active:translate-y-1 transition-all"><Lock className="w-3.5 h-3.5" /> Xác Nhận Đổi Mật Khẩu</button>
+            </form>
           </div>
         )}
 
@@ -2511,8 +2583,8 @@ const App = () => {
         <div className="bg-white border-t border-slate-100 h-14 flex items-center justify-around px-2 pointer-events-auto shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
           {[
             { id: 'dashboard', icon: LayoutDashboard, label: 'Trang chủ' },
-            shouldShowMeterBanner 
-              ? { id: 'meters_list', icon: Boxes, label: 'Chốt số' } 
+            shouldShowMeterBanner
+              ? { id: 'meters_list', icon: Boxes, label: 'Chốt số' }
               : { id: 'rooms', icon: Home, label: 'Phòng' },
             { id: 'spacer', icon: null, label: '' },
             { id: 'bills', icon: FileText, label: 'Hóa đơn' },
