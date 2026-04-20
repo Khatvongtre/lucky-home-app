@@ -389,6 +389,7 @@ const App = () => {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [sharingHouse, setSharingHouse] = useState(null);
   const [assignForm, setAssignForm] = useState({ username: '', role: 'Manager' });
+  const [selectedStatsHouses, setSelectedStatsHouses] = useState([]);
 
   // --- Real Data State ---
   const [houses, setHouses] = useState([]);
@@ -1434,7 +1435,11 @@ const App = () => {
       h.address?.toLowerCase().includes(houseSearchQuery.toLowerCase())
     );
 
-    const houseStats = houses.reduce((acc, h) => {
+    const housesForStats = selectedStatsHouses.length > 0
+      ? houses.filter(h => selectedStatsHouses.includes(h.id))
+      : houses;
+
+    const houseStats = housesForStats.reduce((acc, h) => {
       acc.totalHouses += 1;
       acc.totalRooms += (h.totalRooms || 0);
       acc.emptyRooms += (h.emptyRooms || 0);
@@ -1573,6 +1578,20 @@ const App = () => {
               return (
                 <div key={h.id} className={`w-full p-2.5 rounded-xl border shadow-sm active:scale-[0.99] transition-all text-left relative mb-2 ${cardStyle}`}>
                   <div className="flex items-start justify-between mb-2">
+                    <div className="mr-2 flex items-center h-8" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-600 cursor-pointer"
+                        checked={selectedStatsHouses.includes(h.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedStatsHouses([...selectedStatsHouses, h.id]);
+                          } else {
+                            setSelectedStatsHouses(selectedStatsHouses.filter(id => id !== h.id));
+                          }
+                        }}
+                      />
+                    </div>
                     <button
                       onClick={() => { setSelectedHouse(h); setSearchQuery(''); }}
                       className="flex-1 flex items-center space-x-2 text-left overflow-hidden"
@@ -2497,32 +2516,42 @@ const App = () => {
         {/* --- CÀI ĐẶT --- */}
         {activeTab === 'settings' && isOwnerOrAdmin && (
           <div className="space-y-4 animate-in fade-in pb-20">
-            <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm flex items-center space-x-4 mb-2">
-              <div className="w-12 h-12 rounded-full bg-blue-600 border-4 border-white shadow-lg flex items-center justify-center text-white"><User className="w-6 h-6" /></div>
-              <div><h3 className="font-black text-sm uppercase text-slate-800 leading-none">{user.fullName || 'ADMIN'}</h3><p className="text-[8px] font-black text-blue-600 uppercase tracking-widest mt-1.5 bg-blue-50 px-3 py-0.5 rounded-full w-fit">Chủ cơ sở</p></div>
-            </div>
-
-            <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm space-y-4">
-              <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-widest underline decoration-blue-600 decoration-2 mb-2">Bảng giá dịch vụ</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Điện (/kWh)</label><input type="text" value={formatN(config.priceElec)} onChange={e => setConfig({ ...config, priceElec: parseN(e.target.value) })} className="w-full bg-slate-50 p-2.5 rounded-lg font-black text-xs outline-none focus:border-blue-600 border border-transparent" /></div>
-                <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Tính tiền nước</label>
-                  <select value={config.waterCalcMethod || 'person'} onChange={e => setConfig({ ...config, waterCalcMethod: e.target.value })} className="w-full bg-slate-50 p-2.5 rounded-lg font-black text-xs outline-none appearance-none focus:border-blue-600">
-                    <option value="person">Theo người</option><option value="m3">Theo khối</option>
-                  </select>
-                </div>
-                <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Giá Nước</label><input type="text" value={formatN(config.waterCalcMethod === 'person' ? config.priceWaterPerson : config.priceWaterM3)} onChange={e => setConfig({ ...config, [config.waterCalcMethod === 'person' ? 'priceWaterPerson' : 'priceWaterM3']: parseN(e.target.value) })} className="w-full bg-slate-50 p-2.5 rounded-lg font-black text-xs outline-none focus:border-blue-600 border border-transparent" /></div>
-                <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Phí Dịch Vụ</label><input type="text" value={formatN(config.priceService)} onChange={e => setConfig({ ...config, priceService: parseN(e.target.value) })} className="w-full bg-slate-50 p-2.5 rounded-lg font-black text-xs outline-none focus:border-blue-600 border border-transparent" /></div>
-                <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Internet</label><input type="text" value={formatN(config.priceNet)} onChange={e => setConfig({ ...config, priceNet: parseN(e.target.value) })} className="w-full bg-slate-50 p-2.5 rounded-lg font-black text-xs outline-none focus:border-blue-600 border border-transparent" /></div>
-                <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Xe máy điện</label><input type="text" value={formatN(config.priceEBike)} onChange={e => setConfig({ ...config, priceEBike: parseN(e.target.value) })} className="w-full bg-slate-50 p-2.5 rounded-lg font-black text-xs outline-none focus:border-blue-600 border border-transparent" /></div>
+            <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm flex items-center justify-between mb-2">
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 rounded-full bg-blue-600 border-4 border-white shadow-lg flex items-center justify-center text-white"><User className="w-6 h-6" /></div>
+                <div><h3 className="font-black text-sm uppercase text-slate-800 leading-none">{user.fullName || 'ADMIN'}</h3><p className="text-[8px] font-black text-blue-600 uppercase tracking-widest mt-1.5 bg-blue-50 px-3 py-0.5 rounded-full w-fit">Chủ cơ sở</p></div>
               </div>
-              <button onClick={handleSaveConfig} className="w-full bg-blue-600 text-white py-3.5 rounded-lg font-black uppercase text-[9px] shadow-lg flex items-center justify-center gap-2 border-b-4 border-blue-800 active:translate-y-1 transition-all"><Save className="w-3.5 h-3.5" /> Lưu cấu hình</button>
+              <button onClick={handleLogout} className="p-2 bg-red-50 text-red-600 rounded-xl active:scale-90 transition-all flex flex-col items-center justify-center shadow-sm border border-red-100 hover:bg-red-100">
+                <LogOut className="w-5 h-5 mb-1" />
+                <span className="text-[8px] font-black uppercase tracking-widest">Đăng xuất</span>
+              </button>
             </div>
 
-            <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm space-y-4 text-center">
+            <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+              <div className="bg-blue-600 px-5 py-3">
+                <h4 className="text-[10px] font-black text-white uppercase tracking-widest">Bảng giá dịch vụ</h4>
+              </div>
+              <div className="p-5 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Điện (/kWh)</label><input type="text" value={formatN(config.priceElec)} onChange={e => setConfig({ ...config, priceElec: parseN(e.target.value) })} className="w-full bg-slate-50 p-2.5 rounded-lg font-black text-xs outline-none focus:border-blue-600 border border-transparent" /></div>
+                  <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Tính tiền nước</label>
+                    <select value={config.waterCalcMethod || 'person'} onChange={e => setConfig({ ...config, waterCalcMethod: e.target.value })} className="w-full bg-slate-50 p-2.5 rounded-lg font-black text-xs outline-none appearance-none focus:border-blue-600">
+                      <option value="person">Theo người</option><option value="m3">Theo khối</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Giá Nước</label><input type="text" value={formatN(config.waterCalcMethod === 'person' ? config.priceWaterPerson : config.priceWaterM3)} onChange={e => setConfig({ ...config, [config.waterCalcMethod === 'person' ? 'priceWaterPerson' : 'priceWaterM3']: parseN(e.target.value) })} className="w-full bg-slate-50 p-2.5 rounded-lg font-black text-xs outline-none focus:border-blue-600 border border-transparent" /></div>
+                  <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Phí Dịch Vụ</label><input type="text" value={formatN(config.priceService)} onChange={e => setConfig({ ...config, priceService: parseN(e.target.value) })} className="w-full bg-slate-50 p-2.5 rounded-lg font-black text-xs outline-none focus:border-blue-600 border border-transparent" /></div>
+                  <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Internet</label><input type="text" value={formatN(config.priceNet)} onChange={e => setConfig({ ...config, priceNet: parseN(e.target.value) })} className="w-full bg-slate-50 p-2.5 rounded-lg font-black text-xs outline-none focus:border-blue-600 border border-transparent" /></div>
+                  <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Xe máy điện</label><input type="text" value={formatN(config.priceEBike)} onChange={e => setConfig({ ...config, priceEBike: parseN(e.target.value) })} className="w-full bg-slate-50 p-2.5 rounded-lg font-black text-xs outline-none focus:border-blue-600 border border-transparent" /></div>
+                </div>
+                <button onClick={handleSaveConfig} className="w-full bg-blue-600 text-white py-3.5 rounded-lg font-black uppercase text-[9px] shadow-lg flex items-center justify-center gap-2 border-b-4 border-blue-800 active:translate-y-1 transition-all"><Save className="w-3.5 h-3.5" /> Lưu cấu hình</button>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden text-center">
               {/* HEADER CÓ THÊM NÚT TẢI ẢNH */}
-              <div className="flex items-center justify-between">
-                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Thông tin VietQR</h4>
+              <div className="bg-blue-600 px-5 py-3 flex items-center justify-between">
+                <h4 className="text-[10px] font-black text-white uppercase tracking-widest">Thông tin VietQR</h4>
 
                 {/* Input file ẩn đi */}
                 <input type="file" accept="image/*" ref={qrFileRef} className="hidden" onChange={handleUploadQR} />
@@ -2530,39 +2559,45 @@ const App = () => {
                 <button
                   onClick={() => qrFileRef.current?.click()}
                   disabled={isScanningQR}
-                  className="bg-indigo-50 text-indigo-600 px-3 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 active:scale-95 transition-all disabled:opacity-50 border border-indigo-100 shadow-sm"
+                  className="bg-white text-indigo-600 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 active:scale-95 transition-all disabled:opacity-50 shadow-sm"
                 >
                   {isScanningQR ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <QrCode className="w-3.5 h-3.5" />}
-                  {isScanningQR ? "Đang quét..." : "Upload ảnh QR để tự điền"}
+                  {isScanningQR ? "Đang quét..." : "Upload QR"}
                 </button>
               </div>
 
-              <div className="space-y-3 pt-3 border-t border-slate-50 text-left">
-                <div className="flex justify-between items-center"><p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Ngân hàng</p><input type="text" value={config.bankName || ""} onChange={e => setConfig({ ...config, bankName: e.target.value })} placeholder="VD: MB BANK" className="font-black text-slate-700 text-[11px] text-right bg-transparent border-b border-dashed border-slate-300 focus:border-blue-500 outline-none w-1/2 transition-all" /></div>
-                <div className="flex justify-between items-center"><p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Mã BIN</p><input type="text" value={config.bankBin || "970422"} onChange={e => setConfig({ ...config, bankBin: e.target.value })} className="font-black text-slate-700 text-[11px] text-right bg-transparent border-b border-dashed border-slate-300 focus:border-blue-500 outline-none w-1/2 transition-all" /></div>
-                <div className="flex justify-between items-center"><p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Số tài khoản</p><input type="text" value={config.bankAcc || ""} onChange={e => setConfig({ ...config, bankAcc: e.target.value })} placeholder="9999..." className="font-black text-blue-600 text-sm tracking-widest text-right bg-transparent border-b border-dashed border-blue-300 focus:border-blue-600 outline-none w-2/3 transition-all" /></div>
-              </div>
+              <div className="p-5 space-y-4">
+                <div className="space-y-3 text-left">
+                  <div className="flex justify-between items-center"><p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Ngân hàng</p><input type="text" value={config.bankName || ""} onChange={e => setConfig({ ...config, bankName: e.target.value })} placeholder="VD: MB BANK" className="font-black text-slate-700 text-[11px] text-right bg-transparent border-b border-dashed border-slate-300 focus:border-blue-500 outline-none w-1/2 transition-all" /></div>
+                  <div className="flex justify-between items-center"><p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Mã BIN</p><input type="text" value={config.bankBin || "970422"} onChange={e => setConfig({ ...config, bankBin: e.target.value })} className="font-black text-slate-700 text-[11px] text-right bg-transparent border-b border-dashed border-slate-300 focus:border-blue-500 outline-none w-1/2 transition-all" /></div>
+                  <div className="flex justify-between items-center"><p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Số tài khoản</p><input type="text" value={config.bankAcc || ""} onChange={e => setConfig({ ...config, bankAcc: e.target.value })} placeholder="9999..." className="font-black text-blue-600 text-sm tracking-widest text-right bg-transparent border-b border-dashed border-blue-300 focus:border-blue-600 outline-none w-2/3 transition-all" /></div>
+                </div>
 
-              <button onClick={handleSaveConfig} className="w-full bg-blue-600 text-white py-3.5 rounded-lg font-black uppercase text-[9px] shadow-lg flex items-center justify-center gap-2 border-b-4 border-blue-800 active:translate-y-1 transition-all"><Save className="w-3.5 h-3.5" /> Lưu STK VietQR</button>
+                <button onClick={handleSaveConfig} className="w-full bg-blue-600 text-white py-3.5 rounded-lg font-black uppercase text-[9px] shadow-lg flex items-center justify-center gap-2 border-b-4 border-blue-800 active:translate-y-1 transition-all"><Save className="w-3.5 h-3.5" /> Lưu STK VietQR</button>
+              </div>
             </div>
 
-            <form onSubmit={handleChangePassword} className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm space-y-4">
-              <h4 className="text-[9px] font-black text-slate-400 uppercase tracking-widest decoration-rose-600 decoration-2 mb-2">Đổi Mật Khẩu</h4>
-              <div className="space-y-3">
-                <div className="space-y-1">
-                  <label className="text-[8px] font-black text-slate-400 uppercase px-1">Mật khẩu cũ</label>
-                  <input type="password" value={changePasswordForm.oldPassword || ''} onChange={e => setChangePasswordForm({ ...changePasswordForm, oldPassword: e.target.value })} className="w-full bg-slate-50 p-2.5 rounded-lg font-bold text-xs outline-none focus:border-rose-600 border border-transparent" required />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[8px] font-black text-slate-400 uppercase px-1">Mật khẩu mới</label>
-                  <input type="password" value={changePasswordForm.newPassword || ''} onChange={e => setChangePasswordForm({ ...changePasswordForm, newPassword: e.target.value })} className="w-full bg-slate-50 p-2.5 rounded-lg font-bold text-xs outline-none focus:border-rose-600 border border-transparent" required />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[8px] font-black text-slate-400 uppercase px-1">Xác nhận mật khẩu mới</label>
-                  <input type="password" value={changePasswordForm.confirmNewPassword || ''} onChange={e => setChangePasswordForm({ ...changePasswordForm, confirmNewPassword: e.target.value })} className="w-full bg-slate-50 p-2.5 rounded-lg font-bold text-xs outline-none focus:border-rose-600 border border-transparent" required />
-                </div>
+            <form onSubmit={handleChangePassword} className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+              <div className="bg-blue-600 px-5 py-3">
+                <h4 className="text-[10px] font-black text-white uppercase tracking-widest">Đổi Mật Khẩu</h4>
               </div>
-              <button type="submit" className="w-full bg-rose-600 text-white py-3.5 rounded-lg font-black uppercase text-[9px] shadow-lg flex items-center justify-center gap-2 border-b-4 border-rose-800 active:translate-y-1 transition-all"><Lock className="w-3.5 h-3.5" /> Xác Nhận Đổi Mật Khẩu</button>
+              <div className="p-5 space-y-4">
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-slate-400 uppercase px-1">Mật khẩu cũ</label>
+                    <input type="password" value={changePasswordForm.oldPassword || ''} onChange={e => setChangePasswordForm({ ...changePasswordForm, oldPassword: e.target.value })} className="w-full bg-slate-50 p-2.5 rounded-lg font-bold text-xs outline-none focus:border-rose-600 border border-transparent" required />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-slate-400 uppercase px-1">Mật khẩu mới</label>
+                    <input type="password" value={changePasswordForm.newPassword || ''} onChange={e => setChangePasswordForm({ ...changePasswordForm, newPassword: e.target.value })} className="w-full bg-slate-50 p-2.5 rounded-lg font-bold text-xs outline-none focus:border-rose-600 border border-transparent" required />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-slate-400 uppercase px-1">Xác nhận mật khẩu mới</label>
+                    <input type="password" value={changePasswordForm.confirmNewPassword || ''} onChange={e => setChangePasswordForm({ ...changePasswordForm, confirmNewPassword: e.target.value })} className="w-full bg-slate-50 p-2.5 rounded-lg font-bold text-xs outline-none focus:border-rose-600 border border-transparent" required />
+                  </div>
+                </div>
+                <button type="submit" className="w-full bg-blue-600 text-white py-3.5 rounded-lg font-black uppercase text-[9px] shadow-lg flex items-center justify-center gap-2 border-b-4 border-blue-800 active:translate-y-1 transition-all"><Lock className="w-3.5 h-3.5" /> Xác Nhận Đổi Mật Khẩu</button>
+              </div>
             </form>
           </div>
         )}
