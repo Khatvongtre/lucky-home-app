@@ -8,7 +8,7 @@ import {
   Activity, Wifi, Boxes, Search, MoreHorizontal, Droplets, Bike, ChevronLeft,
   Upload, Mail, Mic, MicOff, CreditCard, Calendar, Image as ImageIcon, Pencil, Loader2, AlertCircle,
   ChevronDown, Check, LucideEdit, Flame, AlertTriangle, Share2,
-  Edit, Trash2, ZapOff
+  Edit, Trash2, ZapOff, PiggyBank, Landmark
 } from 'lucide-react';
 
 import { toPng } from 'html-to-image';
@@ -387,6 +387,10 @@ const App = () => {
   const [isListening, setIsListening] = useState(false);
   const [aiFeedback, setAiFeedback] = useState("");
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [savings, setSavings] = useState([]);
+  const [isAddSavingModalOpen, setIsAddSavingModalOpen] = useState(false);
+  const [editingSaving, setEditingSaving] = useState(null);
+  const [savingCalc, setSavingCalc] = useState({ amount: 0, rate: 0, months: 0 });
   const [sharingHouse, setSharingHouse] = useState(null);
   const [assignForm, setAssignForm] = useState({ username: '', role: 'Manager' });
   const [selectedStatsHouses, setSelectedStatsHouses] = useState([]);
@@ -441,6 +445,7 @@ const App = () => {
     setHouses([]);
     setRooms([]);
     setBills([]);
+    setSavings([]);
   }, []);
 
   const handleChangePassword = async (e) => {
@@ -495,6 +500,16 @@ const App = () => {
     }
   }, [handleLogout]);
 
+  const loadSavings = useCallback(async () => {
+    try {
+      const savingsData = await fetchApi(`/management/savings`);
+      setSavings(savingsData);
+    } catch (e) {
+      setSavings([]);
+    }
+  }, [fetchApi]);
+
+
   // Kiểm tra token khi mới vào web
   useEffect(() => {
     const token = localStorage.getItem('smartstay_token');
@@ -525,6 +540,10 @@ const App = () => {
       document.body.appendChild(script);
     }
   }, [fetchApi, handleLogout]); // Thêm các phụ thuộc vào đây
+
+  useEffect(() => {
+    if (isLoggedIn) loadSavings();
+  }, [isLoggedIn, loadSavings]);
 
   // Lấy danh sách nhà
   useEffect(() => {
@@ -581,6 +600,43 @@ const App = () => {
     setSharingHouse(house);
     setAssignForm({ username: '', role: 'Manager' });
     setIsShareModalOpen(true);
+  };
+
+  const handleAddSaving = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const payload = {
+      bankName: fd.get('bankName'),
+      amount: parseN(fd.get('amount')),
+      interestRate: Number(fd.get('interestRate')),
+      termMonths: Number(fd.get('termMonths')),
+      startDate: fd.get('startDate'),
+      note: fd.get('note')
+    };
+    try {
+      if (editingSaving) {
+        await fetchApi(`/management/savings/${editingSaving.id}`, 'PUT', payload);
+        showToast("Đã cập nhật sổ tiết kiệm!", "success");
+      } else {
+        payload.id = crypto.randomUUID();
+        await fetchApi('/management/savings', 'POST', payload);
+        showToast("Đã thêm sổ tiết kiệm!", "success");
+      }
+      await loadSavings();
+      setIsAddSavingModalOpen(false);
+      setEditingSaving(null);
+    } catch (e) { showToast("Lỗi: " + e.message, "error"); }
+  };
+
+  const handleDeleteSaving = async (id) => {
+    if (!window.confirm("Bạn có chắc chắn muốn xóa sổ tiết kiệm này?")) return;
+    try {
+      await fetchApi(`/management/savings/${id}`, 'DELETE');
+      await loadSavings();
+      setIsAddSavingModalOpen(false);
+      setEditingSaving(null);
+      showToast("Đã xóa sổ tiết kiệm", "success");
+    } catch (e) { showToast("Lỗi xóa: " + e.message, "error"); }
   };
 
   const handleAssignRole = async (e) => {
@@ -1263,6 +1319,8 @@ const App = () => {
   const currentMeters = useMemo(() => meters.filter(m => m.id?.toLowerCase().includes(searchQuery.toLowerCase()) || m.name?.toLowerCase().includes(searchQuery.toLowerCase())), [meters, searchQuery]);
   const currentTransactions = useMemo(() => transactions.filter(t => t.note?.toLowerCase().includes(searchQuery.toLowerCase())), [transactions, searchQuery]);
   const currentBills = useMemo(() => bills.filter(b => b.roomId?.toLowerCase().includes(searchQuery.toLowerCase())), [bills, searchQuery]);
+  const currentSavings = useMemo(() => savings.filter(s => s.bankName?.toLowerCase().includes(searchQuery.toLowerCase()) || s.note?.toLowerCase().includes(searchQuery.toLowerCase())), [savings, searchQuery]);
+  const uniqueBankNames = useMemo(() => [...new Set(savings.map(s => s.bankName).filter(Boolean))], [savings]);
 
   const stats = useMemo(() => {
     const full = rooms.filter(r => r.status === 'full');
@@ -1881,7 +1939,7 @@ const App = () => {
             <ChevronLeft className="w-4 h-4" />
           </button>
           <h2 className="text-[10px] font-black uppercase tracking-widest text-blue-50 mt-0.5">
-            {activeTab === 'dashboard' ? 'Trang chủ' : activeTab === 'rooms' ? 'Phòng' : activeTab === 'meters_list' ? 'Chốt số điện' : activeTab === 'bills' ? 'Hóa đơn' : activeTab === 'finance' ? 'Thu chi' : activeTab === 'ai' ? 'Chat AI' : 'Cài đặt'}
+            {activeTab === 'dashboard' ? 'Trang chủ' : activeTab === 'rooms' ? 'Phòng' : activeTab === 'meters_list' ? 'Chốt số điện' : activeTab === 'bills' ? 'Hóa đơn' : activeTab === 'finance' ? 'Thu chi' : activeTab === 'savings' ? 'Sổ tiết kiệm' : activeTab === 'ai' ? 'Chat AI' : 'Cài đặt'}
           </h2>
         </div>
         <div className="absolute left-1/2 -translate-x-1/2 hidden sm:flex items-center space-x-1.5">
@@ -1902,7 +1960,7 @@ const App = () => {
       </header>
 
       {/* SEARCH BAR (TÌM KIẾM + NÚT ADD) */}
-      {['rooms', 'meters_list', 'finance', 'bills'].includes(activeTab) && (
+      {['rooms', 'meters_list', 'finance', 'bills', 'savings'].includes(activeTab) && (
         <div className="px-4 py-2.5 shrink-0 bg-white border-b border-slate-100 flex items-center space-x-2 shadow-sm text-left">
           <div className="relative flex-1 group">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-300" />
@@ -1916,6 +1974,7 @@ const App = () => {
             if (activeTab === 'rooms') { setEditingRoom(null); setIsAddRoomModalOpen(true); }
             if (activeTab === 'finance') setIsAddTransactionModalOpen(true);
             if (activeTab === 'meters_list') setIsAddMeterModalOpen(true);
+            if (activeTab === 'savings') { setEditingSaving(null); setSavingCalc({ amount: 0, rate: 0, months: 0 }); setIsAddSavingModalOpen(true); }
           }} className="p-1.5 bg-blue-600 text-white rounded-lg shadow-sm active:scale-90 transition-all flex items-center justify-center">
             <Plus className="w-4.5 h-4.5" strokeWidth={4} />
           </button>
@@ -1976,6 +2035,85 @@ const App = () => {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* --- SỔ TIẾT KIỆM --- */}
+        {activeTab === 'savings' && (
+          <div className="animate-in fade-in pb-20">
+            {/* Sticky Header with Totals */}
+            <div className="sticky top-0 z-30 bg-slate-50/80 backdrop-blur-md pt-2 pb-4 px-1">
+              <div className="bg-teal-600 p-6 rounded-xl text-white shadow-xl relative border-b-8 border-teal-800">
+                <p className="text-[10px] font-black text-teal-100 uppercase tracking-widest mb-1">Tổng tiền gửi tiết kiệm</p>
+                <h3 className="text-4xl font-black tracking-tight tabular-nums">
+                  {formatN(savings.reduce((a, b) => a + (b.amount || 0), 0))}
+                </h3>
+                <div className="mt-4 pt-4 border-t border-teal-500/50 flex justify-between items-center">
+                  <div>
+                    <p className="text-[9px] font-bold text-teal-200 uppercase mb-0.5">Tổng lãi dự kiến</p>
+                    <p className="text-sm font-black text-white">+{formatN(savings.reduce((a, b) => a + Math.round((b.amount || 0) * ((b.interestRate || 0) / 100) * ((b.termMonths || 0) / 12)), 0))}</p>
+                  </div>
+                  <PiggyBank className="w-8 h-8 text-teal-400 opacity-50" />
+                </div>
+              </div>
+            </div>
+
+            {/* List */}
+            <div className="px-1 mt-4 pb-4">
+              {currentSavings.length === 0 && (
+                <p className="text-xs text-slate-400 italic text-center mt-10">Chưa có sổ tiết kiệm nào.</p>
+              )}
+              {Object.entries(
+                currentSavings.reduce((acc, s) => {
+                  const bank = s.bankName || 'Khác';
+                  if (!acc[bank]) acc[bank] = [];
+                  acc[bank].push(s);
+                  return acc;
+                }, {})
+              ).map(([bank, items]) => (
+                <div key={bank} className="mb-6 last:mb-0 animate-in fade-in">
+                  <div className="flex items-center gap-2 mb-3 pl-1">
+                    <Landmark className="w-4 h-4 text-teal-600" />
+                    <h4 className="text-[11px] font-black text-slate-700 uppercase tracking-widest">{bank}</h4>
+                    <span className="text-[9px] font-bold bg-slate-200 text-slate-600 px-2 py-0.5 rounded-md">{items.length}</span>
+                  </div>
+                  <div className="space-y-3">
+                    {items.map(s => {
+                      const endDate = new Date(s.startDate);
+                      const tMonths = s.termMonths || 0;
+                      endDate.setMonth(endDate.getMonth() + Math.floor(tMonths)); // Cộng phần nguyên (tháng)
+                      endDate.setDate(endDate.getDate() + Math.round((tMonths - Math.floor(tMonths)) * 30)); // Cộng phần dư (ngày)
+                      const daysLeft = Math.ceil((endDate - new Date()) / (1000 * 60 * 60 * 24));
+                      const isMatured = daysLeft <= 0;
+                      const interest = Math.round((s.amount || 0) * ((s.interestRate || 0) / 100) * ((s.termMonths || 0) / 12));
+
+                      return (
+                        <div key={s.id} onClick={() => { setEditingSaving(s); setSavingCalc({ amount: s.amount || 0, rate: s.interestRate || 0, months: s.termMonths || 0 }); setIsAddSavingModalOpen(true); }} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm active:scale-[0.98] transition-all cursor-pointer relative overflow-hidden ml-2 border-l-4 border-l-teal-500">
+                          {isMatured && <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[8px] font-black px-2 py-1 rounded-bl-lg uppercase z-10 shadow-sm">Đã đến hạn</div>}
+                          <div className="flex justify-between items-start mb-3">
+                            <div className="flex items-center space-x-3">
+                              <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center shadow-inner shrink-0"><PiggyBank className="w-5 h-5" /></div>
+                              <div>
+                                <h4 className="font-black text-[13px] text-slate-800 uppercase line-clamp-1">{s.note || `Sổ tiết kiệm`}</h4>
+                                <p className="text-[9px] font-bold text-slate-400 mt-0.5 uppercase tracking-widest">Gửi ngày: {new Date(s.startDate).toLocaleDateString('vi-VN')}</p>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3 bg-slate-50/50 p-3 rounded-lg border border-slate-50">
+                            <div><p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Số tiền gốc</p><p className="text-sm font-black text-teal-600 tabular-nums">{formatN(s.amount)} đ</p></div>
+                            <div className="text-right"><p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Lãi suất / Kỳ hạn</p><p className="text-sm font-black text-slate-700">{s.interestRate}% <span className="text-[10px] text-slate-400 font-bold">/ {s.termMonths}T</span></p></div>
+                            <div className="col-span-2 pt-2 border-t border-slate-100 flex justify-between items-center">
+                              <div><p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Tiền lãi dự kiến</p><p className="text-xs font-black text-emerald-500 tabular-nums">+{formatN(interest)} đ</p></div>
+                              <div className="text-right"><p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Còn lại</p><p className={`text-xs font-black ${isMatured ? 'text-emerald-500' : 'text-orange-500'}`}>{isMatured ? 'Đáo hạn' : `${daysLeft} ngày`}</p></div>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -2650,6 +2788,7 @@ const App = () => {
               { label: 'Hóa Đơn', icon: Receipt, color: 'text-purple-600 bg-purple-50', action: () => { setActiveTab('bills'); setShowQuickMenu(false); } },
               { label: 'AI Chat', icon: Sparkles, color: 'text-indigo-600 bg-indigo-50', action: () => { setActiveTab('ai'); setShowQuickMenu(false); } },
               { label: 'Thu chi', icon: CircleDollarSign, color: 'text-rose-600 bg-rose-50', action: () => { setIsAddTransactionModalOpen(true); setShowQuickMenu(false); }, hidden: user?.role !== 'Owner' },
+              { label: 'Sổ tiết kiệm', icon: PiggyBank, color: 'text-teal-600 bg-teal-50', action: () => { setActiveTab('savings'); setShowQuickMenu(false); } },
               { label: 'Cài Đặt', icon: Settings, color: 'text-slate-600 bg-slate-50', action: () => { setActiveTab('settings'); setShowQuickMenu(false); }, hidden: user?.role !== 'Owner' },
               { label: 'Đăng Xuất', icon: LogOut, color: 'text-red-600 bg-red-50', action: () => handleLogout() }
             ].filter(i => !i.hidden).map((item, i) => (
@@ -2933,6 +3072,58 @@ const App = () => {
             <div className="space-y-1"><label className="text-[7px] font-black text-slate-400 uppercase px-1">Loại thiết bị</label><select name="type" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none appearance-none focus:border-blue-600"><option value="electric">Điện phòng</option><option value="heater">Bình nóng lạnh chung</option></select></div>
             <div className="space-y-1"><label className="text-[7px] font-black text-slate-400 uppercase px-1">Chỉ số đầu</label><input name="val" type="number" defaultValue="0" required className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
             <button type="submit" className="w-full bg-orange-600 text-white py-3.5 rounded-xl font-black uppercase text-[10px] shadow-xl border-b-4 border-orange-800 active:translate-y-1 transition-all text-center">Tạo công tơ</button>
+          </form>
+        </Modal>
+      )}
+
+      {/* MODAL THÊM SỔ TIẾT KIỆM */}
+      {isAddSavingModalOpen && (
+        <Modal title={editingSaving ? "Cập nhật sổ tiết kiệm" : "Thêm sổ tiết kiệm"} onClose={() => setIsAddSavingModalOpen(false)}>
+          <form onSubmit={handleAddSaving} className="space-y-4 text-left p-1">
+            {savingCalc.amount > 0 && savingCalc.rate > 0 && savingCalc.months > 0 && (
+              <div className="p-3.5 bg-emerald-50 border border-emerald-100 rounded-xl flex justify-between items-center animate-in slide-in-from-top-2">
+                <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Tiền lãi dự tính</span>
+                <span className="text-base font-black text-emerald-600">+{formatN(Math.round((savingCalc.amount * (savingCalc.rate / 100) * (savingCalc.months / 12))))} đ</span>
+              </div>
+            )}
+
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Ngân hàng / Tên sổ</label>
+              <div className="relative group">
+                <Landmark className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-teal-600 transition-colors" />
+                <input type="text" name="bankName" list="bank-names-list" required defaultValue={editingSaving?.bankName} placeholder="VD: Vietcombank, Sổ tiết kiệm 1..." className="w-full pl-10 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-teal-600 shadow-inner" />
+                <datalist id="bank-names-list">
+                  {uniqueBankNames.map((name, idx) => (
+                    <option key={idx} value={name} />
+                  ))}
+                </datalist>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Số tiền gửi (VNĐ)</label>
+              <input type="text" name="amount" required defaultValue={editingSaving ? formatN(editingSaving.amount) : ''} onInput={(e) => { e.target.value = formatN(parseN(e.target.value)); setSavingCalc(prev => ({ ...prev, amount: parseN(e.target.value) })); }} placeholder="0" className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-black text-xl text-teal-700 outline-none focus:border-teal-600 shadow-inner" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Lãi suất (%/năm)</label><input type="number" step="0.1" name="interestRate" required defaultValue={editingSaving?.interestRate} onChange={(e) => setSavingCalc(prev => ({ ...prev, rate: Number(e.target.value) }))} placeholder="VD: 5.5" className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-teal-600 shadow-inner" /></div>
+              <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Kỳ hạn (Tháng)</label><input type="number" step="any" name="termMonths" required defaultValue={editingSaving?.termMonths} onChange={(e) => setSavingCalc(prev => ({ ...prev, months: Number(e.target.value) }))} placeholder="VD: 6, hoặc 0.5..." className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-teal-600 shadow-inner" /></div>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Ngày gửi</label>
+              <input type="date" name="startDate" required defaultValue={getSafeDate(editingSaving?.startDate)} className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-teal-600 shadow-inner" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Ghi chú thêm</label>
+              <textarea name="note" rows="2" defaultValue={editingSaving?.note} placeholder="Tùy chọn..." className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-sm outline-none focus:border-teal-600 shadow-inner resize-none"></textarea>
+            </div>
+
+            <div className="flex gap-2 pt-3">
+              {editingSaving && (
+                <button type="button" onClick={() => handleDeleteSaving(editingSaving.id)} className="flex-1 bg-red-50 text-red-600 py-4 rounded-xl font-black uppercase text-[11px] shadow-sm active:scale-95 border-b-4 border-red-200 transition-all">Xóa sổ</button>
+              )}
+              <button type="submit" className={`flex-[2] text-white py-4 rounded-xl font-black uppercase text-[11px] shadow-lg transition-all active:scale-95 border-b-4 bg-teal-600 border-teal-800`}>
+                {editingSaving ? 'Lưu thay đổi' : 'Thêm sổ tiết kiệm'}
+              </button>
+            </div>
           </form>
         </Modal>
       )}
