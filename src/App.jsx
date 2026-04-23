@@ -394,12 +394,15 @@ const App = () => {
   const [sharingHouse, setSharingHouse] = useState(null);
   const [assignForm, setAssignForm] = useState({ username: '', role: 'Manager' });
   const [selectedStatsHouses, setSelectedStatsHouses] = useState([]);
+  const [unselectedSavingsBanks, setUnselectedSavingsBanks] = useState([]);
+  const [collapsedSavingsBanks, setCollapsedSavingsBanks] = useState([]);
 
   // --- Real Data State ---
   const [houses, setHouses] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [meters, setMeters] = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [rawChartData, setRawChartData] = useState([]);
   const [bills, setBills] = useState([]);
   const [config, setConfig] = useState({});
   const [aiMessages, setAiMessages] = useState([{ role: 'assistant', text: 'Chào bạn! Tôi là trợ lý AI. Hệ thống đang sẵn sàng.' }]);
@@ -446,6 +449,8 @@ const App = () => {
     setRooms([]);
     setBills([]);
     setSavings([]);
+    setTransactions([]);
+    setRawChartData([]);
   }, []);
 
   const handleChangePassword = async (e) => {
@@ -580,8 +585,8 @@ const App = () => {
       })));
 
       if (isOwnerOrAdmin) {
-        const txData = await fetchApi(`/management/transactions/${houseId}?type=all`);
-        setTransactions(txData);
+        const chartRes = await fetchApi(`/management/dashboard/${houseId}/revenue-chart`);
+        setRawChartData(chartRes);
       }
     } catch (e) {
       showToast(e.message, 'error');
@@ -1322,12 +1327,46 @@ const App = () => {
   const currentSavings = useMemo(() => savings.filter(s => s.bankName?.toLowerCase().includes(searchQuery.toLowerCase()) || s.note?.toLowerCase().includes(searchQuery.toLowerCase())), [savings, searchQuery]);
   const uniqueBankNames = useMemo(() => [...new Set(savings.map(s => s.bankName).filter(Boolean))], [savings]);
 
+  const summarySavings = useMemo(() => {
+    return currentSavings.filter(s => {
+      const bank = s.bankName || 'Khác';
+      return !unselectedSavingsBanks.includes(bank);
+    });
+  }, [currentSavings, unselectedSavingsBanks]);
+
   const stats = useMemo(() => {
     const full = rooms.filter(r => r.status === 'full');
     const totalRev = transactions.filter(t => t.type === 'in').reduce((s, t) => s + (t.amount || 0), 0);
     const totalExp = transactions.filter(t => t.type === 'out').reduce((s, t) => s + (t.amount || 0), 0);
-    return { rev: totalRev, exp: totalExp, total: rooms.length, empty: rooms.length - full.length, people: full.reduce((s, r) => s + (r.peopleCount ?? r.people ?? 0), 0), ebikes: full.reduce((s, r) => s + (r.eBikeCount ?? r.ebikes ?? 0), 0) };
-  }, [rooms, transactions]);
+
+    let totalKwh = 0;
+    meters.forEach(m => {
+      const isOldEmpty = m.oldVal === null || m.oldVal === "";
+      const isNewEmpty = m.newVal === null || m.newVal === "";
+      if (!isOldEmpty && !isNewEmpty) {
+        const vOld = parseN(String(m.oldVal));
+        const vNew = parseN(String(m.newVal));
+        if (vNew >= vOld) {
+          totalKwh += (vNew - vOld);
+        }
+      }
+    });
+    const elecCost = totalKwh * (config.priceElec || 0);
+
+    return { rev: totalRev, exp: totalExp, total: rooms.length, empty: rooms.length - full.length, people: full.reduce((s, r) => s + (r.peopleCount ?? r.people ?? 0), 0), ebikes: full.reduce((s, r) => s + (r.eBikeCount ?? r.ebikes ?? 0), 0), elecCost };
+  }, [rooms, transactions, meters, config.priceElec]);
+
+  const revenueChartData = useMemo(() => {
+    if (!rawChartData || rawChartData.length === 0) {
+      return [1, 2, 3, 4, 5, 6].map((_, i) => ({ label: `Th${i + 1}`, value: 0, height: 0, isCurrent: i === 5 }));
+    }
+
+    const maxVal = Math.max(...rawChartData.map(d => d.value), 1);
+    return rawChartData.map(d => ({
+      ...d,
+      height: d.value === 0 ? 0 : Math.max((d.value / maxVal) * 100, 4)
+    }));
+  }, [rawChartData]);
 
   const shouldShowMeterBanner = useMemo(() => {
     if (!rooms || rooms.length === 0) return false;
@@ -1493,17 +1532,17 @@ const App = () => {
       h.address?.toLowerCase().includes(houseSearchQuery.toLowerCase())
     );
 
-    const housesForStats = selectedStatsHouses.length > 0
-      ? houses.filter(h => selectedStatsHouses.includes(h.id))
-      : houses;
+    const visibleSelectedHouses = filteredHouses.filter(h => selectedStatsHouses.includes(h.id));
+    const housesForStats = visibleSelectedHouses.length > 0 ? visibleSelectedHouses : filteredHouses;
 
     const houseStats = housesForStats.reduce((acc, h) => {
       acc.totalHouses += 1;
       acc.totalRooms += (h.totalRooms || 0);
       acc.emptyRooms += (h.emptyRooms || 0);
       acc.totalRevenue += (h.revenue || 0);
+      acc.totalProfit += (h.revenue || 0) - (h.expense || 0) - (h.rentPrice || 0) - (h.internetFee || 0) - (h.otherFees || 0);
       return acc;
-    }, { totalHouses: 0, totalRooms: 0, emptyRooms: 0, totalRevenue: 0 });
+    }, { totalHouses: 0, totalRooms: 0, emptyRooms: 0, totalRevenue: 0, totalProfit: 0 });
 
     // --- LOGIC TÍNH NGÀY ĐẾN HẠN NÂNG CAO (HỖ TRỢ ĐÓNG NHIỀU THÁNG) ---
     const getAdvancedDueInfo = (startDate, paymentDay, paymentPeriod) => {
@@ -1562,9 +1601,15 @@ const App = () => {
 
             {/* Box Thống kê */}
             <div className="bg-slate-900 rounded-xl p-3.5 text-white shadow-xl border-b-4 border-blue-600">
-              <div className="mb-2.5 text-center">
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Tổng doanh thu dự kiến</p>
-                <p className="text-2xl font-black text-emerald-400">{formatN(houseStats.totalRevenue)} đ</p>
+              <div className="flex justify-between items-center mb-3 px-2">
+                <div>
+                  <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Tổng doanh thu</p>
+                  <p className="text-xl font-black text-emerald-400 tabular-nums">+{formatN(houseStats.totalRevenue)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Tổng lợi nhuận</p>
+                  <p className="text-xl font-black text-blue-400 tabular-nums">{formatN(houseStats.totalProfit)}</p>
+                </div>
               </div>
               <div className="grid grid-cols-3 gap-2 border-t border-slate-700 pt-2.5 text-center">
                 <div className="flex flex-col items-center">
@@ -1966,7 +2011,7 @@ const App = () => {
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-300" />
             <input
               type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Tìm phòng, hạng mục..."
+              placeholder={activeTab === 'savings' ? "Tìm ngân hàng, tên sổ..." : "Tìm phòng, hạng mục..."}
               className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-100 rounded-lg text-[11px] font-bold outline-none focus:border-blue-500 transition-all"
             />
           </div>
@@ -2005,15 +2050,22 @@ const App = () => {
             </div>
 
             {isOwnerOrAdmin && (
-              <div className="bg-blue-600 p-5 rounded-xl text-white shadow-xl relative overflow-hidden border-b-6 border-blue-800">
-                <TrendingUp className="w-12 h-12 opacity-10 absolute -right-2 -top-2" />
-                <p className="text-[8px] font-black uppercase tracking-widest mb-1 opacity-60">Doanh thu dự kiến tháng này</p>
-                <h3 className="text-3xl font-black">{formatN(stats.rev)}</h3>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-blue-600 p-4 rounded-xl text-white shadow-sm relative overflow-hidden border-b-4 border-blue-800">
+                  <TrendingUp className="w-10 h-10 opacity-10 absolute -right-2 -top-2" />
+                  <p className="text-[8px] font-black uppercase tracking-widest mb-1 opacity-60">Doanh thu</p>
+                  <h3 className="text-2xl font-black">{formatN(stats.rev)}</h3>
+                </div>
+                <div className="bg-emerald-600 p-4 rounded-xl text-white shadow-sm relative overflow-hidden border-b-4 border-emerald-800">
+                  <CircleDollarSign className="w-10 h-10 opacity-10 absolute -right-2 -top-2" />
+                  <p className="text-[8px] font-black uppercase tracking-widest mb-1 opacity-60">Lợi nhuận</p>
+                  <h3 className="text-2xl font-black">{formatN(stats.rev - stats.exp - (selectedHouse?.rentPrice || 0) - (selectedHouse?.internetFee || 0) - (selectedHouse?.otherFees || 0))}</h3>
+                </div>
               </div>
             )}
 
             <div className="grid grid-cols-2 gap-2">
-              <div className="bg-orange-400 p-4 rounded-xl text-white shadow-md relative overflow-hidden"><Zap className="w-8 h-8 absolute -right-1 -top-1 opacity-20" /><p className="text-[8px] font-black uppercase mb-1 opacity-80">Điện dự tính</p><p className="text-sm font-black">--</p></div>
+              <div className="bg-orange-400 p-4 rounded-xl text-white shadow-md relative overflow-hidden"><Zap className="w-8 h-8 absolute -right-1 -top-1 opacity-20" /><p className="text-[8px] font-black uppercase mb-1 opacity-80">Điện dự tính</p><p className="text-sm font-black">{formatN(stats.elecCost)}</p></div>
               <div className="bg-sky-500 p-4 rounded-xl text-white shadow-md relative overflow-hidden"><Droplets className="w-8 h-8 absolute -right-1 -top-1 opacity-20" /><p className="text-[8px] font-black uppercase mb-1 opacity-80">Nước dự tính</p><p className="text-sm font-black">{formatN(stats.people * (config.priceWaterPerson || 0))}</p></div>
               <div className="bg-purple-400 p-4 rounded-xl text-white shadow-md relative overflow-hidden"><Activity className="w-8 h-8 absolute -right-1 -top-1 opacity-20" /><p className="text-[8px] font-black uppercase mb-1 opacity-80">Dịch vụ</p><p className="text-sm font-black">{formatN(stats.people * (config.priceService || 0))}</p></div>
               <div className="bg-emerald-500 p-4 rounded-xl text-white shadow-md relative overflow-hidden"><Wifi className="w-8 h-8 absolute -right-1 -top-1 opacity-20" /><p className="text-[8px] font-black uppercase mb-1 opacity-80">Internet</p><p className="text-sm font-black">{formatN((stats.total - stats.empty) * (config.priceNet || 0))}</p></div>
@@ -2026,10 +2078,15 @@ const App = () => {
                   <div className="absolute w-full h-[1px] bg-slate-50 bottom-[33%]"></div>
                   <div className="absolute w-full h-[1px] bg-slate-50 bottom-[66%]"></div>
                   <div className="absolute w-full h-[1px] bg-slate-50 top-0"></div>
-                  {[55, 80, 70, 115, 95, 140].map((v, i) => (
-                    <div key={i} className="flex-1 flex flex-col items-center relative z-10">
-                      <div className={`w-full rounded-t-md transition-all duration-1000 ${i === 5 ? 'bg-gradient-to-t from-blue-600 to-sky-400 shadow-md' : 'bg-gradient-to-t from-slate-200 to-slate-100'}`} style={{ height: `${v}%` }}></div>
-                      <span className="text-[6px] font-black text-slate-400 mt-2 uppercase">Th{i + 1}</span>
+                  {revenueChartData.map((d, i) => (
+                    <div key={i} className="flex-1 h-full flex flex-col items-center justify-end relative z-10 group cursor-pointer">
+                      <div className="absolute -top-7 bg-slate-800 text-white text-[9px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20 shadow-md">
+                        {formatN(d.value)} đ
+                      </div>
+                      <div className="w-full flex-1 flex items-end">
+                        <div className={`w-full rounded-t-md transition-all duration-1000 ${d.isCurrent ? 'bg-gradient-to-t from-blue-600 to-sky-400 shadow-md' : 'bg-gradient-to-t from-slate-200 to-slate-100 group-hover:from-blue-300 group-hover:to-blue-200'}`} style={{ height: `${d.height}%`, minHeight: d.height > 0 ? '4px' : '0' }}></div>
+                      </div>
+                      <span className={`text-[6px] font-black mt-2 uppercase ${d.isCurrent ? 'text-blue-600' : 'text-slate-400'}`}>{d.label}</span>
                     </div>
                   ))}
                 </div>
@@ -2043,17 +2100,40 @@ const App = () => {
           <div className="animate-in fade-in pb-20">
             {/* Sticky Header with Totals */}
             <div className="sticky top-0 z-30 bg-slate-50/80 backdrop-blur-md pt-2 pb-4 px-1">
-              <div className="bg-teal-600 p-6 rounded-xl text-white shadow-xl relative border-b-8 border-teal-800">
-                <p className="text-[10px] font-black text-teal-100 uppercase tracking-widest mb-1">Tổng tiền gửi tiết kiệm</p>
-                <h3 className="text-4xl font-black tracking-tight tabular-nums">
-                  {formatN(savings.reduce((a, b) => a + (b.amount || 0), 0))}
+              <div className="bg-slate-900 p-6 rounded-xl text-white shadow-xl relative border-b-8 border-slate-950">
+                <div className="flex justify-between items-center mb-1">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tổng tiền gửi tiết kiệm</p>
+                  {uniqueBankNames.length > 0 && (
+                    <button
+                      onClick={() => {
+                        if (collapsedSavingsBanks.length === uniqueBankNames.length) {
+                          setCollapsedSavingsBanks([]);
+                        } else {
+                          setCollapsedSavingsBanks(uniqueBankNames);
+                        }
+                      }}
+                      className="flex items-center gap-1 text-slate-400 hover:text-amber-400 transition-colors bg-white/5 px-2 py-1 rounded shadow-sm active:scale-95"
+                    >
+                      <span className="text-[8px] font-black uppercase tracking-widest">
+                        {collapsedSavingsBanks.length === uniqueBankNames.length ? 'Mở rộng tất cả' : 'Thu gọn tất cả'}
+                      </span>
+                      <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${collapsedSavingsBanks.length !== uniqueBankNames.length ? 'rotate-180' : ''}`} />
+                    </button>
+                  )}
+                </div>
+                <h3 className="text-4xl font-black tracking-tight tabular-nums text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-yellow-400">
+                  {formatN(summarySavings.reduce((a, b) => a + (b.amount || 0), 0))}
                 </h3>
-                <div className="mt-4 pt-4 border-t border-teal-500/50 flex justify-between items-center">
-                  <div>
-                    <p className="text-[9px] font-bold text-teal-200 uppercase mb-0.5">Tổng lãi dự kiến</p>
-                    <p className="text-sm font-black text-white">+{formatN(savings.reduce((a, b) => a + Math.round((b.amount || 0) * ((b.interestRate || 0) / 100) * ((b.termMonths || 0) / 12)), 0))}</p>
+                <div className="mt-5 grid grid-cols-2 gap-3">
+                  <div className="bg-white/5 p-3.5 rounded-xl border border-white/10 relative overflow-hidden">
+                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Lãi / tháng</p>
+                    <p className="text-base font-black text-amber-400 tabular-nums">+{formatN(summarySavings.reduce((a, b) => a + Math.round((b.amount || 0) * ((b.interestRate || 0) / 100) / 12), 0))}</p>
                   </div>
-                  <PiggyBank className="w-8 h-8 text-teal-400 opacity-50" />
+                  <div className="bg-white/5 p-3.5 rounded-xl border border-white/10 relative overflow-hidden">
+                    <PiggyBank className="w-10 h-10 absolute -right-2 -bottom-2 opacity-10 text-white" />
+                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Tổng lãi dự kiến</p>
+                    <p className="text-base font-black text-amber-400 tabular-nums">+{formatN(summarySavings.reduce((a, b) => a + Math.round((b.amount || 0) * ((b.interestRate || 0) / 100) * ((b.termMonths || 0) / 12)), 0))}</p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2070,49 +2150,126 @@ const App = () => {
                   acc[bank].push(s);
                   return acc;
                 }, {})
-              ).map(([bank, items]) => (
-                <div key={bank} className="mb-6 last:mb-0 animate-in fade-in">
-                  <div className="flex items-center gap-2 mb-3 pl-1">
-                    <Landmark className="w-4 h-4 text-teal-600" />
-                    <h4 className="text-[11px] font-black text-slate-700 uppercase tracking-widest">{bank}</h4>
-                    <span className="text-[9px] font-bold bg-slate-200 text-slate-600 px-2 py-0.5 rounded-md">{items.length}</span>
-                  </div>
-                  <div className="space-y-3">
-                    {items.map(s => {
-                      const endDate = new Date(s.startDate);
-                      const tMonths = s.termMonths || 0;
-                      endDate.setMonth(endDate.getMonth() + Math.floor(tMonths)); // Cộng phần nguyên (tháng)
-                      endDate.setDate(endDate.getDate() + Math.round((tMonths - Math.floor(tMonths)) * 30)); // Cộng phần dư (ngày)
-                      const daysLeft = Math.ceil((endDate - new Date()) / (1000 * 60 * 60 * 24));
-                      const isMatured = daysLeft <= 0;
-                      const interest = Math.round((s.amount || 0) * ((s.interestRate || 0) / 100) * ((s.termMonths || 0) / 12));
+              ).map(([bank, items]) => {
+                const groupAmount = items.reduce((a, b) => a + (b.amount || 0), 0);
+                const groupInterest = items.reduce((a, b) => a + Math.round((b.amount || 0) * ((b.interestRate || 0) / 100) * ((b.termMonths || 0) / 12)), 0);
+                const isSelected = !unselectedSavingsBanks.includes(bank);
+                const isCollapsed = collapsedSavingsBanks.includes(bank);
 
-                      return (
-                        <div key={s.id} onClick={() => { setEditingSaving(s); setSavingCalc({ amount: s.amount || 0, rate: s.interestRate || 0, months: s.termMonths || 0 }); setIsAddSavingModalOpen(true); }} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm active:scale-[0.98] transition-all cursor-pointer relative overflow-hidden ml-2 border-l-4 border-l-teal-500">
-                          {isMatured && <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[8px] font-black px-2 py-1 rounded-bl-lg uppercase z-10 shadow-sm">Đã đến hạn</div>}
-                          <div className="flex justify-between items-start mb-3">
-                            <div className="flex items-center space-x-3">
-                              <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center shadow-inner shrink-0"><PiggyBank className="w-5 h-5" /></div>
-                              <div>
-                                <h4 className="font-black text-[13px] text-slate-800 uppercase line-clamp-1">{s.note || `Sổ tiết kiệm`}</h4>
-                                <p className="text-[9px] font-bold text-slate-400 mt-0.5 uppercase tracking-widest">Gửi ngày: {new Date(s.startDate).toLocaleDateString('vi-VN')}</p>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-3 bg-slate-50/50 p-3 rounded-lg border border-slate-50">
-                            <div><p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Số tiền gốc</p><p className="text-sm font-black text-teal-600 tabular-nums">{formatN(s.amount)} đ</p></div>
-                            <div className="text-right"><p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Lãi suất / Kỳ hạn</p><p className="text-sm font-black text-slate-700">{s.interestRate}% <span className="text-[10px] text-slate-400 font-bold">/ {s.termMonths}T</span></p></div>
-                            <div className="col-span-2 pt-2 border-t border-slate-100 flex justify-between items-center">
-                              <div><p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Tiền lãi dự kiến</p><p className="text-xs font-black text-emerald-500 tabular-nums">+{formatN(interest)} đ</p></div>
-                              <div className="text-right"><p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Còn lại</p><p className={`text-xs font-black ${isMatured ? 'text-emerald-500' : 'text-orange-500'}`}>{isMatured ? 'Đáo hạn' : `${daysLeft} ngày`}</p></div>
-                            </div>
+                return (
+                  <div key={bank} className="mb-6 last:mb-0 animate-in fade-in">
+                    <div className="flex flex-col mb-3 bg-gradient-to-r from-slate-100 to-white p-3 rounded-xl border border-slate-200 shadow-sm gap-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="flex items-center shrink-0 ml-0.5">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => {
+                              if (e.target.checked) setUnselectedSavingsBanks(unselectedSavingsBanks.filter(b => b !== bank));
+                              else setUnselectedSavingsBanks([...unselectedSavingsBanks, bank]);
+                            }}
+                            className="w-4 h-4 rounded border-slate-300 text-amber-500 focus:ring-amber-500 cursor-pointer"
+                          />
+                        </div>
+                        <div className="w-8 h-8 rounded-lg bg-amber-100 border border-amber-200 flex items-center justify-center shadow-inner shrink-0">
+                          <Landmark className="w-4 h-4 text-amber-600" />
+                        </div>
+                        <div className="flex-1 flex justify-between items-center gap-1 min-w-0">
+                          <h4 className="text-[13px] font-black text-blue-900 uppercase tracking-wider leading-tight truncate pr-2">{bank}</h4>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-[9px] font-black bg-amber-500 text-white px-2 py-0.5 rounded shadow-sm">{items.length} SỔ</span>
+                            <button
+                              onClick={() => {
+                                if (isCollapsed) {
+                                  setCollapsedSavingsBanks(collapsedSavingsBanks.filter(b => b !== bank));
+                                } else {
+                                  setCollapsedSavingsBanks([...collapsedSavingsBanks, bank]);
+                                }
+                              }}
+                              className="p-1 -mr-1 text-slate-400 hover:bg-slate-200 rounded-md transition-colors"
+                            >
+                              <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${!isCollapsed ? 'rotate-180' : ''}`} />
+                            </button>
                           </div>
                         </div>
-                      )
-                    })}
+                      </div>
+
+                      <div className="border-t border-slate-200/80 pt-3 flex items-center justify-between px-1">
+                        <div className="flex-1">
+                          <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Tổng gốc</p>
+                          <p className="text-[13px] font-black text-indigo-700 tabular-nums">{formatN(groupAmount)}<span className="text-[9px] text-indigo-400 ml-0.5">đ</span></p>
+                        </div>
+                        <div className="w-[1px] h-8 bg-slate-200 mx-4"></div>
+                        <div className="flex-1 text-right">
+                          <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Tổng lãi</p>
+                          <p className="text-[13px] font-black text-emerald-600 tabular-nums">+{formatN(groupInterest)}<span className="text-[9px] text-emerald-600/50 ml-0.5">đ</span></p>
+                        </div>
+                      </div>
+                    </div>
+                    {!isCollapsed && (
+                      <div className={`space-y-3 transition-all ${!isSelected ? 'opacity-50 grayscale pointer-events-none' : ''}`}>
+                        {items.map(s => {
+                          const endDate = new Date(s.startDate);
+                          const tMonths = s.termMonths || 0;
+                          endDate.setMonth(endDate.getMonth() + Math.floor(tMonths)); // Cộng phần nguyên (tháng)
+                          endDate.setDate(endDate.getDate() + Math.round((tMonths - Math.floor(tMonths)) * 30)); // Cộng phần dư (ngày)
+                          const daysLeft = Math.ceil((endDate - new Date()) / (1000 * 60 * 60 * 24));
+                          const isMatured = daysLeft <= 0;
+                          const interest = Math.round((s.amount || 0) * ((s.interestRate || 0) / 100) * ((s.termMonths || 0) / 12));
+                          const startDate = new Date(s.startDate);
+                          const totalDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+                          const passedDays = Math.max(0, totalDays - daysLeft);
+                          const progress = totalDays > 0 ? Math.min(100, (passedDays / totalDays) * 100) : 100;
+
+                          return (
+                            <div key={s.id} onClick={() => { setEditingSaving(s); setSavingCalc({ amount: s.amount || 0, rate: s.interestRate || 0, months: s.termMonths || 0 }); setIsAddSavingModalOpen(true); }} className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm active:scale-[0.98] transition-all cursor-pointer relative overflow-hidden ml-2 border-l-4 border-l-amber-500">
+                              {isMatured && <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[8px] font-black px-2 py-1 rounded-bl-lg uppercase z-10 shadow-sm">Đã đến hạn</div>}
+                              <div className="flex justify-between items-center mb-3">
+                                <div className="flex items-center space-x-3 w-[60%]">
+                                  <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-100 text-amber-600 flex items-center justify-center shadow-inner shrink-0"><PiggyBank className="w-5 h-5" /></div>
+                                  <div className="overflow-hidden w-full">
+                                    <h4 className="font-black text-[13px] text-blue-900 uppercase leading-tight mb-0.5">{s.note || `Sổ tiết kiệm`}</h4>
+                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate">Gửi: {startDate.toLocaleDateString('vi-VN')}</p>
+                                  </div>
+                                </div>
+                                <div className="text-right w-[40%] pl-2 shrink-0">
+                                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Số tiền gốc</p>
+                                  <p className="text-[15px] font-black text-indigo-700 tabular-nums">{formatN(s.amount)}<span className="text-[10px] text-indigo-400 ml-0.5">đ</span></p>
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between bg-slate-50 rounded-lg p-2.5 border border-slate-100">
+                                <div className="flex items-center gap-3">
+                                  <div>
+                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Lãi suất</p>
+                                    <p className="text-[11px] font-black text-purple-600">{s.interestRate}%<span className="text-[9px] text-purple-400 font-bold">/năm</span></p>
+                                  </div>
+                                  <div className="w-[1px] h-6 bg-slate-200"></div>
+                                  <div>
+                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Kỳ hạn</p>
+                                    <p className="text-[11px] font-black text-emerald-600">{s.termMonths} <span className="text-[9px] text-emerald-500 font-bold">tháng</span></p>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Lãi dự kiến</p>
+                                  <p className="text-[13px] font-black text-emerald-600 tabular-nums">+{formatN(interest)} đ</p>
+                                </div>
+                              </div>
+                              <div className="mt-3 flex items-center justify-between px-1 gap-2">
+                                <div className="flex-1 bg-slate-100 rounded-full h-1.5 overflow-hidden relative">
+                                  <div className={`absolute top-0 left-0 h-full transition-all duration-1000 ${isMatured ? 'bg-emerald-500' : 'bg-amber-400'}`} style={{ width: `${progress}%` }}></div>
+                                </div>
+                                <p className={`text-[9px] font-black uppercase tracking-widest whitespace-nowrap ${isMatured ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                  {isMatured ? 'Đáo hạn' : `Còn ${daysLeft} ngày`}
+                                </p>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}
@@ -2788,7 +2945,7 @@ const App = () => {
               { label: 'Hóa Đơn', icon: Receipt, color: 'text-purple-600 bg-purple-50', action: () => { setActiveTab('bills'); setShowQuickMenu(false); } },
               { label: 'AI Chat', icon: Sparkles, color: 'text-indigo-600 bg-indigo-50', action: () => { setActiveTab('ai'); setShowQuickMenu(false); } },
               { label: 'Thu chi', icon: CircleDollarSign, color: 'text-rose-600 bg-rose-50', action: () => { setIsAddTransactionModalOpen(true); setShowQuickMenu(false); }, hidden: user?.role !== 'Owner' },
-              { label: 'Sổ tiết kiệm', icon: PiggyBank, color: 'text-teal-600 bg-teal-50', action: () => { setActiveTab('savings'); setShowQuickMenu(false); } },
+              { label: 'Sổ tiết kiệm', icon: PiggyBank, color: 'text-amber-600 bg-amber-50', action: () => { setActiveTab('savings'); setShowQuickMenu(false); } },
               { label: 'Cài Đặt', icon: Settings, color: 'text-slate-600 bg-slate-50', action: () => { setActiveTab('settings'); setShowQuickMenu(false); }, hidden: user?.role !== 'Owner' },
               { label: 'Đăng Xuất', icon: LogOut, color: 'text-red-600 bg-red-50', action: () => handleLogout() }
             ].filter(i => !i.hidden).map((item, i) => (
@@ -3090,8 +3247,8 @@ const App = () => {
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Ngân hàng / Tên sổ</label>
               <div className="relative group">
-                <Landmark className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-teal-600 transition-colors" />
-                <input type="text" name="bankName" list="bank-names-list" required defaultValue={editingSaving?.bankName} placeholder="VD: Vietcombank, Sổ tiết kiệm 1..." className="w-full pl-10 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-teal-600 shadow-inner" />
+                <Landmark className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-amber-500 transition-colors" />
+                <input type="text" name="bankName" list="bank-names-list" required defaultValue={editingSaving?.bankName} placeholder="VD: Vietcombank, Sổ tiết kiệm 1..." className="w-full pl-10 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-amber-500 shadow-inner" />
                 <datalist id="bank-names-list">
                   {uniqueBankNames.map((name, idx) => (
                     <option key={idx} value={name} />
@@ -3101,26 +3258,26 @@ const App = () => {
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Số tiền gửi (VNĐ)</label>
-              <input type="text" name="amount" required defaultValue={editingSaving ? formatN(editingSaving.amount) : ''} onInput={(e) => { e.target.value = formatN(parseN(e.target.value)); setSavingCalc(prev => ({ ...prev, amount: parseN(e.target.value) })); }} placeholder="0" className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-black text-xl text-teal-700 outline-none focus:border-teal-600 shadow-inner" />
+              <input type="text" name="amount" required defaultValue={editingSaving ? formatN(editingSaving.amount) : ''} onInput={(e) => { e.target.value = formatN(parseN(e.target.value)); setSavingCalc(prev => ({ ...prev, amount: parseN(e.target.value) })); }} placeholder="0" className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-black text-xl text-slate-800 outline-none focus:border-amber-500 shadow-inner" />
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Lãi suất (%/năm)</label><input type="number" step="0.1" name="interestRate" required defaultValue={editingSaving?.interestRate} onChange={(e) => setSavingCalc(prev => ({ ...prev, rate: Number(e.target.value) }))} placeholder="VD: 5.5" className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-teal-600 shadow-inner" /></div>
-              <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Kỳ hạn (Tháng)</label><input type="number" step="any" name="termMonths" required defaultValue={editingSaving?.termMonths} onChange={(e) => setSavingCalc(prev => ({ ...prev, months: Number(e.target.value) }))} placeholder="VD: 6, hoặc 0.5..." className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-teal-600 shadow-inner" /></div>
+              <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Lãi suất (%/năm)</label><input type="number" step="0.1" name="interestRate" required defaultValue={editingSaving?.interestRate} onChange={(e) => setSavingCalc(prev => ({ ...prev, rate: Number(e.target.value) }))} placeholder="VD: 5.5" className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-amber-500 shadow-inner" /></div>
+              <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Kỳ hạn (Tháng)</label><input type="number" step="any" name="termMonths" required defaultValue={editingSaving?.termMonths} onChange={(e) => setSavingCalc(prev => ({ ...prev, months: Number(e.target.value) }))} placeholder="VD: 6, hoặc 0.5..." className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-amber-500 shadow-inner" /></div>
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Ngày gửi</label>
-              <input type="date" name="startDate" required defaultValue={getSafeDate(editingSaving?.startDate)} className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-teal-600 shadow-inner" />
+              <input type="date" name="startDate" required defaultValue={getSafeDate(editingSaving?.startDate)} className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-amber-500 shadow-inner" />
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Ghi chú thêm</label>
-              <textarea name="note" rows="2" defaultValue={editingSaving?.note} placeholder="Tùy chọn..." className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-sm outline-none focus:border-teal-600 shadow-inner resize-none"></textarea>
+              <textarea name="note" rows="2" defaultValue={editingSaving?.note} placeholder="Tùy chọn..." className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-sm outline-none focus:border-amber-500 shadow-inner resize-none"></textarea>
             </div>
 
             <div className="flex gap-2 pt-3">
               {editingSaving && (
                 <button type="button" onClick={() => handleDeleteSaving(editingSaving.id)} className="flex-1 bg-red-50 text-red-600 py-4 rounded-xl font-black uppercase text-[11px] shadow-sm active:scale-95 border-b-4 border-red-200 transition-all">Xóa sổ</button>
               )}
-              <button type="submit" className={`flex-[2] text-white py-4 rounded-xl font-black uppercase text-[11px] shadow-lg transition-all active:scale-95 border-b-4 bg-teal-600 border-teal-800`}>
+              <button type="submit" className={`flex-[2] text-white py-4 rounded-xl font-black uppercase text-[11px] shadow-lg transition-all active:scale-95 border-b-4 bg-slate-900 border-slate-950 hover:bg-slate-800`}>
                 {editingSaving ? 'Lưu thay đổi' : 'Thêm sổ tiết kiệm'}
               </button>
             </div>
