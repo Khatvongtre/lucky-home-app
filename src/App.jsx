@@ -278,8 +278,8 @@ const AddRoomForm = ({ onSave, onDelete, editingRoom, sharedHeaters, formatN, pa
       <div className="space-y-2">
         <label className="text-[8px] font-black text-slate-400 uppercase px-1">Trạng thái phòng</label>
         <div className="flex p-1 bg-slate-100 rounded-xl gap-1">
-          <button type="button" onClick={() => setStatus('full')} className={`flex-1 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all ${status === 'full' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>Đã chốt</button>
-          <button type="button" onClick={() => setStatus('empty')} className={`flex-1 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all ${status === 'empty' ? 'bg-red-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}>Đang trống</button>
+          <button type="button" onClick={() => setStatus('full')} className={`flex-1 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all ${status === 'full' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-600'}`}>Đã chốt</button>
+          <button type="button" onClick={() => setStatus('empty')} className={`flex-1 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all ${status === 'empty' ? 'bg-red-500 text-white' : 'text-slate-400 hover:text-slate-600'}`}>Đang trống</button>
         </div>
         <input type="hidden" name="status" value={status} />
       </div>
@@ -340,11 +340,11 @@ const AddRoomForm = ({ onSave, onDelete, editingRoom, sharedHeaters, formatN, pa
 
       <div className="flex gap-2 mt-4">
         {editingRoom && (
-          <button type="button" onClick={() => onDelete(editingRoom.id, editingRoom.roomCode)} className="flex-1 bg-red-50 text-red-600 py-4 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-sm border-b-4 border-red-200 active:translate-y-1 transition-all text-center">
+          <button type="button" onClick={() => onDelete(editingRoom.id, editingRoom.roomCode)} className="flex-1 bg-red-50 text-red-600 py-4 rounded-xl font-black uppercase text-[10px] tracking-widest border-b-4 border-red-200 active:translate-y-1 transition-all text-center">
             Xóa
           </button>
         )}
-        <button type="submit" className="flex-[2] bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl border-b-4 border-blue-800 active:translate-y-1 transition-all text-center">
+        <button type="submit" className="flex-[2] bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest border-b-4 border-blue-800 active:translate-y-1 transition-all text-center">
           {status === 'full' ? 'Lưu phòng' : 'Lưu phòng trống'}
         </button>
       </div>
@@ -377,6 +377,7 @@ const App = () => {
   const [isAddTransactionModalOpen, setIsAddTransactionModalOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState(null);
   const [isAddMeterModalOpen, setIsAddMeterModalOpen] = useState(false);
+  const [editingMeter, setEditingMeter] = useState(null);
   const [mappingMeter, setMappingMeter] = useState(null);
   const [bottomSheet, setBottomSheet] = useState(null);
   const [isAiCreateHouseOpen, setIsAiCreateHouseOpen] = useState(false);
@@ -396,6 +397,7 @@ const App = () => {
   const [selectedStatsHouses, setSelectedStatsHouses] = useState([]);
   const [unselectedSavingsBanks, setUnselectedSavingsBanks] = useState([]);
   const [collapsedSavingsBanks, setCollapsedSavingsBanks] = useState([]);
+  const [settingsExpanded, setSettingsExpanded] = useState({ services: true, qr: false, pass: false });
 
   // --- Real Data State ---
   const [houses, setHouses] = useState([]);
@@ -417,6 +419,8 @@ const App = () => {
   const [isCatOpen, setIsCatOpen] = useState(false);
   const [isMonthOpen, setIsMonthOpen] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState('this-month');
+  const [isFinanceStatsOpen, setIsFinanceStatsOpen] = useState(true);
+  const [isSavingsStatsOpen, setIsSavingsStatsOpen] = useState(true);
 
   // Hàm hiển thị thông báo với Type (success/error)
   const showToast = useCallback((text, type = 'success') => {
@@ -552,14 +556,28 @@ const App = () => {
 
   // Lấy danh sách nhà
   useEffect(() => {
-    if (isLoggedIn) {
-      fetchApi('/houses')
-        .then(data => setHouses(data))
-        .catch(err => {
+    if (isLoggedIn && !selectedHouse) {
+      const fetchHousesAndStats = async () => {
+        try {
+          const data = await fetchApi('/houses');
+          const housesWithStats = await Promise.all(data.map(async (h) => {
+            try {
+              const txData = await fetchApi(`/management/transactions/${h.id}?type=this-month`);
+              const txExp = txData.filter(t => t.type === 'out').reduce((s, t) => s + (t.amount || 0), 0);
+              const txRev = txData.filter(t => t.type === 'in').reduce((s, t) => s + (t.amount || 0), 0);
+              return { ...h, calculatedTxExp: txExp, calculatedTxRev: txRev };
+            } catch (e) {
+              return { ...h, calculatedTxExp: h.expense || 0, calculatedTxRev: h.revenue || 0 };
+            }
+          }));
+          setHouses(housesWithStats);
+        } catch (err) {
           showToast(err.message, 'error');
-        });
+        }
+      };
+      fetchHousesAndStats();
     }
-  }, [isLoggedIn, fetchApi, showToast]);
+  }, [isLoggedIn, selectedHouse, fetchApi, showToast]);
 
   const loadHouseData = useCallback(async (houseId) => {
     try {
@@ -570,8 +588,14 @@ const App = () => {
       setMeters([]);
       setBills([]);
 
-      const h = houses.find(x => x.id === houseId);
-      if (h) setConfig({ ...h });
+      // Cập nhật lại danh sách nhà để đồng bộ Doanh thu / Chi phí mới nhất
+      const updatedHouses = await fetchApi('/houses');
+      setHouses(updatedHouses);
+      const h = updatedHouses.find(x => x.id === houseId);
+      if (h) {
+        setConfig({ ...h });
+        setSelectedHouse(h);
+      }
 
       const roomsData = await fetchApi(`/management/rooms/${houseId}`);
       setRooms(roomsData);
@@ -688,8 +712,18 @@ const App = () => {
       }
       // [QUAN TRỌNG]: Thay vì tự setHouses thủ công, hãy gọi lại API lấy danh sách mới nhất
       // Điều này đảm bảo house mới có đầy đủ UserRole và các trường thống kê từ Backend
-      const updatedHouses = await fetchApi('/houses', 'GET');
-      setHouses(updatedHouses);
+      const data = await fetchApi('/houses', 'GET');
+      const housesWithStats = await Promise.all(data.map(async (h) => {
+        try {
+          const txData = await fetchApi(`/management/transactions/${h.id}?type=this-month`);
+          const txExp = txData.filter(t => t.type === 'out').reduce((s, t) => s + (t.amount || 0), 0);
+          const txRev = txData.filter(t => t.type === 'in').reduce((s, t) => s + (t.amount || 0), 0);
+          return { ...h, calculatedTxExp: txExp, calculatedTxRev: txRev };
+        } catch (e) {
+          return { ...h, calculatedTxExp: h.expense || 0, calculatedTxRev: h.revenue || 0 };
+        }
+      }));
+      setHouses(housesWithStats);
 
       setIsAiCreateHouseOpen(false);
       setEditingHouse(null);
@@ -814,6 +848,45 @@ const App = () => {
       setEditingTransaction(null);
       showToast("Đã xóa phiếu thu chi!", "success");
     } catch (e) { showToast("Lỗi: " + e.message, "error"); }
+  };
+
+  const handleSaveMeter = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const payload = {
+      id: editingMeter ? editingMeter.id : fd.get('mid'),
+      houseId: selectedHouse?.id,
+      type: fd.get('type'),
+      name: fd.get('name'),
+      oldVal: Number(fd.get('val'))
+    };
+    try {
+      if (editingMeter) {
+        await fetchApi(`/management/meters/${editingMeter.id}`, 'PUT', payload);
+        showToast("Đã cập nhật công tơ!", "success");
+      } else {
+        await fetchApi('/management/meters', 'POST', payload);
+        showToast("Đã tạo công tơ!", "success");
+      }
+      await loadHouseData(selectedHouse?.id);
+      setIsAddMeterModalOpen(false);
+      setEditingMeter(null);
+    } catch (err) {
+      showToast("Lỗi: " + err.message, "error");
+    }
+  };
+
+  const handleDeleteMeter = async (meterId) => {
+    if (!window.confirm("Bạn có chắc muốn xóa công tơ này?")) return;
+    try {
+      await fetchApi(`/management/meters/${meterId}`, 'DELETE');
+      await loadHouseData(selectedHouse?.id);
+      setIsAddMeterModalOpen(false);
+      setEditingMeter(null);
+      showToast("Đã xóa công tơ", "success");
+    } catch (err) {
+      showToast("Lỗi: " + err.message, "error");
+    }
   };
 
   const handleSaveMetersAndGenerateBills = async () => {
@@ -1337,7 +1410,13 @@ const App = () => {
   const stats = useMemo(() => {
     const full = rooms.filter(r => r.status === 'full');
     const totalRev = transactions.filter(t => t.type === 'in').reduce((s, t) => s + (t.amount || 0), 0);
-    const totalExp = transactions.filter(t => t.type === 'out').reduce((s, t) => s + (t.amount || 0), 0);
+
+    // Chi phí phát sinh (từ phiếu chi)
+    const txExp = transactions.filter(t => t.type === 'out').reduce((s, t) => s + (t.amount || 0), 0);
+    // Chi phí cố định (Tiền thuê nhà, Internet, Phí khác...)
+    const fixedCosts = (selectedHouse?.rentPrice || 0) + (selectedHouse?.internetFee || 0) + (selectedHouse?.otherFees || 0);
+    // TỔNG CHI PHÍ
+    const totalExp = txExp + fixedCosts;
 
     let totalKwh = 0;
     meters.forEach(m => {
@@ -1353,8 +1432,8 @@ const App = () => {
     });
     const elecCost = totalKwh * (config.priceElec || 0);
 
-    return { rev: totalRev, exp: totalExp, total: rooms.length, empty: rooms.length - full.length, people: full.reduce((s, r) => s + (r.peopleCount ?? r.people ?? 0), 0), ebikes: full.reduce((s, r) => s + (r.eBikeCount ?? r.ebikes ?? 0), 0), elecCost };
-  }, [rooms, transactions, meters, config.priceElec]);
+    return { rev: totalRev, exp: totalExp, txExp, fixedCosts, total: rooms.length, empty: rooms.length - full.length, people: full.reduce((s, r) => s + (r.peopleCount ?? r.people ?? 0), 0), ebikes: full.reduce((s, r) => s + (r.eBikeCount ?? r.ebikes ?? 0), 0), elecCost };
+  }, [rooms, transactions, meters, config.priceElec, selectedHouse]);
 
   const revenueChartData = useMemo(() => {
     if (!rawChartData || rawChartData.length === 0) {
@@ -1539,10 +1618,19 @@ const App = () => {
       acc.totalHouses += 1;
       acc.totalRooms += (h.totalRooms || 0);
       acc.emptyRooms += (h.emptyRooms || 0);
-      acc.totalRevenue += (h.revenue || 0);
-      acc.totalProfit += (h.revenue || 0) - (h.expense || 0) - (h.rentPrice || 0) - (h.internetFee || 0) - (h.otherFees || 0);
+
+      // Doanh thu = Tổng các khoản thu (từ phiếu thu)
+      const grossRev = h.calculatedTxRev !== undefined ? h.calculatedTxRev : (h.revenue || 0);
+      // Chi phí = Các khoản chi ra (từ phiếu chi) + Phí cố định
+      const txExp = h.calculatedTxExp !== undefined ? h.calculatedTxExp : (h.expense || 0);
+      const fixedCosts = (h.rentPrice || 0) + (h.internetFee || 0) + (h.otherFees || 0);
+      const totalExp = txExp + fixedCosts;
+
+      acc.totalRevenue += grossRev;
+      acc.totalExpense += totalExp;
+      acc.totalProfit += grossRev - totalExp;
       return acc;
-    }, { totalHouses: 0, totalRooms: 0, emptyRooms: 0, totalRevenue: 0, totalProfit: 0 });
+    }, { totalHouses: 0, totalRooms: 0, emptyRooms: 0, totalRevenue: 0, totalExpense: 0, totalProfit: 0 });
 
     // --- LOGIC TÍNH NGÀY ĐẾN HẠN NÂNG CAO (HỖ TRỢ ĐÓNG NHIỀU THÁNG) ---
     const getAdvancedDueInfo = (startDate, paymentDay, paymentPeriod) => {
@@ -1601,17 +1689,21 @@ const App = () => {
 
             {/* Box Thống kê */}
             <div className="bg-slate-900 rounded-xl p-3.5 text-white shadow-xl border-b-4 border-blue-600">
-              <div className="flex justify-between items-center mb-3 px-2">
-                <div>
-                  <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Tổng doanh thu</p>
-                  <p className="text-xl font-black text-emerald-400 tabular-nums">+{formatN(houseStats.totalRevenue)}</p>
+              <div className="flex justify-between items-center mb-3 px-2 border-b border-slate-700 pb-3">
+                <div className="text-left">
+                  <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Doanh thu</p>
+                  <p className="text-sm font-black text-emerald-400 tabular-nums">+{formatN(houseStats.totalRevenue)}</p>
+                </div>
+                <div className="text-center border-x border-slate-700 px-3">
+                  <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Chi phí</p>
+                  <p className="text-sm font-black text-rose-400 tabular-nums">-{formatN(houseStats.totalExpense)}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Tổng lợi nhuận</p>
-                  <p className="text-xl font-black text-blue-400 tabular-nums">{formatN(houseStats.totalProfit)}</p>
+                  <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Lợi nhuận</p>
+                  <p className="text-sm font-black text-blue-400 tabular-nums">{formatN(houseStats.totalProfit)}</p>
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-2 border-t border-slate-700 pt-2.5 text-center">
+              <div className="grid grid-cols-3 gap-2 text-center">
                 <div className="flex flex-col items-center">
                   <p className="text-[8px] font-bold text-slate-400 uppercase mb-0.5">Số nhà</p>
                   <p className="text-sm font-black">{houseStats.totalHouses}</p>
@@ -1762,7 +1854,7 @@ const App = () => {
             <div className="flex flex-col gap-2 pointer-events-auto">
               <button
                 onClick={() => { setEditingHouse(null); setIsAiCreateHouseOpen(true); }}
-                className="w-full bg-blue-600 text-white py-2.5 rounded-xl flex items-center justify-center shadow-lg active:scale-95 border-b-[3px] border-blue-800 transition-all gap-2"
+                className="w-full bg-blue-600 text-white py-2.5 rounded-xl flex items-center justify-center active:scale-95 border-b-[3px] border-blue-800 transition-all gap-2"
               >
                 <PlusCircle className="w-4 h-4 text-white" />
                 <span className="font-black text-[10px] uppercase tracking-widest mt-0.5">Thêm cơ sở mới</span>
@@ -1770,7 +1862,7 @@ const App = () => {
 
               <button
                 onClick={() => { setIsAiPromptModalOpen(true); setAiPrompt(""); setIsListening(false); }}
-                className="w-full bg-slate-800 text-white py-2.5 rounded-xl flex items-center justify-center shadow-lg active:scale-95 border-b-[3px] border-slate-900 transition-all gap-2"
+                className="w-full bg-slate-800 text-white py-2.5 rounded-xl flex items-center justify-center active:scale-95 border-b-[3px] border-slate-900 transition-all gap-2"
               >
                 <Sparkles className="w-4 h-4 text-indigo-300" />
                 <span className="font-black text-[10px] uppercase tracking-widest mt-0.5">Tạo nhanh bằng AI</span>
@@ -1808,7 +1900,7 @@ const App = () => {
                 </select>
               </div>
 
-              <button type="submit" className="w-full bg-blue-600 text-white py-3.5 rounded-xl font-black uppercase text-[11px] shadow-lg flex items-center justify-center gap-2 border-b-4 border-blue-800 text-center mt-4 active:scale-95 transition-all">
+              <button type="submit" className="w-full bg-blue-600 text-white py-3.5 rounded-xl font-black uppercase text-[11px] flex items-center justify-center gap-2 border-b-4 border-blue-800 text-center mt-4 active:scale-95 transition-all">
                 <UserCheck className="w-4 h-4" /> Xác nhận cấp quyền
               </button>
             </form>
@@ -1838,7 +1930,7 @@ const App = () => {
                   <div className="space-y-1 col-span-2"><label className="text-[8px] font-black text-slate-400 uppercase px-1">9. Ghi chú</label><textarea name="notes" defaultValue={editingHouse?.notes || ''} rows="2" placeholder="Ghi chú thêm..." className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600 resize-none" /></div>
                 </div>
               </div>
-              <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-[11px] shadow-lg flex items-center justify-center gap-2 border-b-4 border-blue-800 text-center mt-4">
+              <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-[11px] flex items-center justify-center gap-2 border-b-4 border-blue-800 text-center mt-4">
                 <Save className="w-4 h-4" /> {editingHouse ? "Lưu thay đổi" : "Khởi tạo cơ sở"}
               </button>
             </form>
@@ -1959,7 +2051,7 @@ const App = () => {
                     showToast("Lỗi khi tạo AI: " + e.message, "error");
                   }
                 }}
-                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 rounded-xl font-black uppercase text-[11px] shadow-xl shadow-indigo-200 flex items-center justify-center gap-2 border-b-4 border-indigo-800 text-center mt-4 active:scale-95 transition-all"
+                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 rounded-xl font-black uppercase text-[11px] flex items-center justify-center gap-2 border-b-4 border-indigo-800 text-center mt-4 active:scale-95 transition-all"
               >
                 <Sparkles className="w-4 h-4 text-indigo-100" /> Bắt đầu tạo tự động
               </button>
@@ -2020,7 +2112,7 @@ const App = () => {
             if (activeTab === 'finance') setIsAddTransactionModalOpen(true);
             if (activeTab === 'meters_list') setIsAddMeterModalOpen(true);
             if (activeTab === 'savings') { setEditingSaving(null); setSavingCalc({ amount: 0, rate: 0, months: 0 }); setIsAddSavingModalOpen(true); }
-          }} className="p-1.5 bg-blue-600 text-white rounded-lg shadow-sm active:scale-90 transition-all flex items-center justify-center">
+          }} className="p-1.5 bg-blue-600 text-white rounded-lg active:scale-90 transition-all flex items-center justify-center">
             <Plus className="w-4.5 h-4.5" strokeWidth={4} />
           </button>
         </div>
@@ -2038,7 +2130,7 @@ const App = () => {
                   <div className="p-2 bg-white/20 rounded-lg"><Zap className="w-5 h-5" /></div>
                   <div><p className="font-black text-sm uppercase">Đến hạn chốt điện</p><p className="text-[9px] font-bold opacity-90">Kỳ chốt công tơ điện tháng này</p></div>
                 </div>
-                <button onClick={() => setActiveTab('meters_list')} className="px-4 py-2 bg-white text-orange-600 rounded-lg font-black text-[10px] active:scale-95 shadow-md">Ghi Số</button>
+                <button onClick={() => setActiveTab('meters_list')} className="px-4 py-2 bg-white text-orange-600 rounded-lg font-black text-[10px] active:scale-95">Ghi Số</button>
               </div>
             )}
 
@@ -2050,16 +2142,27 @@ const App = () => {
             </div>
 
             {isOwnerOrAdmin && (
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-blue-600 p-4 rounded-xl text-white shadow-sm relative overflow-hidden border-b-4 border-blue-800">
-                  <TrendingUp className="w-10 h-10 opacity-10 absolute -right-2 -top-2" />
-                  <p className="text-[8px] font-black uppercase tracking-widest mb-1 opacity-60">Doanh thu</p>
-                  <h3 className="text-2xl font-black">{formatN(stats.rev)}</h3>
+              <div className="bg-slate-900 p-5 rounded-xl text-white shadow-xl relative overflow-hidden border-b-4 border-emerald-500">
+                <div className="absolute -right-4 -top-4 w-32 h-32 bg-emerald-500 rounded-full blur-3xl opacity-20 pointer-events-none"></div>
+                <div className="flex justify-between items-start mb-2 relative z-10">
+                  <div>
+                    <p className="text-[9px] font-black uppercase tracking-widest mb-1 text-slate-400">Tổng doanh thu dự kiến</p>
+                    <h3 className="text-3xl font-black text-emerald-400 tabular-nums leading-none">+{formatN(stats.rev)}</h3>
+                  </div>
+                  <div className="p-2 bg-emerald-500/20 rounded-lg">
+                    <TrendingUp className="w-5 h-5 text-emerald-400" />
+                  </div>
                 </div>
-                <div className="bg-emerald-600 p-4 rounded-xl text-white shadow-sm relative overflow-hidden border-b-4 border-emerald-800">
-                  <CircleDollarSign className="w-10 h-10 opacity-10 absolute -right-2 -top-2" />
-                  <p className="text-[8px] font-black uppercase tracking-widest mb-1 opacity-60">Lợi nhuận</p>
-                  <h3 className="text-2xl font-black">{formatN(stats.rev - stats.exp - (selectedHouse?.rentPrice || 0) - (selectedHouse?.internetFee || 0) - (selectedHouse?.otherFees || 0))}</h3>
+
+                <div className="grid grid-cols-2 gap-4 border-t border-slate-700/80 pt-3 mt-4 relative z-10">
+                  <div>
+                    <p className="text-[8px] font-black uppercase tracking-widest mb-1 text-slate-400">Tổng chi phí</p>
+                    <p className="text-sm font-black text-rose-400">-{formatN(stats.exp)}</p>
+                  </div>
+                  <div className="text-right border-l border-slate-700/80 pl-4">
+                    <p className="text-[8px] font-black uppercase tracking-widest mb-1 text-slate-400">Lợi nhuận ròng</p>
+                    <p className="text-sm font-black text-blue-400">{formatN(stats.rev - stats.exp)}</p>
+                  </div>
                 </div>
               </div>
             )}
@@ -2101,8 +2204,11 @@ const App = () => {
             {/* Sticky Header with Totals */}
             <div className="sticky top-0 z-30 bg-slate-50/80 backdrop-blur-md pt-2 pb-4 px-1">
               <div className="bg-slate-900 p-6 rounded-xl text-white shadow-xl relative border-b-8 border-slate-950">
-                <div className="flex justify-between items-center mb-1">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tổng tiền gửi tiết kiệm</p>
+                <div className="flex justify-between items-center">
+                  <button onClick={() => setIsSavingsStatsOpen(!isSavingsStatsOpen)} className="flex items-center gap-1 active:scale-95 transition-all text-left">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tổng tiền gửi tiết kiệm</p>
+                    <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-300 ${!isSavingsStatsOpen ? 'rotate-180' : ''}`} />
+                  </button>
                   {uniqueBankNames.length > 0 && (
                     <button
                       onClick={() => {
@@ -2121,20 +2227,24 @@ const App = () => {
                     </button>
                   )}
                 </div>
-                <h3 className="text-4xl font-black tracking-tight tabular-nums text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-yellow-400">
-                  {formatN(summarySavings.reduce((a, b) => a + (b.amount || 0), 0))}
-                </h3>
-                <div className="mt-5 grid grid-cols-2 gap-3">
-                  <div className="bg-white/5 p-3.5 rounded-xl border border-white/10 relative overflow-hidden">
-                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Lãi / tháng</p>
-                    <p className="text-base font-black text-amber-400 tabular-nums">+{formatN(summarySavings.reduce((a, b) => a + Math.round((b.amount || 0) * ((b.interestRate || 0) / 100) / 12), 0))}</p>
+                {isSavingsStatsOpen && (
+                  <div className="animate-in slide-in-from-top-2 duration-200 mt-3">
+                    <h3 className="text-4xl font-black tracking-tight tabular-nums text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-yellow-400">
+                      {formatN(summarySavings.reduce((a, b) => a + (b.amount || 0), 0))}
+                    </h3>
+                    <div className="mt-5 grid grid-cols-2 gap-3">
+                      <div className="bg-white/5 p-3.5 rounded-xl border border-white/10 relative overflow-hidden">
+                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Lãi / tháng</p>
+                        <p className="text-base font-black text-amber-400 tabular-nums">+{formatN(summarySavings.reduce((a, b) => a + Math.round((b.amount || 0) * ((b.interestRate || 0) / 100) / 12), 0))}</p>
+                      </div>
+                      <div className="bg-white/5 p-3.5 rounded-xl border border-white/10 relative overflow-hidden">
+                        <PiggyBank className="w-10 h-10 absolute -right-2 -bottom-2 opacity-10 text-white" />
+                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Tổng lãi dự kiến</p>
+                        <p className="text-base font-black text-amber-400 tabular-nums">+{formatN(summarySavings.reduce((a, b) => a + Math.round((b.amount || 0) * ((b.interestRate || 0) / 100) * ((b.termMonths || 0) / 12)), 0))}</p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="bg-white/5 p-3.5 rounded-xl border border-white/10 relative overflow-hidden">
-                    <PiggyBank className="w-10 h-10 absolute -right-2 -bottom-2 opacity-10 text-white" />
-                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Tổng lãi dự kiến</p>
-                    <p className="text-base font-black text-amber-400 tabular-nums">+{formatN(summarySavings.reduce((a, b) => a + Math.round((b.amount || 0) * ((b.interestRate || 0) / 100) * ((b.termMonths || 0) / 12)), 0))}</p>
-                  </div>
-                </div>
+                )}
               </div>
             </div>
 
@@ -2186,7 +2296,7 @@ const App = () => {
                                   setCollapsedSavingsBanks([...collapsedSavingsBanks, bank]);
                                 }
                               }}
-                              className="p-1 -mr-1 text-slate-400 hover:bg-slate-200 rounded-md transition-colors"
+                              className="p-1 -mr-1 text-slate-400 hover:bg-slate-200 rounded-md transition-colors shadow-none"
                             >
                               <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${!isCollapsed ? 'rotate-180' : ''}`} />
                             </button>
@@ -2291,7 +2401,7 @@ const App = () => {
                       <span className={`px-2 py-0.5 rounded-md font-black text-[10px] shadow-sm ${r.status === 'full' ? 'bg-blue-600 text-white' : 'bg-red-600 text-white'}`}>
                         {r.roomType === 'mbkd' ? 'MBKD ' : 'P.'}{r.roomCode || r.id} {r.status === 'empty' ? '- TRỐNG' : ''}
                       </span>
-                      <button onClick={() => { setEditingRoom(r); setIsAddRoomModalOpen(true); }} className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-white hover:bg-blue-300 hover:text-white active:scale-95 transition-all shadow-sm"><LucideEdit className="w-3 h-3" /></button>
+                      <button onClick={() => { setEditingRoom(r); setIsAddRoomModalOpen(true); }} className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-white hover:bg-blue-300 hover:text-white active:scale-95 transition-all"><LucideEdit className="w-3 h-3" /></button>
                     </div>
                     <p className="text-[13px] font-black text-rose-800 leading-none mb-2">{formatN(r.price)}</p>
 
@@ -2312,7 +2422,7 @@ const App = () => {
 
             {/* NÚT THÊM PHÒNG CHO NGƯỜI DÙNG */}
             {isManagerOrAbove && (
-              <button onClick={() => { setEditingRoom(null); setIsAddRoomModalOpen(true); }} className="w-full mt-6 bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all">
+              <button onClick={() => { setEditingRoom(null); setIsAddRoomModalOpen(true); }} className="w-full mt-6 bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all">
                 <PlusCircle className="w-4 h-4 text-white" /> Thêm Phòng Mới
               </button>
             )}
@@ -2352,7 +2462,7 @@ const App = () => {
                 </button>
                 <button
                   onClick={executeGenerateBills}
-                  className="flex-1 py-4 bg-blue-600 text-white font-black uppercase text-[10px] rounded-2xl shadow-lg shadow-blue-200 active:scale-95 transition-all border-b-4 border-blue-800"
+                  className="flex-1 py-4 bg-blue-600 text-white font-black uppercase text-[10px] rounded-2xl active:scale-95 transition-all border-b-4 border-blue-800"
                 >
                   Đồng ý tạo lại
                 </button>
@@ -2528,9 +2638,14 @@ const App = () => {
                           </p>
                         </div>
                       </div>
-                      <button onClick={() => setMappingMeter(m)} className="p-2 bg-slate-50 text-slate-400 rounded-xl active:bg-orange-50 active:text-orange-500 transition-all">
-                        <Boxes className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => { setEditingMeter(m); setIsAddMeterModalOpen(true); }} className="p-2 bg-slate-50 text-slate-400 rounded-xl hover:text-blue-600 transition-all">
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => setMappingMeter(m)} className="p-2 bg-slate-50 text-slate-400 rounded-xl active:bg-orange-50 active:text-orange-500 transition-all">
+                          <Boxes className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
@@ -2553,7 +2668,7 @@ const App = () => {
               <div className="fixed bottom-[4.5rem] left-1/2 -translate-x-1/2 w-full max-w-lg px-4 z-40">
                 <button
                   onClick={handleSaveMetersAndGenerateBills}
-                  className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-[11px] shadow-xl border-b-4 border-blue-800 active:translate-y-1 transition-all flex items-center justify-center gap-2"
+                  className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-[11px] border-b-4 border-blue-800 active:translate-y-1 transition-all flex items-center justify-center gap-2"
                 >
                   <Receipt className="w-4 h-4" /> Xác nhận lưu & Lập hóa đơn {monthDisplay}
                 </button>
@@ -2567,13 +2682,20 @@ const App = () => {
           <div className="animate-in fade-in pb-20">
             {/* BOX TỔNG HỢP - STICKY */}
             <div className="sticky top-0 z-30 bg-slate-50/80 backdrop-blur-md pt-2 pb-4 px-1">
-              <div className="bg-slate-900 p-6 rounded-xl text-white shadow-xl relative border-b-8 border-blue-600">
+              <div className="bg-slate-900 p-5 rounded-2xl text-white shadow-2xl relative border-b-4 border-blue-600 overflow-hidden">
+                <div className="absolute top-0 right-0 w-40 h-40 bg-blue-600 rounded-full blur-3xl opacity-20 pointer-events-none"></div>
 
                 {/* Header Row: Label + Custom Dropdown */}
-                <div className="flex justify-between items-center mb-1">
-                  <p className="text-[10px] font-black text-blue-300 uppercase tracking-widest">
-                    Tổng thu chi
-                  </p>
+                <div className="flex justify-between items-center relative z-10">
+                  <button onClick={() => setIsFinanceStatsOpen(!isFinanceStatsOpen)} className="flex items-center gap-2 active:scale-95 transition-all text-left">
+                    <div className="p-1.5 bg-blue-500/20 rounded-lg">
+                      <Wallet className="w-4 h-4 text-blue-400" />
+                    </div>
+                    <p className="text-[10px] font-black text-blue-300 uppercase tracking-widest flex items-center gap-1">
+                      Báo cáo tài chính
+                      <ChevronDown className={`w-3.5 h-3.5 text-blue-400 transition-transform duration-300 ${!isFinanceStatsOpen ? 'rotate-180' : ''}`} />
+                    </p>
+                  </button>
 
                   {/* CUSTOM DROPDOWN UI */}
                   <div className="relative">
@@ -2612,20 +2734,37 @@ const App = () => {
                   </div>
                 </div>
 
-                <h3 className="text-4xl font-black tracking-tight tabular-nums">
-                  {formatN(stats.rev - stats.exp)}
-                </h3>
+                {isFinanceStatsOpen && (
+                  <div className="animate-in slide-in-from-top-2 duration-200 mt-5">
+                    <div className="text-center mb-5 relative z-10">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Lợi nhuận ròng</p>
+                      <h3 className="text-4xl font-black tracking-tight tabular-nums text-transparent bg-clip-text bg-gradient-to-r from-blue-200 to-blue-400">
+                        {formatN(stats.rev - stats.exp)}
+                      </h3>
+                    </div>
 
-                <div className="mt-6 flex gap-8 border-t border-white/10 pt-4">
-                  <div>
-                    <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">Thu vào</p>
-                    <p className="text-base font-black text-emerald-400">+{formatN(stats.rev)}</p>
+                    <div className="grid grid-cols-2 gap-3 relative z-10">
+                      <div className="bg-white/5 border border-white/10 rounded-xl p-3.5">
+                        <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Tổng Doanh Thu</p>
+                        <p className="text-lg font-black text-emerald-400">+{formatN(stats.rev)}</p>
+                      </div>
+                      <div className="bg-white/5 border border-white/10 rounded-xl p-3.5">
+                        <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Tổng Chi Phí</p>
+                        <p className="text-lg font-black text-rose-400 mb-2">-{formatN(stats.exp)}</p>
+                        <div className="space-y-1 border-t border-white/10 pt-2">
+                          <div className="flex justify-between items-center text-[8px] font-bold">
+                            <span className="text-slate-400">Phí cố định</span>
+                            <span className="text-slate-300">{formatN(stats.fixedCosts)}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-[8px] font-bold">
+                            <span className="text-slate-400">Phát sinh</span>
+                            <span className="text-slate-300">{formatN(stats.txExp)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-[9px] font-bold text-slate-500 uppercase mb-1">Chi ra</p>
-                    <p className="text-base font-black text-rose-400">-{formatN(stats.exp)}</p>
-                  </div>
-                </div>
+                )}
               </div>
             </div>
 
@@ -2678,7 +2817,7 @@ const App = () => {
                 <button
                   type="button"
                   onClick={() => setTxType('in')}
-                  className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase transition-all flex items-center justify-center gap-2 ${txType === 'in' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400'
+                  className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase transition-all flex items-center justify-center gap-2 ${txType === 'in' ? 'bg-white text-emerald-600' : 'text-slate-400'
                     }`}
                 >
                   <div className={`w-2 h-2 rounded-full ${txType === 'in' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
@@ -2687,7 +2826,7 @@ const App = () => {
                 <button
                   type="button"
                   onClick={() => setTxType('out')}
-                  className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase transition-all flex items-center justify-center gap-2 ${txType === 'out' ? 'bg-white text-rose-600 shadow-sm' : 'text-slate-400'
+                  className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase transition-all flex items-center justify-center gap-2 ${txType === 'out' ? 'bg-white text-rose-600' : 'text-slate-400'
                     }`}
                 >
                   <div className={`w-2 h-2 rounded-full ${txType === 'out' ? 'bg-rose-500 animate-pulse' : 'bg-slate-300'}`} />
@@ -2772,11 +2911,11 @@ const App = () => {
               {/* 5. NÚT XÁC NHẬN */}
               <div className="flex gap-2 pt-3">
                 {editingTransaction && (
-                  <button type="button" onClick={() => handleDeleteTransaction(editingTransaction.id)} className="flex-1 bg-red-50 text-red-600 py-4 rounded-xl font-black uppercase text-[11px] shadow-sm active:scale-95 border-b-4 border-red-200">
+                  <button type="button" onClick={() => handleDeleteTransaction(editingTransaction.id)} className="flex-1 bg-red-50 text-red-600 py-4 rounded-xl font-black uppercase text-[11px] active:scale-95 border-b-4 border-red-200">
                     Xóa
                   </button>
                 )}
-                <button type="submit" className={`flex-[2] text-white py-4 rounded-xl font-black uppercase text-[11px] shadow-lg transition-all active:scale-95 border-b-4 ${txType === 'in' ? 'bg-emerald-600 border-emerald-800' : 'bg-rose-600 border-rose-800'}`}>
+                <button type="submit" className={`flex-[2] text-white py-4 rounded-xl font-black uppercase text-[11px] transition-all active:scale-95 border-b-4 ${txType === 'in' ? 'bg-emerald-600 border-emerald-800' : 'bg-rose-600 border-rose-800'}`}>
                   {editingTransaction ? 'Lưu thay đổi' : 'Xác nhận'}
                 </button>
               </div>
@@ -2823,30 +2962,44 @@ const App = () => {
             </div>
 
             <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-              <div className="bg-blue-600 px-5 py-3">
+              <button
+                onClick={() => setSettingsExpanded(prev => ({ ...prev, services: !prev.services }))}
+                className="w-full bg-blue-600 px-5 py-4 flex items-center justify-between active:bg-blue-700 transition-colors"
+              >
                 <h4 className="text-[10px] font-black text-white uppercase tracking-widest">Bảng giá dịch vụ</h4>
-              </div>
-              <div className="p-5 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Điện (/kWh)</label><input type="text" value={formatN(config.priceElec)} onChange={e => setConfig({ ...config, priceElec: parseN(e.target.value) })} className="w-full bg-slate-50 p-2.5 rounded-lg font-black text-xs outline-none focus:border-blue-600 border border-transparent" /></div>
-                  <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Tính tiền nước</label>
-                    <select value={config.waterCalcMethod || 'person'} onChange={e => setConfig({ ...config, waterCalcMethod: e.target.value })} className="w-full bg-slate-50 p-2.5 rounded-lg font-black text-xs outline-none appearance-none focus:border-blue-600">
-                      <option value="person">Theo người</option><option value="m3">Theo khối</option>
-                    </select>
+                <ChevronDown className={`w-4 h-4 text-white transition-transform duration-300 ${settingsExpanded.services ? 'rotate-180' : ''}`} />
+              </button>
+              {settingsExpanded.services && (
+                <div className="p-5 animate-in slide-in-from-top-2 duration-200">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Điện (/kWh)</label><input type="text" value={formatN(config.priceElec)} onChange={e => setConfig({ ...config, priceElec: parseN(e.target.value) })} className="w-full bg-slate-50 p-3 rounded-xl font-black text-xs outline-none focus:border-blue-600 border border-transparent transition-all" /></div>
+                    <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Tính tiền nước</label>
+                      <select value={config.waterCalcMethod || 'person'} onChange={e => setConfig({ ...config, waterCalcMethod: e.target.value })} className="w-full bg-slate-50 p-3 rounded-xl font-black text-xs outline-none appearance-none focus:border-blue-600 border border-transparent transition-all">
+                        <option value="person">Theo người</option><option value="m3">Theo khối</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Giá Nước</label><input type="text" value={formatN(config.waterCalcMethod === 'person' ? config.priceWaterPerson : config.priceWaterM3)} onChange={e => setConfig({ ...config, [config.waterCalcMethod === 'person' ? 'priceWaterPerson' : 'priceWaterM3']: parseN(e.target.value) })} className="w-full bg-slate-50 p-3 rounded-xl font-black text-xs outline-none focus:border-blue-600 border border-transparent transition-all" /></div>
+                    <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Phí Dịch Vụ</label><input type="text" value={formatN(config.priceService)} onChange={e => setConfig({ ...config, priceService: parseN(e.target.value) })} className="w-full bg-slate-50 p-3 rounded-xl font-black text-xs outline-none focus:border-blue-600 border border-transparent transition-all" /></div>
+                    <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Internet</label><input type="text" value={formatN(config.priceNet)} onChange={e => setConfig({ ...config, priceNet: parseN(e.target.value) })} className="w-full bg-slate-50 p-3 rounded-xl font-black text-xs outline-none focus:border-blue-600 border border-transparent transition-all" /></div>
+                    <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Xe máy điện</label><input type="text" value={formatN(config.priceEBike)} onChange={e => setConfig({ ...config, priceEBike: parseN(e.target.value) })} className="w-full bg-slate-50 p-3 rounded-xl font-black text-xs outline-none focus:border-blue-600 border border-transparent transition-all" /></div>
+                    <div className="col-span-2 mt-2">
+                      <button onClick={handleSaveConfig} className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 border-b-4 border-blue-800 active:translate-y-1 transition-all"><Save className="w-4 h-4" /> Lưu cấu hình</button>
+                    </div>
                   </div>
-                  <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Giá Nước</label><input type="text" value={formatN(config.waterCalcMethod === 'person' ? config.priceWaterPerson : config.priceWaterM3)} onChange={e => setConfig({ ...config, [config.waterCalcMethod === 'person' ? 'priceWaterPerson' : 'priceWaterM3']: parseN(e.target.value) })} className="w-full bg-slate-50 p-2.5 rounded-lg font-black text-xs outline-none focus:border-blue-600 border border-transparent" /></div>
-                  <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Phí Dịch Vụ</label><input type="text" value={formatN(config.priceService)} onChange={e => setConfig({ ...config, priceService: parseN(e.target.value) })} className="w-full bg-slate-50 p-2.5 rounded-lg font-black text-xs outline-none focus:border-blue-600 border border-transparent" /></div>
-                  <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Internet</label><input type="text" value={formatN(config.priceNet)} onChange={e => setConfig({ ...config, priceNet: parseN(e.target.value) })} className="w-full bg-slate-50 p-2.5 rounded-lg font-black text-xs outline-none focus:border-blue-600 border border-transparent" /></div>
-                  <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Xe máy điện</label><input type="text" value={formatN(config.priceEBike)} onChange={e => setConfig({ ...config, priceEBike: parseN(e.target.value) })} className="w-full bg-slate-50 p-2.5 rounded-lg font-black text-xs outline-none focus:border-blue-600 border border-transparent" /></div>
                 </div>
-                <button onClick={handleSaveConfig} className="w-full bg-blue-600 text-white py-3.5 rounded-lg font-black uppercase text-[9px] shadow-lg flex items-center justify-center gap-2 border-b-4 border-blue-800 active:translate-y-1 transition-all"><Save className="w-3.5 h-3.5" /> Lưu cấu hình</button>
-              </div>
+              )}
             </div>
 
             <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden text-center">
               {/* HEADER CÓ THÊM NÚT TẢI ẢNH */}
-              <div className="bg-blue-600 px-5 py-3 flex items-center justify-between">
-                <h4 className="text-[10px] font-black text-white uppercase tracking-widest">Thông tin VietQR</h4>
+              <div className="bg-blue-600 px-5 py-3 flex items-center justify-between gap-3">
+                <button
+                  onClick={() => setSettingsExpanded(prev => ({ ...prev, qr: !prev.qr }))}
+                  className="flex items-center gap-2 flex-1 text-left"
+                >
+                  <h4 className="text-[10px] font-black text-white uppercase tracking-widest">Thông tin VietQR</h4>
+                  <ChevronDown className={`w-4 h-4 text-white transition-transform duration-300 ${settingsExpanded.qr ? 'rotate-180' : ''}`} />
+                </button>
 
                 {/* Input file ẩn đi */}
                 <input type="file" accept="image/*" ref={qrFileRef} className="hidden" onChange={handleUploadQR} />
@@ -2854,46 +3007,60 @@ const App = () => {
                 <button
                   onClick={() => qrFileRef.current?.click()}
                   disabled={isScanningQR}
-                  className="bg-white text-indigo-600 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 active:scale-95 transition-all disabled:opacity-50 shadow-sm"
+                  className="bg-white text-indigo-600 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 active:scale-95 transition-all disabled:opacity-50"
                 >
                   {isScanningQR ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <QrCode className="w-3.5 h-3.5" />}
                   {isScanningQR ? "Đang quét..." : "Upload QR"}
                 </button>
               </div>
 
-              <div className="p-5 space-y-4">
-                <div className="space-y-3 text-left">
-                  <div className="flex justify-between items-center"><p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Ngân hàng</p><input type="text" value={config.bankName || ""} onChange={e => setConfig({ ...config, bankName: e.target.value })} placeholder="VD: MB BANK" className="font-black text-slate-700 text-[11px] text-right bg-transparent border-b border-dashed border-slate-300 focus:border-blue-500 outline-none w-1/2 transition-all" /></div>
-                  <div className="flex justify-between items-center"><p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Mã BIN</p><input type="text" value={config.bankBin || "970422"} onChange={e => setConfig({ ...config, bankBin: e.target.value })} className="font-black text-slate-700 text-[11px] text-right bg-transparent border-b border-dashed border-slate-300 focus:border-blue-500 outline-none w-1/2 transition-all" /></div>
-                  <div className="flex justify-between items-center"><p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">Số tài khoản</p><input type="text" value={config.bankAcc || ""} onChange={e => setConfig({ ...config, bankAcc: e.target.value })} placeholder="9999..." className="font-black text-blue-600 text-sm tracking-widest text-right bg-transparent border-b border-dashed border-blue-300 focus:border-blue-600 outline-none w-2/3 transition-all" /></div>
+              {settingsExpanded.qr && (
+                <div className="p-5 animate-in slide-in-from-top-2 duration-200">
+                  <div className="grid grid-cols-2 gap-4 text-left">
+                    <div className="space-y-1 col-span-2"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Ngân hàng</label><input type="text" value={config.bankName || ""} onChange={e => setConfig({ ...config, bankName: e.target.value })} placeholder="VD: MB BANK" className="w-full bg-slate-50 p-3 rounded-xl font-black text-xs outline-none focus:border-blue-600 border border-transparent transition-all" /></div>
+                    <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Mã BIN</label><input type="text" value={config.bankBin || "970422"} onChange={e => setConfig({ ...config, bankBin: e.target.value })} className="w-full bg-slate-50 p-3 rounded-xl font-black text-xs outline-none focus:border-blue-600 border border-transparent transition-all" /></div>
+                    <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Số tài khoản</label><input type="text" value={config.bankAcc || ""} onChange={e => setConfig({ ...config, bankAcc: e.target.value })} placeholder="9999..." className="w-full bg-slate-50 p-3 rounded-xl font-black text-xs outline-none focus:border-blue-600 border border-transparent transition-all" /></div>
+                    <div className="col-span-2 mt-2">
+                      <button onClick={handleSaveConfig} className="w-full bg-slate-800 text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 border-b-4 border-slate-950 active:translate-y-1 transition-all"><Save className="w-4 h-4" /> Lưu STK VietQR</button>
+                    </div>
+                  </div>
                 </div>
-
-                <button onClick={handleSaveConfig} className="w-full bg-blue-600 text-white py-3.5 rounded-lg font-black uppercase text-[9px] shadow-lg flex items-center justify-center gap-2 border-b-4 border-blue-800 active:translate-y-1 transition-all"><Save className="w-3.5 h-3.5" /> Lưu STK VietQR</button>
-              </div>
+              )}
             </div>
 
-            <form onSubmit={handleChangePassword} className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-              <div className="bg-blue-600 px-5 py-3">
+            <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setSettingsExpanded(prev => ({ ...prev, pass: !prev.pass }))}
+                className="w-full bg-blue-600 px-5 py-4 flex items-center justify-between active:bg-blue-700 transition-colors"
+              >
                 <h4 className="text-[10px] font-black text-white uppercase tracking-widest">Đổi Mật Khẩu</h4>
-              </div>
-              <div className="p-5 space-y-4">
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <label className="text-[8px] font-black text-slate-400 uppercase px-1">Mật khẩu cũ</label>
-                    <input type="password" value={changePasswordForm.oldPassword || ''} onChange={e => setChangePasswordForm({ ...changePasswordForm, oldPassword: e.target.value })} className="w-full bg-slate-50 p-2.5 rounded-lg font-bold text-xs outline-none focus:border-rose-600 border border-transparent" required />
+                <ChevronDown className={`w-4 h-4 text-white transition-transform duration-300 ${settingsExpanded.pass ? 'rotate-180' : ''}`} />
+              </button>
+              {settingsExpanded.pass && (
+                <form onSubmit={handleChangePassword} className="p-5 animate-in slide-in-from-top-2 duration-200">
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[8px] font-black text-slate-400 uppercase px-1">Mật khẩu cũ</label>
+                      <input type="password" value={changePasswordForm.oldPassword || ''} onChange={e => setChangePasswordForm({ ...changePasswordForm, oldPassword: e.target.value })} className="w-full bg-slate-50 p-3 rounded-xl font-bold text-xs outline-none focus:border-rose-600 border border-transparent transition-all" required />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-slate-400 uppercase px-1">Mật khẩu mới</label>
+                        <input type="password" value={changePasswordForm.newPassword || ''} onChange={e => setChangePasswordForm({ ...changePasswordForm, newPassword: e.target.value })} className="w-full bg-slate-50 p-3 rounded-xl font-bold text-xs outline-none focus:border-rose-600 border border-transparent transition-all" required />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] font-black text-slate-400 uppercase px-1">Xác nhận MK mới</label>
+                        <input type="password" value={changePasswordForm.confirmNewPassword || ''} onChange={e => setChangePasswordForm({ ...changePasswordForm, confirmNewPassword: e.target.value })} className="w-full bg-slate-50 p-3 rounded-xl font-bold text-xs outline-none focus:border-rose-600 border border-transparent transition-all" required />
+                      </div>
+                    </div>
+                    <div className="mt-2">
+                      <button type="submit" className="w-full bg-rose-600 text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 border-b-4 border-rose-800 active:translate-y-1 transition-all"><Lock className="w-4 h-4" /> Xác Nhận Đổi Mật Khẩu</button>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[8px] font-black text-slate-400 uppercase px-1">Mật khẩu mới</label>
-                    <input type="password" value={changePasswordForm.newPassword || ''} onChange={e => setChangePasswordForm({ ...changePasswordForm, newPassword: e.target.value })} className="w-full bg-slate-50 p-2.5 rounded-lg font-bold text-xs outline-none focus:border-rose-600 border border-transparent" required />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[8px] font-black text-slate-400 uppercase px-1">Xác nhận mật khẩu mới</label>
-                    <input type="password" value={changePasswordForm.confirmNewPassword || ''} onChange={e => setChangePasswordForm({ ...changePasswordForm, confirmNewPassword: e.target.value })} className="w-full bg-slate-50 p-2.5 rounded-lg font-bold text-xs outline-none focus:border-rose-600 border border-transparent" required />
-                  </div>
-                </div>
-                <button type="submit" className="w-full bg-blue-600 text-white py-3.5 rounded-lg font-black uppercase text-[9px] shadow-lg flex items-center justify-center gap-2 border-b-4 border-blue-800 active:translate-y-1 transition-all"><Lock className="w-3.5 h-3.5" /> Xác Nhận Đổi Mật Khẩu</button>
-              </div>
-            </form>
+                </form>
+              )}
+            </div>
           </div>
         )}
 
@@ -2929,7 +3096,7 @@ const App = () => {
             )
           ))}
         </div>
-        <button onClick={() => setShowQuickMenu(!showQuickMenu)} className={`absolute -top-5 left-1/2 -translate-x-1/2 w-14 h-14 rounded-[1.4rem] flex items-center justify-center shadow-2xl transition-all duration-500 active:scale-90 pointer-events-auto border-[4px] border-white ${showQuickMenu ? 'bg-slate-800 rotate-45' : 'bg-blue-600 shadow-blue-300'}`}><Plus className="w-7 h-7 text-white stroke-[4px]" /></button>
+        <button onClick={() => setShowQuickMenu(!showQuickMenu)} className={`absolute -top-5 left-1/2 -translate-x-1/2 w-14 h-14 rounded-[1.4rem] flex items-center justify-center transition-all duration-500 active:scale-90 pointer-events-auto border-[4px] border-white ${showQuickMenu ? 'bg-slate-800 rotate-45' : 'bg-blue-600'}`}><Plus className="w-7 h-7 text-white stroke-[4px]" /></button>
       </div>
 
       {/* QUICK MENU */}
@@ -2950,7 +3117,7 @@ const App = () => {
               { label: 'Đăng Xuất', icon: LogOut, color: 'text-red-600 bg-red-50', action: () => handleLogout() }
             ].filter(i => !i.hidden).map((item, i) => (
               <button key={i} onClick={() => item.action()} className="flex flex-col items-center space-y-2 active:scale-90 transition-all">
-                <div className={`w-14 h-14 ${item.color} rounded-xl flex items-center justify-center shadow-sm`}><item.icon className="w-6 h-6" strokeWidth={1.5} /></div>
+                <div className={`w-14 h-14 ${item.color} rounded-xl flex items-center justify-center`}><item.icon className="w-6 h-6" strokeWidth={1.5} /></div>
                 <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter text-center leading-tight">{item.label}</span>
               </button>
             ))}
@@ -3019,13 +3186,13 @@ const App = () => {
               </div>
 
               <div className="grid grid-cols-1 gap-4">
-                <button disabled={isGeneratingImage} onClick={() => handleShareZaloImage(bottomSheet.data)} className="w-full bg-[#0068FF] text-white py-4 rounded-xl font-black text-[12px] uppercase shadow-xl active:scale-95 border-b-4 border-[#004BBF] flex items-center justify-center gap-2 transition-all disabled:opacity-70">
+                <button disabled={isGeneratingImage} onClick={() => handleShareZaloImage(bottomSheet.data)} className="w-full bg-[#0068FF] text-white py-4 rounded-xl font-black text-[12px] uppercase active:scale-95 border-b-4 border-[#004BBF] flex items-center justify-center gap-2 transition-all disabled:opacity-70">
                   {isGeneratingImage ? <Loader2 className="w-5 h-5 animate-spin" /> : <ImageIcon className="w-5 h-5" />}
                   {isGeneratingImage ? 'ĐANG TẠO ẢNH...' : 'COPY ẢNH CHO ZALO'}
                 </button>
 
                 {bottomSheet.data.status === 'pending' && isManagerOrAbove && (
-                  <button onClick={() => handlePayBill(bottomSheet.data.id)} className="w-full bg-emerald-600 text-white py-4 rounded-xl font-black text-[12px] uppercase active:scale-95 shadow-xl border-b-4 border-emerald-800 flex items-center justify-center gap-2">
+                  <button onClick={() => handlePayBill(bottomSheet.data.id)} className="w-full bg-emerald-600 text-white py-4 rounded-xl font-black text-[12px] uppercase active:scale-95 border-b-4 border-emerald-800 flex items-center justify-center gap-2">
                     <CheckCircle2 className="w-5 h-5" /> Xác Nhận Đã Thu Tiền
                   </button>
                 )}
@@ -3217,18 +3384,18 @@ const App = () => {
       )}
 
       {isAddMeterModalOpen && (
-        <Modal title="Thêm công tơ mới" onClose={() => setIsAddMeterModalOpen(false)}>
-          <form onSubmit={(e) => {
-            e.preventDefault();
-            const fd = new FormData(e.target);
-            setMeters(prev => [...prev, { id: fd.get('mid'), houseId: selectedHouse?.id, type: fd.get('type'), name: fd.get('name'), roomIds: [], oldVal: Number(fd.get('val')), newVal: Number(fd.get('val')) }]);
-            showToast("Đã tạo công tơ (Có thể chưa lưu lên Server)", "success"); setIsAddMeterModalOpen(false);
-          }} className="space-y-4 text-left">
-            <div className="space-y-1"><label className="text-[7px] font-black text-slate-400 uppercase px-1">Mã công tơ</label><input name="mid" placeholder="VD: CT-01" required className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
-            <div className="space-y-1"><label className="text-[7px] font-black text-slate-400 uppercase px-1">Tên mô tả</label><input name="name" placeholder="VD: BNL Tầng 1" required className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
-            <div className="space-y-1"><label className="text-[7px] font-black text-slate-400 uppercase px-1">Loại thiết bị</label><select name="type" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none appearance-none focus:border-blue-600"><option value="electric">Điện phòng</option><option value="heater">Bình nóng lạnh chung</option></select></div>
-            <div className="space-y-1"><label className="text-[7px] font-black text-slate-400 uppercase px-1">Chỉ số đầu</label><input name="val" type="number" defaultValue="0" required className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
-            <button type="submit" className="w-full bg-orange-600 text-white py-3.5 rounded-xl font-black uppercase text-[10px] shadow-xl border-b-4 border-orange-800 active:translate-y-1 transition-all text-center">Tạo công tơ</button>
+        <Modal title={editingMeter ? "Cập nhật công tơ" : "Thêm công tơ mới"} onClose={() => { setIsAddMeterModalOpen(false); setEditingMeter(null); }}>
+          <form onSubmit={handleSaveMeter} className="space-y-4 text-left">
+            <div className="space-y-1"><label className="text-[7px] font-black text-slate-400 uppercase px-1">Mã công tơ</label><input name="mid" defaultValue={editingMeter?.id || ''} disabled={!!editingMeter} placeholder="VD: CT-01" required className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600 disabled:opacity-50" /></div>
+            <div className="space-y-1"><label className="text-[7px] font-black text-slate-400 uppercase px-1">Tên mô tả</label><input name="name" defaultValue={editingMeter?.name || ''} placeholder="VD: BNL Tầng 1" required className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
+            <div className="space-y-1"><label className="text-[7px] font-black text-slate-400 uppercase px-1">Loại thiết bị</label><select name="type" defaultValue={editingMeter?.type || 'electric'} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none appearance-none focus:border-blue-600"><option value="electric">Điện phòng</option><option value="heater">Bình nóng lạnh chung</option></select></div>
+            <div className="space-y-1"><label className="text-[7px] font-black text-slate-400 uppercase px-1">Chỉ số đầu</label><input name="val" type="number" defaultValue={editingMeter?.oldVal || '0'} required className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
+            <div className="flex gap-2 mt-4">
+              {editingMeter && (
+                <button type="button" onClick={() => handleDeleteMeter(editingMeter.id)} className="flex-1 bg-red-50 text-red-600 py-3.5 rounded-xl font-black uppercase text-[10px] border-b-4 border-red-200 active:translate-y-1 transition-all text-center">Xóa</button>
+              )}
+              <button type="submit" className="flex-[2] bg-orange-600 text-white py-3.5 rounded-xl font-black uppercase text-[10px] border-b-4 border-orange-800 active:translate-y-1 transition-all text-center">{editingMeter ? 'Lưu thay đổi' : 'Tạo công tơ'}</button>
+            </div>
           </form>
         </Modal>
       )}
@@ -3275,7 +3442,7 @@ const App = () => {
 
             <div className="flex gap-2 pt-3">
               {editingSaving && (
-                <button type="button" onClick={() => handleDeleteSaving(editingSaving.id)} className="flex-1 bg-red-50 text-red-600 py-4 rounded-xl font-black uppercase text-[11px] shadow-sm active:scale-95 border-b-4 border-red-200 transition-all">Xóa sổ</button>
+                <button type="button" onClick={() => handleDeleteSaving(editingSaving.id)} className="flex-1 bg-red-50 text-red-600 py-4 rounded-xl font-black uppercase text-[11px] active:scale-95 border-b-4 border-red-200 transition-all">Xóa sổ</button>
               )}
               <button type="submit" className={`flex-[2] text-white py-4 rounded-xl font-black uppercase text-[11px] shadow-lg transition-all active:scale-95 border-b-4 bg-slate-900 border-slate-950 hover:bg-slate-800`}>
                 {editingSaving ? 'Lưu thay đổi' : 'Thêm sổ tiết kiệm'}
