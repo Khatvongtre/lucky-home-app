@@ -551,31 +551,17 @@ const App = () => {
   }, [fetchApi, handleLogout]); // Thêm các phụ thuộc vào đây
 
   useEffect(() => {
-    if (isLoggedIn) loadSavings();
-  }, [isLoggedIn, loadSavings]);
+    if (isLoggedIn && activeTab === 'savings') loadSavings();
+  }, [isLoggedIn, activeTab, loadSavings]);
 
   // Lấy danh sách nhà
   useEffect(() => {
     if (isLoggedIn && !selectedHouse) {
-      const fetchHousesAndStats = async () => {
-        try {
-          const data = await fetchApi('/houses');
-          const housesWithStats = await Promise.all(data.map(async (h) => {
-            try {
-              const txData = await fetchApi(`/management/transactions/${h.id}?type=this-month`);
-              const txExp = txData.filter(t => t.type === 'out').reduce((s, t) => s + (t.amount || 0), 0);
-              const txRev = txData.filter(t => t.type === 'in').reduce((s, t) => s + (t.amount || 0), 0);
-              return { ...h, calculatedTxExp: txExp, calculatedTxRev: txRev };
-            } catch (e) {
-              return { ...h, calculatedTxExp: h.expense || 0, calculatedTxRev: h.revenue || 0 };
-            }
-          }));
-          setHouses(housesWithStats);
-        } catch (err) {
+      fetchApi('/houses')
+        .then(data => setHouses(data))
+        .catch(err => {
           showToast(err.message, 'error');
-        }
-      };
-      fetchHousesAndStats();
+        });
     }
   }, [isLoggedIn, selectedHouse, fetchApi, showToast]);
 
@@ -713,17 +699,7 @@ const App = () => {
       // [QUAN TRỌNG]: Thay vì tự setHouses thủ công, hãy gọi lại API lấy danh sách mới nhất
       // Điều này đảm bảo house mới có đầy đủ UserRole và các trường thống kê từ Backend
       const data = await fetchApi('/houses', 'GET');
-      const housesWithStats = await Promise.all(data.map(async (h) => {
-        try {
-          const txData = await fetchApi(`/management/transactions/${h.id}?type=this-month`);
-          const txExp = txData.filter(t => t.type === 'out').reduce((s, t) => s + (t.amount || 0), 0);
-          const txRev = txData.filter(t => t.type === 'in').reduce((s, t) => s + (t.amount || 0), 0);
-          return { ...h, calculatedTxExp: txExp, calculatedTxRev: txRev };
-        } catch (e) {
-          return { ...h, calculatedTxExp: h.expense || 0, calculatedTxRev: h.revenue || 0 };
-        }
-      }));
-      setHouses(housesWithStats);
+      setHouses(data);
 
       setIsAiCreateHouseOpen(false);
       setEditingHouse(null);
@@ -1619,16 +1595,9 @@ const App = () => {
       acc.totalRooms += (h.totalRooms || 0);
       acc.emptyRooms += (h.emptyRooms || 0);
 
-      // Doanh thu = Tổng các khoản thu (từ phiếu thu)
-      const grossRev = h.calculatedTxRev !== undefined ? h.calculatedTxRev : (h.revenue || 0);
-      // Chi phí = Các khoản chi ra (từ phiếu chi) + Phí cố định
-      const txExp = h.calculatedTxExp !== undefined ? h.calculatedTxExp : (h.expense || 0);
-      const fixedCosts = (h.rentPrice || 0) + (h.internetFee || 0) + (h.otherFees || 0);
-      const totalExp = txExp + fixedCosts;
-
-      acc.totalRevenue += grossRev;
-      acc.totalExpense += totalExp;
-      acc.totalProfit += grossRev - totalExp;
+      acc.totalRevenue += (h.revenue || 0);
+      acc.totalExpense += (h.expense || 0);
+      acc.totalProfit += (h.profit || ((h.revenue || 0) - (h.expense || 0)));
       return acc;
     }, { totalHouses: 0, totalRooms: 0, emptyRooms: 0, totalRevenue: 0, totalExpense: 0, totalProfit: 0 });
 
@@ -2681,7 +2650,7 @@ const App = () => {
         {activeTab === 'finance' && isManagerOrAbove && (
           <div className="animate-in fade-in pb-20">
             {/* BOX TỔNG HỢP - STICKY */}
-            <div className="sticky top-0 z-30 bg-slate-50/80 backdrop-blur-md pt-2 pb-4 px-1">
+            <div className="sticky top-0 z-30 bg-slate-50 pt-4 pb-4 -mt-4 -mx-4 px-5">
               <div className="bg-slate-900 p-5 rounded-2xl text-white shadow-2xl relative border-b-4 border-blue-600 overflow-hidden">
                 <div className="absolute top-0 right-0 w-40 h-40 bg-blue-600 rounded-full blur-3xl opacity-20 pointer-events-none"></div>
 
