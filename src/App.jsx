@@ -233,7 +233,7 @@ const AuthView = ({ fetchApi, setIsLoggedIn, setUser, showToast }) => {
           <p className="text-xs text-slate-500 mb-4 font-medium text-center">Vui lòng nhập SĐT/Tên đăng nhập để nhận lại mật khẩu.</p>
           <div className="relative group"><Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" /><input type="text" placeholder="SĐT / Tên đăng nhập" className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-600 shadow-sm" value={authForm.username} onChange={e => setAuthForm({ ...authForm, username: e.target.value })} required /></div>
 
-          <button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-4 rounded-xl font-black uppercase text-xs shadow-xl active:scale-95 transition-all mt-4 border-b-4 border-indigo-800 text-center">
+          <button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-4 rounded-xl font-black uppercase text-xs shadow-xl active:scale-95 transition-all mt-4 border-b-1 border-indigo-800 text-center">
             Gửi yêu cầu
           </button>
           <button type="button" onClick={() => setIsForgotPassword(false)} className="w-full text-[10px] font-black text-slate-400 uppercase tracking-widest py-3 text-center hover:text-blue-600 transition-colors">
@@ -256,7 +256,7 @@ const AuthView = ({ fetchApi, setIsLoggedIn, setUser, showToast }) => {
             </div>
           )}
 
-          <button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-4 rounded-xl font-black uppercase text-xs shadow-xl active:scale-95 transition-all mt-4 border-b-4 border-indigo-800 text-center">
+          <button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-4 rounded-xl font-black uppercase text-xs shadow-xl active:scale-95 transition-all mt-4 border-b-1 border-indigo-800 text-center">
             {isRegistering ? "Tạo Tài Khoản" : "Đăng Nhập"}
           </button>
           <button type="button" onClick={() => setIsRegistering(!isRegistering)} className="w-full text-[10px] font-black text-slate-400 uppercase tracking-widest py-3 text-center hover:text-blue-600 transition-colors">
@@ -340,11 +340,11 @@ const AddRoomForm = ({ onSave, onDelete, editingRoom, sharedHeaters, formatN, pa
 
       <div className="flex gap-2 mt-4">
         {editingRoom && (
-          <button type="button" onClick={() => onDelete(editingRoom.id, editingRoom.roomCode)} className="flex-1 bg-red-50 text-red-600 py-4 rounded-xl font-black uppercase text-[10px] tracking-widest border-b-4 border-red-200 active:translate-y-1 transition-all text-center">
+          <button type="button" onClick={() => onDelete(editingRoom.id, editingRoom.roomCode)} className="flex-1 bg-red-500 text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest border-b-1 border-red-200 active:translate-y-1 transition-all text-center">
             Xóa
           </button>
         )}
-        <button type="submit" className="flex-[2] bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest border-b-4 border-blue-800 active:translate-y-1 transition-all text-center">
+        <button type="submit" className="flex-[2] bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest border-b-1 border-blue-800 active:translate-y-1 transition-all text-center">
           {status === 'full' ? 'Lưu phòng' : 'Lưu phòng trống'}
         </button>
       </div>
@@ -511,7 +511,7 @@ const App = () => {
 
   const loadSavings = useCallback(async () => {
     try {
-      const savingsData = await fetchApi(`/management/savings`);
+      const savingsData = await fetchApi(`/saving`);
       setSavings(savingsData);
     } catch (e) {
       setSavings([]);
@@ -530,8 +530,8 @@ const App = () => {
       setIsLoggedIn(true);
 
       // 2. Kiểm tra "sức khỏe" của token với backend (Tùy chọn nhưng nên có)
-      // Bạn có thể tạo 1 endpoint /auth/me hoặc đơn giản là gọi /houses
-      fetchApi('/houses')
+      // Bạn có thể tạo 1 endpoint /auth/me hoặc đơn giản là gọi /house
+      fetchApi('/house')
         .then(data => setHouses(data))
         .catch(err => {
           // Nếu lỗi ở đây (thường là 401), fetchApi sẽ tự gọi handleLogout()
@@ -557,7 +557,7 @@ const App = () => {
   // Lấy danh sách nhà
   useEffect(() => {
     if (isLoggedIn && !selectedHouse) {
-      fetchApi('/houses')
+      fetchApi('/house')
         .then(data => setHouses(data))
         .catch(err => {
           showToast(err.message, 'error');
@@ -575,7 +575,7 @@ const App = () => {
       setBills([]);
 
       // Cập nhật lại danh sách nhà để đồng bộ Doanh thu / Chi phí mới nhất
-      const updatedHouses = await fetchApi('/houses');
+      const updatedHouses = await fetchApi('/house');
       setHouses(updatedHouses);
       const h = updatedHouses.find(x => x.id === houseId);
       if (h) {
@@ -583,13 +583,13 @@ const App = () => {
         setSelectedHouse(h);
       }
 
-      const roomsData = await fetchApi(`/management/rooms/${houseId}`);
+      const roomsData = await fetchApi(`/room/${houseId}`);
       setRooms(roomsData);
 
-      const metersData = await fetchApi(`/management/meters/${houseId}?year=${year}&month=${month}`);
+      const metersData = await fetchApi(`/meter/${houseId}?year=${year}&month=${month}`);
       setMeters(metersData.map(m => ({ ...m, roomIds: JSON.parse(m.roomIdsJson || '[]') })));
 
-      const billsData = await fetchApi(`/management/bills/${houseId}?year=${year}&month=${month}`);
+      const billsData = await fetchApi(`/bill/${houseId}?year=${year}&month=${month}`);
       setBills(billsData.map(b => ({
         ...b, roomId: b.roomCode, details: JSON.parse(b.detailsJson || '{}'), meter: JSON.parse(b.meterInfoJson || '{}'), heaterMeter: b.heaterInfoJson ? JSON.parse(b.heaterInfoJson) : null
       })));
@@ -630,11 +630,11 @@ const App = () => {
     };
     try {
       if (editingSaving) {
-        await fetchApi(`/management/savings/${editingSaving.id}`, 'PUT', payload);
+        await fetchApi(`/saving/${editingSaving.id}`, 'PUT', payload);
         showToast("Đã cập nhật sổ tiết kiệm!", "success");
       } else {
         payload.id = crypto.randomUUID();
-        await fetchApi('/management/savings', 'POST', payload);
+        await fetchApi('/saving', 'POST', payload);
         showToast("Đã thêm sổ tiết kiệm!", "success");
       }
       await loadSavings();
@@ -646,7 +646,7 @@ const App = () => {
   const handleDeleteSaving = async (id) => {
     if (!window.confirm("Bạn có chắc chắn muốn xóa sổ tiết kiệm này?")) return;
     try {
-      await fetchApi(`/management/savings/${id}`, 'DELETE');
+      await fetchApi(`/saving/${id}`, 'DELETE');
       await loadSavings();
       setIsAddSavingModalOpen(false);
       setEditingSaving(null);
@@ -657,7 +657,7 @@ const App = () => {
   const handleAssignRole = async (e) => {
     e.preventDefault();
     try {
-      await fetchApi(`/houses/${sharingHouse.id}/assign`, 'POST', assignForm);
+      await fetchApi(`/house/${sharingHouse.id}/assign`, 'POST', assignForm);
       showToast(`Đã cấp quyền ${assignForm.role} cho ${assignForm.username} thành công!`, "success");
       setIsShareModalOpen(false);
     } catch (err) {
@@ -687,18 +687,18 @@ const App = () => {
     try {
       if (editingHouse) {
         // Cập nhật nhà hiện tại (BẠN CẦN CHUẨN BỊ API PUT Ở BACKEND)
-        await fetchApi(`/houses/${editingHouse.id}`, 'PUT', houseData);
+        await fetchApi(`/house/${editingHouse.id}`, 'PUT', houseData);
         setHouses(houses.map(h => h.id === editingHouse.id ? { ...h, ...houseData } : h));
         showToast("Cập nhật cơ sở thành công!", "success");
       } else {
         // Thêm nhà mới
-        const res = await fetchApi('/houses', 'POST', houseData);
+        const res = await fetchApi('/house', 'POST', houseData);
         setHouses([...houses, res]);
         showToast("Tạo cơ sở thành công!", "success");
       }
       // [QUAN TRỌNG]: Thay vì tự setHouses thủ công, hãy gọi lại API lấy danh sách mới nhất
       // Điều này đảm bảo house mới có đầy đủ UserRole và các trường thống kê từ Backend
-      const data = await fetchApi('/houses', 'GET');
+      const data = await fetchApi('/house', 'GET');
       setHouses(data);
 
       setIsAiCreateHouseOpen(false);
@@ -784,7 +784,7 @@ const App = () => {
     };
 
     try {
-      await fetchApi('/management/rooms', 'POST', payload);
+      await fetchApi('/room', 'POST', payload);
       await loadHouseData(selectedHouse?.id);
       showToast("Lưu phòng thành công!", "success");
       setIsAddRoomModalOpen(false);
@@ -797,7 +797,7 @@ const App = () => {
   const handleDeleteHouse = async (houseId, houseName) => {
     if (!window.confirm(`Bạn có chắc chắn muốn xóa cơ sở "${houseName}" và TOÀN BỘ dữ liệu liên quan không?`)) return;
     try {
-      await fetchApi(`/houses/${houseId}`, 'DELETE');
+      await fetchApi(`/house/${houseId}`, 'DELETE');
       setHouses(houses.filter(h => h.id !== houseId));
       if (selectedHouse?.id === houseId) setSelectedHouse(null);
       showToast("Đã xóa cơ sở thành công!", "success");
@@ -807,7 +807,7 @@ const App = () => {
   const handleDeleteRoom = async (roomId, roomCode) => {
     if (!window.confirm(`Bạn có chắc muốn xóa phòng/MBKD "${roomCode}" không?`)) return;
     try {
-      await fetchApi(`/management/rooms/${roomId}`, 'DELETE');
+      await fetchApi(`/room/${roomId}`, 'DELETE');
       await loadHouseData(selectedHouse?.id);
       setIsAddRoomModalOpen(false);
       setEditingRoom(null);
@@ -818,7 +818,7 @@ const App = () => {
   const handleDeleteTransaction = async (txId) => {
     if (!window.confirm(`Bạn có chắc chắn muốn xóa phiếu thu chi này không?`)) return;
     try {
-      await fetchApi(`/management/transactions/${txId}`, 'DELETE');
+      await fetchApi(`/transaction/${txId}`, 'DELETE');
       await loadHouseData(selectedHouse?.id);
       setIsAddTransactionModalOpen(false);
       setEditingTransaction(null);
@@ -830,7 +830,7 @@ const App = () => {
     e.preventDefault();
     const fd = new FormData(e.target);
     const payload = {
-      id: editingMeter ? editingMeter.id : fd.get('mid'),
+      id: editingMeter ? editingMeter.id : crypto.randomUUID(),
       houseId: selectedHouse?.id,
       type: fd.get('type'),
       name: fd.get('name'),
@@ -838,10 +838,10 @@ const App = () => {
     };
     try {
       if (editingMeter) {
-        await fetchApi(`/management/meters/${editingMeter.id}`, 'PUT', payload);
+        await fetchApi(`/meter/save`, 'POST', payload);
         showToast("Đã cập nhật công tơ!", "success");
       } else {
-        await fetchApi('/management/meters', 'POST', payload);
+        await fetchApi('/meter/save', 'POST', payload);
         showToast("Đã tạo công tơ!", "success");
       }
       await loadHouseData(selectedHouse?.id);
@@ -855,7 +855,7 @@ const App = () => {
   const handleDeleteMeter = async (meterId) => {
     if (!window.confirm("Bạn có chắc muốn xóa công tơ này?")) return;
     try {
-      await fetchApi(`/management/meters/${meterId}`, 'DELETE');
+      await fetchApi(`/meter/${meterId}`, 'DELETE');
       await loadHouseData(selectedHouse?.id);
       setIsAddMeterModalOpen(false);
       setEditingMeter(null);
@@ -865,9 +865,21 @@ const App = () => {
     }
   };
 
+  const handleSaveMeterMapping = async () => {
+    if (!mappingMeter) return;
+    try {
+      await fetchApi(`/meter/${mappingMeter.id}/map`, 'PUT', {
+        roomIds: mappingMeter.roomIds
+      });
+      showToast("Đã cập nhật sơ đồ công tơ!", "success");
+      setMappingMeter(null);
+    } catch (e) {
+      showToast("Lỗi lưu sơ đồ: " + e.message, "error");
+    }
+  };
+
   const handleSaveMetersAndGenerateBills = async () => {
     try {
-      debugger
       const monthSelected = viewDate.getMonth() + 1;
       const yearSelected = viewDate.getFullYear();
 
@@ -889,7 +901,7 @@ const App = () => {
       if (updates.length === 0) return showToast("Chưa nhập số mới nào!", "error");
 
       // 2. Gửi lệnh lưu chỉ số công tơ
-      await fetchApi('/management/meters/update', 'POST', updates);
+      await fetchApi('/meter/update', 'POST', updates);
 
       // 3. TỰ ĐỘNG LẬP HÓA ĐƠN cho các phòng đã có số mới
       // Lọc những phòng mà công tơ điện (electric) vừa được cập nhật newVal
@@ -940,7 +952,7 @@ const App = () => {
         });
 
         // Gửi lệnh tạo hóa đơn hàng loạt (Bulk Update/Insert)
-        await fetchApi('/management/bills/generate-bulk', 'POST', newBills);
+        await fetchApi('/bill/generate-bulk', 'POST', newBills);
         showToast(`Đã lưu chỉ số & tự động lập ${roomsToGenerate.length} hóa đơn!`, "success");
       } else {
         showToast(`Đã lưu chỉ số ${monthDisplay}!`, "success");
@@ -1020,7 +1032,7 @@ const App = () => {
     });
 
     try {
-      await fetchApi('/management/bills/generate-bulk', 'POST', newBills);
+      await fetchApi('/bill/generate-bulk', 'POST', newBills);
       await loadHouseData(selectedHouse?.id);
       showToast("Đã lập hóa đơn thành công!", "success");
     } catch (e) {
@@ -1111,7 +1123,7 @@ const App = () => {
     try {
       const billToUpdate = bills.find(b => b.id === billId);
       if (billToUpdate) {
-        await fetchApi(`/management/bills/${billId}/discount`, 'PUT', {
+        await fetchApi(`/bill/${billId}/discount`, 'PUT', {
           discount: dVal,
           total: billToUpdate.total,
           details: billToUpdate.details
@@ -1137,11 +1149,11 @@ const App = () => {
 
     try {
       if (editingTransaction) {
-        await fetchApi(`/management/transactions/${editingTransaction.id}`, 'PUT', payload);
+        await fetchApi(`/transaction/${editingTransaction.id}`, 'PUT', payload);
         showToast("Đã cập nhật phiếu thu chi!", "success");
       } else {
         payload.id = crypto.randomUUID();
-        await fetchApi('/management/transactions', 'POST', payload);
+        await fetchApi('/transaction', 'POST', payload);
         showToast("Đã ghi sổ thu chi!", "success");
       }
       await loadHouseData(selectedHouse?.id);
@@ -1155,7 +1167,7 @@ const App = () => {
 
   const handlePayBill = async (billId) => {
     try {
-      await fetchApi(`/management/bills/pay/${billId}`, 'POST');
+      await fetchApi(`/bill/pay/${billId}`, 'POST');
       await loadHouseData(selectedHouse?.id);
       showToast("Gạch nợ & Ghi sổ thành công!", "success");
       setBottomSheet(null);
@@ -1167,7 +1179,7 @@ const App = () => {
 
   const handleSaveConfig = async () => {
     try {
-      await fetchApi(`/houses/${selectedHouse?.id}/config`, 'PUT', config);
+      await fetchApi(`/house/${selectedHouse?.id}/config`, 'PUT', config);
       showToast("Đã lưu cấu hình lên máy chủ!", "success");
     } catch (e) {
       showToast("Đã có lỗi xảy ra ! (" + e.message + ")", "error");
@@ -1480,7 +1492,7 @@ const App = () => {
   //     try {
   //       // Gọi API lấy dữ liệu theo tháng/năm đã chọn
   //       const metersData = await fetchApi(
-  //         `/management/meters/${houseIdSelected}?year=${yearSelected}&month=${monthSelected}`
+  //         `/meter/${houseIdSelected}?year=${yearSelected}&month=${monthSelected}`
   //       );
 
   //       // Cập nhật State meters
@@ -1550,7 +1562,7 @@ const App = () => {
       try {
         // Truyền tham số type vào URL (ví dụ: ?type=this_month)
         const txData = await fetchApi(
-          `/management/transactions/${selectedHouse.id}?type=${selectedMonth}`
+          `/transaction/${selectedHouse.id}?type=${selectedMonth}`
         );
 
         // Cập nhật danh sách giao dịch
@@ -1657,7 +1669,7 @@ const App = () => {
             </div>
 
             {/* Box Thống kê */}
-            <div className="bg-slate-900 rounded-xl p-3.5 text-white shadow-xl border-b-4 border-blue-600">
+            <div className="bg-slate-900 rounded-xl p-3.5 text-white shadow-xl border-b-1 border-blue-600">
               <div className="flex justify-between items-center mb-3 px-2 border-b border-slate-700 pb-3">
                 <div className="text-left">
                   <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Doanh thu</p>
@@ -1869,7 +1881,7 @@ const App = () => {
                 </select>
               </div>
 
-              <button type="submit" className="w-full bg-blue-600 text-white py-3.5 rounded-xl font-black uppercase text-[11px] flex items-center justify-center gap-2 border-b-4 border-blue-800 text-center mt-4 active:scale-95 transition-all">
+              <button type="submit" className="w-full bg-blue-600 text-white py-3.5 rounded-xl font-black uppercase text-[11px] flex items-center justify-center gap-2 border-b-1 border-blue-800 text-center mt-4 active:scale-95 transition-all">
                 <UserCheck className="w-4 h-4" /> Xác nhận cấp quyền
               </button>
             </form>
@@ -1899,7 +1911,7 @@ const App = () => {
                   <div className="space-y-1 col-span-2"><label className="text-[8px] font-black text-slate-400 uppercase px-1">9. Ghi chú</label><textarea name="notes" defaultValue={editingHouse?.notes || ''} rows="2" placeholder="Ghi chú thêm..." className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600 resize-none" /></div>
                 </div>
               </div>
-              <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-[11px] flex items-center justify-center gap-2 border-b-4 border-blue-800 text-center mt-4">
+              <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-[11px] flex items-center justify-center gap-2 border-b-1 border-blue-800 text-center mt-4">
                 <Save className="w-4 h-4" /> {editingHouse ? "Lưu thay đổi" : "Khởi tạo cơ sở"}
               </button>
             </form>
@@ -2001,7 +2013,7 @@ const App = () => {
 
                   try {
                     // Gọi API Backend đã tạo
-                    const res = await fetchApi('/houses/ai-generate', 'POST', { prompt: aiPrompt });
+                    const res = await fetchApi('/house/ai-generate', 'POST', { prompt: aiPrompt });
 
                     if (res.isSuccess === false) {
                       // Bị thiếu thông tin, hiện thông báo đòi nhập thêm
@@ -2009,7 +2021,7 @@ const App = () => {
                       showToast("AI cần thêm thông tin!", "error");
                     } else {
                       // Tạo thành công
-                      const updatedHouses = await fetchApi('/houses', 'GET');
+                      const updatedHouses = await fetchApi('/house', 'GET');
                       setHouses(updatedHouses);
                       showToast("Phép màu đã xảy ra! Nhà đã được tạo.", "success");
                       setIsAiPromptModalOpen(false);
@@ -2020,7 +2032,7 @@ const App = () => {
                     showToast("Lỗi khi tạo AI: " + e.message, "error");
                   }
                 }}
-                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 rounded-xl font-black uppercase text-[11px] flex items-center justify-center gap-2 border-b-4 border-indigo-800 text-center mt-4 active:scale-95 transition-all"
+                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 rounded-xl font-black uppercase text-[11px] flex items-center justify-center gap-2 border-b-1 border-indigo-800 text-center mt-4 active:scale-95 transition-all"
               >
                 <Sparkles className="w-4 h-4 text-indigo-100" /> Bắt đầu tạo tự động
               </button>
@@ -2111,7 +2123,7 @@ const App = () => {
             </div>
 
             {isOwnerOrAdmin && (
-              <div className="bg-slate-900 p-5 rounded-xl text-white shadow-xl relative overflow-hidden border-b-4 border-emerald-500">
+              <div className="bg-slate-900 p-5 rounded-xl text-white shadow-xl relative overflow-hidden border-b-1 border-emerald-500">
                 <div className="absolute -right-4 -top-4 w-32 h-32 bg-emerald-500 rounded-full blur-3xl opacity-20 pointer-events-none"></div>
                 <div className="flex justify-between items-start mb-2 relative z-10">
                   <div>
@@ -2431,7 +2443,7 @@ const App = () => {
                 </button>
                 <button
                   onClick={executeGenerateBills}
-                  className="flex-1 py-4 bg-blue-600 text-white font-black uppercase text-[10px] rounded-2xl active:scale-95 transition-all border-b-4 border-blue-800"
+                  className="flex-1 py-4 bg-blue-600 text-white font-black uppercase text-[10px] rounded-2xl active:scale-95 transition-all border-b-1 border-blue-800"
                 >
                   Đồng ý tạo lại
                 </button>
@@ -2637,7 +2649,7 @@ const App = () => {
               <div className="fixed bottom-[4.5rem] left-1/2 -translate-x-1/2 w-full max-w-lg px-4 z-40">
                 <button
                   onClick={handleSaveMetersAndGenerateBills}
-                  className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-[11px] border-b-4 border-blue-800 active:translate-y-1 transition-all flex items-center justify-center gap-2"
+                  className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-[11px] border-b-1 border-blue-800 active:translate-y-1 transition-all flex items-center justify-center gap-2"
                 >
                   <Receipt className="w-4 h-4" /> Xác nhận lưu & Lập hóa đơn {monthDisplay}
                 </button>
@@ -2651,7 +2663,7 @@ const App = () => {
           <div className="animate-in fade-in pb-20">
             {/* BOX TỔNG HỢP - STICKY */}
             <div className="sticky top-0 z-30 bg-slate-50 pt-4 pb-4 -mt-4 -mx-4 px-5">
-              <div className="bg-slate-900 p-5 rounded-2xl text-white shadow-2xl relative border-b-4 border-blue-600 overflow-hidden">
+              <div className="bg-slate-900 p-5 rounded-2xl text-white shadow-2xl relative border-b-1 border-blue-600 overflow-hidden">
                 <div className="absolute top-0 right-0 w-40 h-40 bg-blue-600 rounded-full blur-3xl opacity-20 pointer-events-none"></div>
 
                 {/* Header Row: Label + Custom Dropdown */}
@@ -2880,11 +2892,11 @@ const App = () => {
               {/* 5. NÚT XÁC NHẬN */}
               <div className="flex gap-2 pt-3">
                 {editingTransaction && (
-                  <button type="button" onClick={() => handleDeleteTransaction(editingTransaction.id)} className="flex-1 bg-red-50 text-red-600 py-4 rounded-xl font-black uppercase text-[11px] active:scale-95 border-b-4 border-red-200">
+                  <button type="button" onClick={() => handleDeleteTransaction(editingTransaction.id)} className="flex-1 bg-red-500 text-white py-4 rounded-xl font-black uppercase text-[11px] active:scale-95 border-b-1 border-red-200">
                     Xóa
                   </button>
                 )}
-                <button type="submit" className={`flex-[2] text-white py-4 rounded-xl font-black uppercase text-[11px] transition-all active:scale-95 border-b-4 ${txType === 'in' ? 'bg-emerald-600 border-emerald-800' : 'bg-rose-600 border-rose-800'}`}>
+                <button type="submit" className={`flex-[2] text-white py-4 rounded-xl font-black uppercase text-[11px] transition-all active:scale-95 border-b-1 ${txType === 'in' ? 'bg-emerald-600 border-emerald-800' : 'bg-rose-600 border-rose-800'}`}>
                   {editingTransaction ? 'Lưu thay đổi' : 'Xác nhận'}
                 </button>
               </div>
@@ -2952,7 +2964,7 @@ const App = () => {
                     <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Internet</label><input type="text" value={formatN(config.priceNet)} onChange={e => setConfig({ ...config, priceNet: parseN(e.target.value) })} className="w-full bg-slate-50 p-3 rounded-xl font-black text-xs outline-none focus:border-blue-600 border border-transparent transition-all" /></div>
                     <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Xe máy điện</label><input type="text" value={formatN(config.priceEBike)} onChange={e => setConfig({ ...config, priceEBike: parseN(e.target.value) })} className="w-full bg-slate-50 p-3 rounded-xl font-black text-xs outline-none focus:border-blue-600 border border-transparent transition-all" /></div>
                     <div className="col-span-2 mt-2">
-                      <button onClick={handleSaveConfig} className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 border-b-4 border-blue-800 active:translate-y-1 transition-all"><Save className="w-4 h-4" /> Lưu cấu hình</button>
+                      <button onClick={handleSaveConfig} className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 border-b-1 border-blue-800 active:translate-y-1 transition-all"><Save className="w-4 h-4" /> Lưu cấu hình</button>
                     </div>
                   </div>
                 </div>
@@ -2990,7 +3002,7 @@ const App = () => {
                     <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Mã BIN</label><input type="text" value={config.bankBin || "970422"} onChange={e => setConfig({ ...config, bankBin: e.target.value })} className="w-full bg-slate-50 p-3 rounded-xl font-black text-xs outline-none focus:border-blue-600 border border-transparent transition-all" /></div>
                     <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Số tài khoản</label><input type="text" value={config.bankAcc || ""} onChange={e => setConfig({ ...config, bankAcc: e.target.value })} placeholder="9999..." className="w-full bg-slate-50 p-3 rounded-xl font-black text-xs outline-none focus:border-blue-600 border border-transparent transition-all" /></div>
                     <div className="col-span-2 mt-2">
-                      <button onClick={handleSaveConfig} className="w-full bg-slate-800 text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 border-b-4 border-slate-950 active:translate-y-1 transition-all"><Save className="w-4 h-4" /> Lưu STK VietQR</button>
+                      <button onClick={handleSaveConfig} className="w-full bg-slate-800 text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 border-b-1 border-slate-950 active:translate-y-1 transition-all"><Save className="w-4 h-4" /> Lưu STK VietQR</button>
                     </div>
                   </div>
                 </div>
@@ -3024,7 +3036,7 @@ const App = () => {
                       </div>
                     </div>
                     <div className="mt-2">
-                      <button type="submit" className="w-full bg-rose-600 text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 border-b-4 border-rose-800 active:translate-y-1 transition-all"><Lock className="w-4 h-4" /> Xác Nhận Đổi Mật Khẩu</button>
+                      <button type="submit" className="w-full bg-rose-600 text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 border-b-1 border-rose-800 active:translate-y-1 transition-all"><Lock className="w-4 h-4" /> Xác Nhận Đổi Mật Khẩu</button>
                     </div>
                   </div>
                 </form>
@@ -3155,13 +3167,13 @@ const App = () => {
               </div>
 
               <div className="grid grid-cols-1 gap-4">
-                <button disabled={isGeneratingImage} onClick={() => handleShareZaloImage(bottomSheet.data)} className="w-full bg-[#0068FF] text-white py-4 rounded-xl font-black text-[12px] uppercase active:scale-95 border-b-4 border-[#004BBF] flex items-center justify-center gap-2 transition-all disabled:opacity-70">
+                <button disabled={isGeneratingImage} onClick={() => handleShareZaloImage(bottomSheet.data)} className="w-full bg-[#0068FF] text-white py-4 rounded-xl font-black text-[12px] uppercase active:scale-95 border-b-1 border-[#004BBF] flex items-center justify-center gap-2 transition-all disabled:opacity-70">
                   {isGeneratingImage ? <Loader2 className="w-5 h-5 animate-spin" /> : <ImageIcon className="w-5 h-5" />}
                   {isGeneratingImage ? 'ĐANG TẠO ẢNH...' : 'COPY ẢNH CHO ZALO'}
                 </button>
 
                 {bottomSheet.data.status === 'pending' && isManagerOrAbove && (
-                  <button onClick={() => handlePayBill(bottomSheet.data.id)} className="w-full bg-emerald-600 text-white py-4 rounded-xl font-black text-[12px] uppercase active:scale-95 border-b-4 border-emerald-800 flex items-center justify-center gap-2">
+                  <button onClick={() => handlePayBill(bottomSheet.data.id)} className="w-full bg-emerald-600 text-white py-4 rounded-xl font-black text-[12px] uppercase active:scale-95 border-b-1 border-emerald-800 flex items-center justify-center gap-2">
                     <CheckCircle2 className="w-5 h-5" /> Xác Nhận Đã Thu Tiền
                   </button>
                 )}
@@ -3306,7 +3318,7 @@ const App = () => {
                   <div className="w-20 h-20 bg-white rounded-lg border border-slate-200 flex items-center justify-center">
                     <img
                       key={`qr-${bottomSheet.data.id}`}
-                      src={`https://api.vietqr.io/image/${config.bankBin || '970422'}-${config.bankAcc || '0'}-compact2.jpg?amount=${bottomSheet.data.total}&addInfo=${encodeURIComponent(`P${bottomSheet.data.roomCode} ${bottomSheet.data.currentMonthFull}`)}&nocache=${Math.random()}`}
+                      src={`${API_URL}/vietqr/generate?bankBin=${config.bankBin || '970422'}&bankAcc=${config.bankAcc || '0'}&amount=${bottomSheet.data.total}&addInfo=${encodeURIComponent(`P${bottomSheet.data.roomId} ${bottomSheet.data.currentMonthFull}`)}&t=${Date.now()}`}
                       className="w-full h-full object-contain"
                       crossOrigin="anonymous"
                     />
@@ -3347,7 +3359,7 @@ const App = () => {
                 )
               })}
             </div>
-            <button onClick={() => setMappingMeter(null)} className="w-full bg-blue-600 text-white py-3.5 rounded-xl font-black uppercase text-[10px] shadow-lg active:scale-95 transition-all border-b-4 border-blue-800 text-center">Hoàn tất</button>
+            <button onClick={handleSaveMeterMapping} className="w-full bg-blue-600 text-white py-3.5 rounded-xl font-black uppercase text-[10px] shadow-lg active:scale-95 transition-all border-b-1 border-blue-800 text-center">Hoàn tất</button>
           </div>
         </Modal>
       )}
@@ -3355,15 +3367,14 @@ const App = () => {
       {isAddMeterModalOpen && (
         <Modal title={editingMeter ? "Cập nhật công tơ" : "Thêm công tơ mới"} onClose={() => { setIsAddMeterModalOpen(false); setEditingMeter(null); }}>
           <form onSubmit={handleSaveMeter} className="space-y-4 text-left">
-            <div className="space-y-1"><label className="text-[7px] font-black text-slate-400 uppercase px-1">Mã công tơ</label><input name="mid" defaultValue={editingMeter?.id || ''} disabled={!!editingMeter} placeholder="VD: CT-01" required className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600 disabled:opacity-50" /></div>
             <div className="space-y-1"><label className="text-[7px] font-black text-slate-400 uppercase px-1">Tên mô tả</label><input name="name" defaultValue={editingMeter?.name || ''} placeholder="VD: BNL Tầng 1" required className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
             <div className="space-y-1"><label className="text-[7px] font-black text-slate-400 uppercase px-1">Loại thiết bị</label><select name="type" defaultValue={editingMeter?.type || 'electric'} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none appearance-none focus:border-blue-600"><option value="electric">Điện phòng</option><option value="heater">Bình nóng lạnh chung</option></select></div>
             <div className="space-y-1"><label className="text-[7px] font-black text-slate-400 uppercase px-1">Chỉ số đầu</label><input name="val" type="number" defaultValue={editingMeter?.oldVal || '0'} required className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
             <div className="flex gap-2 mt-4">
               {editingMeter && (
-                <button type="button" onClick={() => handleDeleteMeter(editingMeter.id)} className="flex-1 bg-red-50 text-red-600 py-3.5 rounded-xl font-black uppercase text-[10px] border-b-4 border-red-200 active:translate-y-1 transition-all text-center">Xóa</button>
+                <button type="button" onClick={() => handleDeleteMeter(editingMeter.id)} className="flex-1 bg-red-500 text-white py-3.5 rounded-xl font-black uppercase text-[10px] border-b-1 border-red-200 active:translate-y-1 transition-all text-center">Xóa</button>
               )}
-              <button type="submit" className="flex-[2] bg-orange-600 text-white py-3.5 rounded-xl font-black uppercase text-[10px] border-b-4 border-orange-800 active:translate-y-1 transition-all text-center">{editingMeter ? 'Lưu thay đổi' : 'Tạo công tơ'}</button>
+              <button type="submit" className="flex-[2] bg-orange-600 text-white py-3.5 rounded-xl font-black uppercase text-[10px] border-b-1 border-orange-800 active:translate-y-1 transition-all text-center">{editingMeter ? 'Lưu thay đổi' : 'Tạo công tơ'}</button>
             </div>
           </form>
         </Modal>
@@ -3411,9 +3422,9 @@ const App = () => {
 
             <div className="flex gap-2 pt-3">
               {editingSaving && (
-                <button type="button" onClick={() => handleDeleteSaving(editingSaving.id)} className="flex-1 bg-red-50 text-red-600 py-4 rounded-xl font-black uppercase text-[11px] active:scale-95 border-b-4 border-red-200 transition-all">Xóa sổ</button>
+                <button type="button" onClick={() => handleDeleteSaving(editingSaving.id)} className="flex-1 bg-red-500 text-white py-4 rounded-xl font-black uppercase text-[11px] active:scale-95 border-b-1 border-red-200 transition-all">Xóa sổ</button>
               )}
-              <button type="submit" className={`flex-[2] text-white py-4 rounded-xl font-black uppercase text-[11px] shadow-lg transition-all active:scale-95 border-b-4 bg-slate-900 border-slate-950 hover:bg-slate-800`}>
+              <button type="submit" className={`flex-[2] text-white py-4 rounded-xl font-black uppercase text-[11px] shadow-lg transition-all active:scale-95 border-b-1 bg-slate-900 border-slate-950 hover:bg-slate-800`}>
                 {editingSaving ? 'Lưu thay đổi' : 'Thêm sổ tiết kiệm'}
               </button>
             </div>
