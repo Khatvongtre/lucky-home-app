@@ -1968,7 +1968,7 @@ const App = () => {
                             {roleInfo.text}
                           </span>
                         </div>
-                         <p className="text-[9px] font-semibold text-slate-500 mt-0.5 flex items-center truncate">
+                        <p className="text-[9px] font-semibold text-slate-500 mt-0.5 flex items-center truncate">
                           <MapPin className="w-2.5 h-2.5 mr-1 shrink-0 opacity-60" />
                           {h.address || "Chưa cập nhật địa chỉ"}
                         </p>
@@ -1992,7 +1992,7 @@ const App = () => {
 
                   <div className="pt-2 border-t border-black/5 flex items-center justify-between gap-2">
                     <div className="flex items-center">
-                        <div className={`flex items-center text-[10px] font-bold px-2 py-1 rounded-md ${isFull ? 'text-emerald-700 bg-emerald-100/50' : 'text-blue-700 bg-blue-50'}`}>
+                      <div className={`flex items-center text-[10px] font-bold px-2 py-1 rounded-md ${isFull ? 'text-emerald-700 bg-emerald-100/50' : 'text-blue-700 bg-blue-50'}`}>
                         <div className={`w-1.5 h-1.5 rounded-full mr-2 ${isFull ? '' : 'animate-pulse'} ${getRoomStatusColor()}`} />
                         {isFull ? `Đã lấp đầy (${h.totalRooms} phòng)` : `Trống ${h.emptyRooms} / ${h.totalRooms} phòng`}
                       </div>
@@ -2711,7 +2711,8 @@ const App = () => {
                         <Receipt className="w-5 h-5" />
                       </div>
                       <div>
-                        <p className="text-[12px] font-black uppercase text-slate-800 leading-none mb-1.5">
+                        <p className={`text-[12px] font-black uppercase leading-none mb-1.5 ${bill.status === 'paid' ? 'text-emerald-700' : 'text-rose-700'
+                          }`}>
                           Phòng {bill.roomId}
                         </p>
                         <div className={`text-[8px] font-black px-2 py-0.5 rounded uppercase tracking-wider inline-flex items-center ${bill.status === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
