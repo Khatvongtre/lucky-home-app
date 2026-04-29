@@ -2642,7 +2642,7 @@ const App = () => {
         {activeTab === 'finance' && isManagerOrAbove && (
           <div className="animate-in fade-in pb-20">
             {/* BOX TỔNG HỢP - STICKY */}
-            <div className="sticky top-0 z-30 bg-slate-50 pt-4 pb-4 -mt-4 -mx-4 px-5">
+            <div className="sticky top-0 z-30 bg-slate-50 pb-4 -mt-4 -mx-4 px-5">
               <div className="bg-slate-900 p-5 rounded-2xl text-white shadow-2xl relative border-b-1 border-blue-600 overflow-hidden">
                 <div className="absolute top-0 right-0 w-40 h-40 bg-blue-600 rounded-full blur-3xl opacity-20 pointer-events-none"></div>
 
