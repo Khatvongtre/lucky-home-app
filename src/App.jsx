@@ -1961,14 +1961,14 @@ const App = () => {
                       </div>
                       <div className="overflow-hidden">
                         <div className="flex items-center gap-1.5">
-                          <h3 className={`font-black text-[13px] uppercase tracking-tight leading-tight truncate ${isUrgentPay ? 'text-red-700' : 'text-slate-800'}`}>
+                          <h3 className={`font-black text-[13px] uppercase tracking-tight leading-tight truncate ${isUrgentPay ? 'text-red-700' : isWarningPay ? 'text-amber-700' : 'text-blue-800'}`}>
                             {h.name}
                           </h3>
                           <span className={`text-[7px] font-black px-1.5 py-0.5 rounded uppercase shrink-0 ${roleInfo.class}`}>
                             {roleInfo.text}
                           </span>
                         </div>
-                        <p className="text-[9px] font-medium text-slate-400 mt-0.5 flex items-center truncate">
+                         <p className="text-[9px] font-semibold text-slate-500 mt-0.5 flex items-center truncate">
                           <MapPin className="w-2.5 h-2.5 mr-1 shrink-0 opacity-60" />
                           {h.address || "Chưa cập nhật địa chỉ"}
                         </p>
@@ -1992,7 +1992,7 @@ const App = () => {
 
                   <div className="pt-2 border-t border-black/5 flex items-center justify-between gap-2">
                     <div className="flex items-center">
-                      <div className={`flex items-center text-[10px] font-bold px-2 py-1 rounded-md ${isFull ? 'text-emerald-700 bg-emerald-100/50' : 'text-slate-500 bg-slate-100/50'}`}>
+                        <div className={`flex items-center text-[10px] font-bold px-2 py-1 rounded-md ${isFull ? 'text-emerald-700 bg-emerald-100/50' : 'text-blue-700 bg-blue-50'}`}>
                         <div className={`w-1.5 h-1.5 rounded-full mr-2 ${isFull ? '' : 'animate-pulse'} ${getRoomStatusColor()}`} />
                         {isFull ? `Đã lấp đầy (${h.totalRooms} phòng)` : `Trống ${h.emptyRooms} / ${h.totalRooms} phòng`}
                       </div>
@@ -2561,29 +2561,49 @@ const App = () => {
               {currentRooms.length === 0 && <p className="text-xs text-slate-400 italic mt-5 col-span-2 text-center">Chưa có phòng nào. Bấm Thêm phòng mới bên dưới.</p>}
               {currentRooms.map(r => {
                 const payDays = getDueInfo(r.paymentDate).daysLeft;
-                const endDays = diffDays(endContract(r.contractStart, r.months));
-                const payColor = payDays <= 3 ? 'bg-red-100 text-red-700 border-red-200' : payDays <= 7 ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-green-100 text-slate-600 border-slate-200';
-                const endColor = endDays <= 30 ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-green-100 text-slate-600 border-slate-200';
+                const contractEndDate = endContract(r.contractStart, r.months);
+                const endDays = diffDays(contractEndDate);
+                const isPayUrgent = r.status === 'full' && payDays <= 3;
+                const isPaySoon = r.status === 'full' && payDays > 3 && payDays <= 7;
+                const showContractWarning = r.status === 'full' && contractEndDate && endDays <= 30;
+                const cardStyle = r.status !== 'full'
+                  ? 'bg-white/70 border-dashed border-slate-200 opacity-75'
+                  : isPayUrgent
+                    ? 'bg-red-50 border-red-200 shadow-red-100'
+                    : isPaySoon
+                      ? 'bg-amber-50 border-amber-200 shadow-amber-100'
+                      : 'bg-white border-slate-200 shadow-slate-100';
+                const roomBadgeStyle = r.status !== 'full'
+                  ? 'bg-slate-200 text-slate-600'
+                  : isPayUrgent
+                    ? 'bg-red-600 text-white'
+                    : isPaySoon
+                      ? 'bg-amber-500 text-white'
+                      : 'bg-blue-600 text-white';
+                const payColor = isPayUrgent ? 'bg-red-100 text-red-700 border-red-200' : isPaySoon ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-100';
+                const endColor = endDays <= 7 ? 'bg-red-100 text-red-700 border-red-200' : 'bg-amber-100 text-amber-700 border-amber-200';
 
                 return (
-                  <div key={r.id} className={`bg-white p-2.5 rounded-xl border-2 shadow-sm relative transition-all flex flex-col ${r.status === 'full' ? 'border-blue-100' : 'opacity-70 border-dashed border-slate-200'}`}>
+                  <div key={r.id} className={`p-3 rounded-xl border-2 shadow-sm relative transition-all flex flex-col active:scale-[0.99] ${cardStyle}`}>
                     <div className="flex justify-between items-center mb-1.5">
-                      <span className={`px-2 py-0.5 rounded-md font-black text-[10px] shadow-sm ${r.status === 'full' ? 'bg-blue-600 text-white' : 'bg-red-600 text-white'}`}>
+                      <span className={`px-2 py-0.5 rounded-md font-black text-[10px] shadow-sm ${roomBadgeStyle}`}>
                         {r.roomType === 'mbkd' ? 'MBKD ' : 'P.'}{r.roomCode || r.id} {r.status === 'empty' ? '- TRỐNG' : ''}
                       </span>
-                      <button onClick={() => { setEditingRoom(r); setIsAddRoomModalOpen(true); }} className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-white hover:bg-blue-300 hover:text-white active:scale-95 transition-all"><LucideEdit className="w-3 h-3" /></button>
+                      <button onClick={() => { setEditingRoom(r); setIsAddRoomModalOpen(true); }} className="w-6 h-6 bg-white border border-slate-200 rounded-full flex items-center justify-center text-slate-500 hover:bg-blue-600 hover:border-blue-600 hover:text-white active:scale-95 transition-all shadow-sm"><LucideEdit className="w-3 h-3" /></button>
                     </div>
-                    <p className="text-[13px] font-black text-rose-800 leading-none mb-2">{formatN(r.price)}</p>
+                    <p className={`text-[14px] font-black leading-none mb-2 ${isPayUrgent ? 'text-red-700' : isPaySoon ? 'text-amber-700' : 'text-blue-800'}`}>{formatN(r.price)}</p>
 
                     {r.status === 'full' && (
-                      <div className="space-y-1 border-t border-slate-50 pt-1.5 flex-1">
-                        <div className="flex justify-between items-center text-[8px] font-bold uppercase"><span className="text-rose-600 flex items-center"><CreditCard className="w-3 h-3 mr-1" /> Đóng tiền:</span><span className={`px-1.5 py-0.5 rounded border text-center ${payColor}`}>Còn {payDays > 0 ? payDays : 0} ngày</span></div>
-                        <div className="flex justify-between items-center text-[8px] font-bold uppercase"><span className="text-orange-600 flex items-center"><Calendar className="w-3 h-3 mr-1" /> Hợp đồng:</span><span className={`px-1.5 py-0.5 rounded border bg-green-300 text-green-900 text-center ${endColor}`}>Còn {endDays > 0 ? endDays : 0} ngày</span></div>
+                      <div className="space-y-1.5 border-t border-slate-200/70 pt-2 flex-1">
+                        <div className="flex justify-between items-center text-[8px] font-bold uppercase gap-2"><span className="text-slate-500 flex items-center"><CreditCard className="w-3 h-3 mr-1 text-blue-600" /> Đóng tiền</span><span className={`px-1.5 py-0.5 rounded-md border text-center font-black ${payColor}`}>Còn {payDays > 0 ? payDays : 0} ngày</span></div>
+                        {showContractWarning && (
+                          <div className="flex justify-between items-center text-[8px] font-bold uppercase gap-2"><span className="text-slate-500 flex items-center"><Calendar className="w-3 h-3 mr-1 text-amber-600" /> Hợp đồng</span><span className={`px-1.5 py-0.5 rounded-md border text-center font-black ${endColor}`}>Còn {endDays > 0 ? endDays : 0} ngày</span></div>
+                        )}
                       </div>
                     )}
-                    <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-slate-50 pt-2">
-                      <div className="flex items-center text-blue-600 font-bold text-[9px] bg-blue-50 px-1.5 py-0.5 rounded-md"><Users2 className="w-3 h-3 mr-1" />{r.peopleCount ?? r.people ?? 0} người</div>
-                      {r.eBikeCount > 0 && <div className="flex items-center text-orange-600 font-bold text-[9px] bg-orange-50 px-1.5 py-0.5 rounded-md"><Bike className="w-3 h-3 mr-1" />{r.eBikeCount ?? r.ebikes ?? 0} xe điện</div>}
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-slate-200/70 pt-2">
+                      <div className="flex items-center text-slate-600 font-bold text-[9px] bg-white/70 border border-slate-200 px-1.5 py-0.5 rounded-md"><Users2 className="w-3 h-3 mr-1 text-blue-600" />{r.peopleCount ?? r.people ?? 0} người</div>
+                      {r.eBikeCount > 0 && <div className="flex items-center text-slate-600 font-bold text-[9px] bg-white/70 border border-slate-200 px-1.5 py-0.5 rounded-md"><Bike className="w-3 h-3 mr-1 text-amber-600" />{r.eBikeCount ?? r.ebikes ?? 0} xe điện</div>}
                     </div>
                   </div>
                 )
