@@ -406,6 +406,7 @@ const App = () => {
   const [transactions, setTransactions] = useState([]);
   const [dashboardSummary, setDashboardSummary] = useState(null);
   const [bills, setBills] = useState([]);
+  const [billStats, setBillStats] = useState({ totalRooms: 0, totalBillPaids: 0, totalBillNotPaids: 0, totalAmountPaids: 0 });
   const [config, setConfig] = useState({});
   const [aiMessages, setAiMessages] = useState([{ role: 'assistant', text: 'Chào bạn! Tôi là trợ lý AI. Hệ thống đang sẵn sàng.' }]);
 
@@ -452,6 +453,7 @@ const App = () => {
     setHouses([]);
     setRooms([]);
     setBills([]);
+    setBillStats({ totalRooms: 0, totalBillPaids: 0, totalBillNotPaids: 0, totalAmountPaids: 0 });
     setSavings([]);
     setTransactions([]);
     setDashboardSummary(null);
@@ -573,12 +575,19 @@ const App = () => {
     const month = viewDate.getMonth() + 1;
     const year = viewDate.getFullYear();
 
-    const [billsData] = await Promise.all([
+    const [billsResult] = await Promise.all([
       fetchApi(`/bill/${houseId}?year=${year}&month=${month}`)
     ]);
 
+    const billsData = Array.isArray(billsResult) ? billsResult : (billsResult?.bills || []);
+    setBillStats({
+      totalRooms: billsResult?.totalRooms ?? 0,
+      totalBillPaids: billsResult?.totalBillPaids ?? billsData.filter(b => b.status === 'paid').length,
+      totalBillNotPaids: billsResult?.totalBillNotPaids ?? billsData.filter(b => b.status !== 'paid').length,
+      totalAmountPaids: billsResult?.totalAmountPaids ?? billsData.filter(b => b.status === 'paid').reduce((sum, b) => sum + (b.total || 0), 0)
+    });
     setBills(parseBills(billsData));
-  }, [fetchApi, parseBills, parseMeters, viewDate]);
+  }, [fetchApi, parseBills, viewDate]);
 
   const loadTransactions = useCallback(async (houseId) => {
     const txData = await fetchApi(`/transaction/${houseId}?type=${selectedMonth}`);
@@ -2560,16 +2569,16 @@ const App = () => {
               {/* Box thông số */}
               <div className="grid grid-cols-3 gap-2">
                 <div className="bg-white p-3 rounded-xl text-center">
-                  <p className="text-[7px] font-black text-slate-400 uppercase">Đã lập</p>
-                  <p className="text-sm font-black text-emerald-600">{currentBills.length}/{rooms.filter(r => r.status === 'full').length}</p>
+                  <p className="text-[7px] font-black text-slate-400 uppercase">Đã thu</p>
+                  <p className="text-sm font-black text-emerald-600">{billStats.totalBillPaids}/{billStats.totalRooms}</p>
                 </div>
                 <div className="bg-white p-3 rounded-xl text-center">
                   <p className="text-[7px] font-black text-slate-400 uppercase">Chưa thu</p>
-                  <p className="text-sm font-black text-rose-600">{currentBills.filter(b => b.status !== 'paid').length}</p>
+                  <p className="text-sm font-black text-rose-600">{billStats.totalBillNotPaids}</p>
                 </div>
                 <div className="bg-white p-3 rounded-xl text-center">
-                  <p className="text-[7px] font-black text-slate-400 uppercase">Tổng tiền</p>
-                  <p className="text-sm font-black text-indigo-600">{formatN(currentBills.reduce((s, b) => s + b.total, 0))}</p>
+                  <p className="text-[7px] font-black text-slate-400 uppercase">Tiền đã thu</p>
+                  <p className="text-sm font-black text-indigo-600">{formatN(billStats.totalAmountPaids)}</p>
                 </div>
               </div>
             </div>
@@ -2760,7 +2769,7 @@ const App = () => {
                 <div className="absolute top-0 right-0 w-40 h-40 bg-blue-600 rounded-full blur-3xl opacity-20 pointer-events-none"></div>
 
                 {/* Header Row: Label + Custom Dropdown */}
-                <div className="flex justify-between items-center relative z-50">
+                <div className="flex justify-between items-center relative z-10">
                   <button onClick={() => setIsFinanceStatsOpen(!isFinanceStatsOpen)} className="flex items-center gap-2 active:scale-95 transition-all text-left">
                     <div className="p-1.5 bg-blue-500/20 rounded-lg">
                       <Wallet className="w-4 h-4 text-blue-400" />
@@ -2772,10 +2781,10 @@ const App = () => {
                   </button>
 
                   {/* CUSTOM DROPDOWN UI */}
-                  <div className="relative z-50">
+                  <div className="relative">
                     <button
                       onClick={() => setIsMonthOpen(!isMonthOpen)}
-                      className="flex items-center gap-2 bg-blue-600 border border-blue-400 py-1.5 px-3 rounded-full text-[10px] font-black uppercase tracking-wider text-white shadow-lg shadow-blue-950/30 hover:bg-blue-500 transition-all active:scale-95"
+                      className="flex items-center gap-2 bg-white/10 border border-white/10 py-1.5 px-3 rounded-full text-[10px] font-bold uppercase tracking-wider hover:bg-white/20 transition-all active:scale-95"
                     >
                       {monthLabels[selectedMonth]}
                       <ChevronDown className={`w-3 h-3 transition-transform ${isMonthOpen ? 'rotate-180' : ''}`} />
@@ -2783,7 +2792,7 @@ const App = () => {
 
                     {/* Menu đổ xuống */}
                     {isMonthOpen && (
-                      <div className="absolute right-0 mt-2 w-44 bg-slate-900 border border-blue-500/40 rounded-2xl shadow-2xl z-[80] overflow-hidden animate-in zoom-in-95 duration-200 origin-top-right">
+                      <div className="absolute right-0 mt-2 w-44 bg-slate-800 border border-white/10 rounded-2xl shadow-2xl z-20 overflow-hidden animate-in zoom-in-95 duration-200 origin-top-right">
                         <div className="p-1">
                           {Object.keys(monthLabels).map((key) => (
                             <button
@@ -2809,8 +2818,8 @@ const App = () => {
                 </div>
 
                 {isFinanceStatsOpen && (
-                  <div className="animate-in slide-in-from-top-2 duration-200 mt-5 relative z-0">
-                    <div className="text-center mb-5 relative z-0">
+                  <div className="animate-in slide-in-from-top-2 duration-200 mt-5">
+                    <div className="text-center mb-5 relative z-10">
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Lợi nhuận ròng</p>
                       <h3 className="text-4xl font-black tracking-tight tabular-nums text-transparent bg-clip-text bg-gradient-to-r from-blue-200 to-blue-400">
                         {formatN(financeStats.rev - financeStats.exp)}
