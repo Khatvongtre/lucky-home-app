@@ -2289,7 +2289,7 @@ const App = () => {
       )}
 
       {/* KHU VỰC HIỂN THỊ NỘI DUNG CHÍNH */}
-      <main className="flex-1 w-full overflow-y-auto px-4 pt-4 pb-32 no-scrollbar scroll-smooth">
+      <main className="flex-1 w-full overflow-y-auto px-4 pt-2 pb-32 no-scrollbar scroll-smooth">
 
         {/* --- TỔNG QUAN --- */}
         {activeTab === 'dashboard' && (
@@ -2372,7 +2372,7 @@ const App = () => {
         {activeTab === 'savings' && (
           <div className="animate-in fade-in pb-20">
             {/* Sticky Header with Totals */}
-            <div className="sticky top-0 z-30 bg-slate-50/80 backdrop-blur-md pb-4 px-1">
+            <div className="sticky top-0 z-30 bg-slate-50/80 backdrop-blur-md px-1">
               <div className="bg-slate-900 p-6 rounded-xl text-white shadow-xl relative border-b-8 border-slate-950">
                 <div className="flex justify-between items-center">
                   <button onClick={() => setIsSavingsStatsOpen(!isSavingsStatsOpen)} className="flex items-center gap-1 active:scale-95 transition-all text-left">
@@ -2960,7 +2960,7 @@ const App = () => {
             </div>
 
             {/* DANH SÁCH GIAO DỊCH - SCROLLABLE */}
-            <div className="space-y-2 px-1">
+            <div className="mt-4 space-y-2 px-1">
               {currentTransactions.length === 0 && (
                 <p className="text-xs text-slate-400 italic text-center mt-10">Chưa có giao dịch thu chi nào.</p>
               )}
