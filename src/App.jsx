@@ -518,6 +518,123 @@ const App = () => {
     }
   }, [fetchApi]);
 
+  const parseMeters = useCallback((metersData) =>
+    metersData.map(m => ({ ...m, roomIds: JSON.parse(m.roomIdsJson || '[]') })), []);
+
+  const parseBills = useCallback((billsData) =>
+    billsData.map(b => ({
+      ...b,
+      roomId: b.roomCode,
+      details: JSON.parse(b.detailsJson || '{}'),
+      meter: JSON.parse(b.meterInfoJson || '{}'),
+      heaterMeter: b.heaterInfoJson ? JSON.parse(b.heaterInfoJson) : null
+    })), []);
+
+  const loadHouses = useCallback(async () => {
+    const data = await fetchApi('/house');
+    setHouses(data);
+    return data;
+  }, [fetchApi]);
+
+  const loadDashboardData = useCallback(async (houseId) => {
+    const month = viewDate.getMonth() + 1;
+    const year = viewDate.getFullYear();
+
+    const [summaryData] = await Promise.all([
+      fetchApi(`/management/dashboard/summary/${houseId}?year=${year}&month=${month}`),
+    ]);
+
+    setDashboardSummary(summaryData);
+  }, [fetchApi, viewDate]);
+
+  const loadRoomsData = useCallback(async (houseId) => {
+    const month = viewDate.getMonth() + 1;
+    const year = viewDate.getFullYear();
+
+    const [roomsData] = await Promise.all([
+      fetchApi(`/room/${houseId}`),
+    ]);
+
+    setRooms(roomsData);
+  }, [fetchApi, parseMeters, viewDate]);
+
+  const loadMetersData = useCallback(async (houseId) => {
+    const month = viewDate.getMonth() + 1;
+    const year = viewDate.getFullYear();
+
+    const [metersData] = await Promise.all([
+      fetchApi(`/meter/${houseId}?year=${year}&month=${month}`)
+    ]);
+
+    setMeters(parseMeters(metersData));
+  }, [fetchApi, parseMeters, viewDate]);
+
+  const loadBillsData = useCallback(async (houseId) => {
+    const month = viewDate.getMonth() + 1;
+    const year = viewDate.getFullYear();
+
+    const [billsData] = await Promise.all([
+      fetchApi(`/bill/${houseId}?year=${year}&month=${month}`)
+    ]);
+
+    setBills(parseBills(billsData));
+  }, [fetchApi, parseBills, parseMeters, viewDate]);
+
+  const loadTransactions = useCallback(async (houseId) => {
+    const txData = await fetchApi(`/transaction/${houseId}?type=${selectedMonth}`);
+    setTransactions(txData);
+  }, [fetchApi, selectedMonth]);
+
+  const loadTabData = useCallback(async (tab = activeTab, houseId = selectedHouse?.id) => {
+    try {
+      if (tab === 'savings') {
+        await loadSavings();
+        return;
+      }
+
+      if (!houseId) return;
+
+      switch (tab) {
+        case 'dashboard':
+          await loadDashboardData(houseId);
+          break;
+        case 'rooms':
+          await loadRoomsData(houseId);
+          break;
+        case 'meters_list':
+          await loadMetersData(houseId);
+          break;
+        case 'bills':
+          await loadBillsData(houseId);
+          break;
+        case 'finance':
+          await loadTransactions(houseId);
+          break;
+        case 'settings':
+          setConfig(prev => ({ ...selectedHouse, ...prev }));
+          break;
+        default:
+          break;
+      }
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+  }, [
+    activeTab,
+    selectedHouse,
+    loadSavings,
+    loadDashboardData,
+    loadRoomsData,
+    loadMetersData,
+    loadBillsData,
+    loadTransactions,
+    showToast
+  ]);
+
+  const loadHouseData = useCallback(async (houseId, tab = activeTab) => {
+    await loadTabData(tab, houseId);
+  }, [activeTab, loadTabData]);
+
 
   // Kiểm tra token khi mới vào web
   useEffect(() => {
@@ -531,7 +648,7 @@ const App = () => {
 
       // 2. Kiểm tra "sức khỏe" của token với backend (Tùy chọn nhưng nên có)
       // Bạn có thể tạo 1 endpoint /auth/me hoặc đơn giản là gọi /house
-      fetchApi('/house')
+      loadHouses()
         .then(data => setHouses(data))
         .catch(err => {
           // Nếu lỗi ở đây (thường là 401), fetchApi sẽ tự gọi handleLogout()
@@ -548,24 +665,20 @@ const App = () => {
       script.async = true;
       document.body.appendChild(script);
     }
-  }, [fetchApi, handleLogout]); // Thêm các phụ thuộc vào đây
-
-  useEffect(() => {
-    if (isLoggedIn && activeTab === 'savings') loadSavings();
-  }, [isLoggedIn, activeTab, loadSavings]);
+  }, [loadHouses, handleLogout]); // Thêm các phụ thuộc vào đây
 
   // Lấy danh sách nhà
   useEffect(() => {
     if (isLoggedIn && !selectedHouse) {
-      fetchApi('/house')
+      loadHouses()
         .then(data => setHouses(data))
         .catch(err => {
           showToast(err.message, 'error');
         });
     }
-  }, [isLoggedIn, selectedHouse, fetchApi, showToast]);
+  }, [isLoggedIn, selectedHouse, loadHouses, showToast]);
 
-  const loadHouseData = useCallback(async (houseId) => {
+  const LOAD_ALL_HOUSE_DATA_LEGACY = useCallback(async (houseId) => {
     try {
       const now = new Date();
       const month = viewDate.getMonth() + 1;
@@ -603,10 +716,10 @@ const App = () => {
   }, [houses, fetchApi, user, rooms.length, showToast, viewDate]);
 
   useEffect(() => {
-    if (selectedHouse) {
-      loadHouseData(selectedHouse.id);
+    if (isLoggedIn && activeTab !== 'finance') {
+      loadTabData(activeTab, selectedHouse?.id);
     }
-  }, [activeTab, selectedHouse?.id, viewDate]);
+  }, [isLoggedIn, activeTab, selectedHouse?.id, viewDate, selectedMonth, loadTabData]);
   // Thêm activeTab vào dependency để mỗi khi bấm chuyển Tab nó sẽ refresh lại dữ liệu mới nhất từ DB
 
   const handleOpenShare = (e, house) => {
@@ -1537,7 +1650,7 @@ const App = () => {
   // --- LOGIC TẢI GIAO DỊCH THEO LOẠI ---
   useEffect(() => {
     const loadTransactions = async () => {
-      if (!selectedHouse?.id) return;
+      if (activeTab !== 'finance' || !selectedHouse?.id) return;
 
       try {
         // Truyền tham số type vào URL (ví dụ: ?type=this_month)
@@ -1555,7 +1668,7 @@ const App = () => {
     };
 
     loadTransactions();
-  }, [selectedMonth, selectedHouse?.id]); // Chạy lại khi đổi loại tháng hoặc đổi nhà
+  }, [activeTab, selectedMonth, selectedHouse?.id]); // Chạy lại khi đang ở tab Thu chi
 
   // ==========================================
   // RENDER QUYẾT ĐỊNH LUỒNG
@@ -1749,7 +1862,7 @@ const App = () => {
                       />
                     </div>
                     <button
-                      onClick={() => { setSelectedHouse(h); setSearchQuery(''); }}
+                      onClick={() => { setSelectedHouse(h); setConfig({ ...h }); setActiveTab('dashboard'); setSearchQuery(''); }}
                       className="flex-1 flex items-center space-x-2 text-left overflow-hidden"
                     >
                       <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 shadow-inner ${isUrgentPay ? 'bg-red-100 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
@@ -2163,7 +2276,7 @@ const App = () => {
         {activeTab === 'savings' && (
           <div className="animate-in fade-in pb-20">
             {/* Sticky Header with Totals */}
-            <div className="sticky top-0 z-30 bg-slate-50/80 backdrop-blur-md pt-2 pb-4 px-1">
+            <div className="sticky top-0 z-30 bg-slate-50/80 backdrop-blur-md pb-4 px-1">
               <div className="bg-slate-900 p-6 rounded-xl text-white shadow-xl relative border-b-8 border-slate-950">
                 <div className="flex justify-between items-center">
                   <button onClick={() => setIsSavingsStatsOpen(!isSavingsStatsOpen)} className="flex items-center gap-1 active:scale-95 transition-all text-left">
@@ -2647,7 +2760,7 @@ const App = () => {
                 <div className="absolute top-0 right-0 w-40 h-40 bg-blue-600 rounded-full blur-3xl opacity-20 pointer-events-none"></div>
 
                 {/* Header Row: Label + Custom Dropdown */}
-                <div className="flex justify-between items-center relative z-10">
+                <div className="flex justify-between items-center relative z-50">
                   <button onClick={() => setIsFinanceStatsOpen(!isFinanceStatsOpen)} className="flex items-center gap-2 active:scale-95 transition-all text-left">
                     <div className="p-1.5 bg-blue-500/20 rounded-lg">
                       <Wallet className="w-4 h-4 text-blue-400" />
@@ -2659,10 +2772,10 @@ const App = () => {
                   </button>
 
                   {/* CUSTOM DROPDOWN UI */}
-                  <div className="relative">
+                  <div className="relative z-50">
                     <button
                       onClick={() => setIsMonthOpen(!isMonthOpen)}
-                      className="flex items-center gap-2 bg-white/10 border border-white/10 py-1.5 px-3 rounded-full text-[10px] font-bold uppercase tracking-wider hover:bg-white/20 transition-all active:scale-95"
+                      className="flex items-center gap-2 bg-blue-600 border border-blue-400 py-1.5 px-3 rounded-full text-[10px] font-black uppercase tracking-wider text-white shadow-lg shadow-blue-950/30 hover:bg-blue-500 transition-all active:scale-95"
                     >
                       {monthLabels[selectedMonth]}
                       <ChevronDown className={`w-3 h-3 transition-transform ${isMonthOpen ? 'rotate-180' : ''}`} />
@@ -2670,7 +2783,7 @@ const App = () => {
 
                     {/* Menu đổ xuống */}
                     {isMonthOpen && (
-                      <div className="absolute right-0 mt-2 w-44 bg-slate-800 border border-white/10 rounded-2xl shadow-2xl z-20 overflow-hidden animate-in zoom-in-95 duration-200 origin-top-right">
+                      <div className="absolute right-0 mt-2 w-44 bg-slate-900 border border-blue-500/40 rounded-2xl shadow-2xl z-[80] overflow-hidden animate-in zoom-in-95 duration-200 origin-top-right">
                         <div className="p-1">
                           {Object.keys(monthLabels).map((key) => (
                             <button
@@ -2696,8 +2809,8 @@ const App = () => {
                 </div>
 
                 {isFinanceStatsOpen && (
-                  <div className="animate-in slide-in-from-top-2 duration-200 mt-5">
-                    <div className="text-center mb-5 relative z-10">
+                  <div className="animate-in slide-in-from-top-2 duration-200 mt-5 relative z-0">
+                    <div className="text-center mb-5 relative z-0">
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Lợi nhuận ròng</p>
                       <h3 className="text-4xl font-black tracking-tight tabular-nums text-transparent bg-clip-text bg-gradient-to-r from-blue-200 to-blue-400">
                         {formatN(financeStats.rev - financeStats.exp)}
