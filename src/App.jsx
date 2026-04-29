@@ -404,7 +404,7 @@ const App = () => {
   const [rooms, setRooms] = useState([]);
   const [meters, setMeters] = useState([]);
   const [transactions, setTransactions] = useState([]);
-  const [rawChartData, setRawChartData] = useState([]);
+  const [dashboardSummary, setDashboardSummary] = useState(null);
   const [bills, setBills] = useState([]);
   const [config, setConfig] = useState({});
   const [aiMessages, setAiMessages] = useState([{ role: 'assistant', text: 'Chào bạn! Tôi là trợ lý AI. Hệ thống đang sẵn sàng.' }]);
@@ -454,7 +454,7 @@ const App = () => {
     setBills([]);
     setSavings([]);
     setTransactions([]);
-    setRawChartData([]);
+    setDashboardSummary(null);
   }, []);
 
   const handleChangePassword = async (e) => {
@@ -583,6 +583,9 @@ const App = () => {
         setSelectedHouse(h);
       }
 
+      const summaryData = await fetchApi(`/management/dashboard/summary/${houseId}?year=${year}&month=${month}`);
+      setDashboardSummary(summaryData);
+
       const roomsData = await fetchApi(`/room/${houseId}`);
       setRooms(roomsData);
 
@@ -594,10 +597,6 @@ const App = () => {
         ...b, roomId: b.roomCode, details: JSON.parse(b.detailsJson || '{}'), meter: JSON.parse(b.meterInfoJson || '{}'), heaterMeter: b.heaterInfoJson ? JSON.parse(b.heaterInfoJson) : null
       })));
 
-      if (isOwnerOrAdmin) {
-        const chartRes = await fetchApi(`/management/dashboard/${houseId}/revenue-chart`);
-        setRawChartData(chartRes);
-      }
     } catch (e) {
       showToast(e.message, 'error');
     }
@@ -1395,45 +1394,26 @@ const App = () => {
     });
   }, [currentSavings, unselectedSavingsBanks]);
 
-  const stats = useMemo(() => {
-    const full = rooms.filter(r => r.status === 'full');
+  const financeStats = useMemo(() => {
     const totalRev = transactions.filter(t => t.type === 'in').reduce((s, t) => s + (t.amount || 0), 0);
-
-    // Chi phí phát sinh (từ phiếu chi)
     const txExp = transactions.filter(t => t.type === 'out').reduce((s, t) => s + (t.amount || 0), 0);
-    // Chi phí cố định (Tiền thuê nhà, Internet, Phí khác...)
     const fixedCosts = (selectedHouse?.rentPrice || 0) + (selectedHouse?.internetFee || 0) + (selectedHouse?.otherFees || 0);
-    // TỔNG CHI PHÍ
     const totalExp = txExp + fixedCosts;
-
-    let totalKwh = 0;
-    meters.forEach(m => {
-      const isOldEmpty = m.oldVal === null || m.oldVal === "";
-      const isNewEmpty = m.newVal === null || m.newVal === "";
-      if (!isOldEmpty && !isNewEmpty) {
-        const vOld = parseN(String(m.oldVal));
-        const vNew = parseN(String(m.newVal));
-        if (vNew >= vOld) {
-          totalKwh += (vNew - vOld);
-        }
-      }
-    });
-    const elecCost = totalKwh * (config.priceElec || 0);
-
-    return { rev: totalRev, exp: totalExp, txExp, fixedCosts, total: rooms.length, empty: rooms.length - full.length, people: full.reduce((s, r) => s + (r.peopleCount ?? r.people ?? 0), 0), ebikes: full.reduce((s, r) => s + (r.eBikeCount ?? r.ebikes ?? 0), 0), elecCost };
-  }, [rooms, transactions, meters, config.priceElec, selectedHouse]);
+    return { rev: totalRev, exp: totalExp, txExp, fixedCosts };
+  }, [transactions, selectedHouse]);
 
   const revenueChartData = useMemo(() => {
-    if (!rawChartData || rawChartData.length === 0) {
+    const chartRaw = dashboardSummary?.revenueChart || [];
+    if (!chartRaw || chartRaw.length === 0) {
       return [1, 2, 3, 4, 5, 6].map((_, i) => ({ label: `Th${i + 1}`, value: 0, height: 0, isCurrent: i === 5 }));
     }
 
-    const maxVal = Math.max(...rawChartData.map(d => d.value), 1);
-    return rawChartData.map(d => ({
+    const maxVal = Math.max(...chartRaw.map(d => d.value), 1);
+    return chartRaw.map(d => ({
       ...d,
       height: d.value === 0 ? 0 : Math.max((d.value / maxVal) * 100, 4)
     }));
-  }, [rawChartData]);
+  }, [dashboardSummary]);
 
   const shouldShowMeterBanner = useMemo(() => {
     if (!rooms || rooms.length === 0) return false;
@@ -2116,10 +2096,10 @@ const App = () => {
             )}
 
             <div className="grid grid-cols-4 gap-2 text-center">
-              <div className="bg-white p-2 rounded-xl border border-slate-100 shadow-sm flex flex-col items-center"><p className="text-[13px] font-black text-blue-600">{stats.total}</p><p className="text-[7px] font-bold text-slate-400 uppercase mt-1">Phòng</p></div>
-              <div className="bg-white p-2 rounded-xl border border-slate-100 shadow-sm flex flex-col items-center"><p className="text-[13px] font-black text-emerald-600">{stats.empty}</p><p className="text-[7px] font-bold text-slate-400 uppercase mt-1">Trống</p></div>
-              <div className="bg-white p-2 rounded-xl border border-slate-100 shadow-sm flex flex-col items-center"><p className="text-[13px] font-black text-indigo-600">{stats.people}</p><p className="text-[7px] font-bold text-slate-400 uppercase mt-1">Người</p></div>
-              <div className="bg-white p-2 rounded-xl border border-slate-100 shadow-sm flex flex-col items-center"><p className="text-[13px] font-black text-orange-600">{stats.ebikes}</p><p className="text-[7px] font-bold text-slate-400 uppercase mt-1">Xe điện</p></div>
+              <div className="bg-white p-2 rounded-xl border border-slate-100 shadow-sm flex flex-col items-center"><p className="text-[13px] font-black text-blue-600">{dashboardSummary?.totalRooms || 0}</p><p className="text-[7px] font-bold text-slate-400 uppercase mt-1">Phòng</p></div>
+              <div className="bg-white p-2 rounded-xl border border-slate-100 shadow-sm flex flex-col items-center"><p className="text-[13px] font-black text-emerald-600">{dashboardSummary?.emptyRooms || 0}</p><p className="text-[7px] font-bold text-slate-400 uppercase mt-1">Trống</p></div>
+              <div className="bg-white p-2 rounded-xl border border-slate-100 shadow-sm flex flex-col items-center"><p className="text-[13px] font-black text-indigo-600">{dashboardSummary?.totalPeople || 0}</p><p className="text-[7px] font-bold text-slate-400 uppercase mt-1">Người</p></div>
+              <div className="bg-white p-2 rounded-xl border border-slate-100 shadow-sm flex flex-col items-center"><p className="text-[13px] font-black text-orange-600">{dashboardSummary?.totalEbikes || 0}</p><p className="text-[7px] font-bold text-slate-400 uppercase mt-1">Xe điện</p></div>
             </div>
 
             {isOwnerOrAdmin && (
@@ -2128,7 +2108,7 @@ const App = () => {
                 <div className="flex justify-between items-start mb-2 relative z-10">
                   <div>
                     <p className="text-[9px] font-black uppercase tracking-widest mb-1 text-slate-400">Tổng doanh thu dự kiến</p>
-                    <h3 className="text-3xl font-black text-emerald-400 tabular-nums leading-none">+{formatN(stats.rev)}</h3>
+                    <h3 className="text-3xl font-black text-emerald-400 tabular-nums leading-none">+{formatN(dashboardSummary?.revenue || 0)}</h3>
                   </div>
                   <div className="p-2 bg-emerald-500/20 rounded-lg">
                     <TrendingUp className="w-5 h-5 text-emerald-400" />
@@ -2138,21 +2118,21 @@ const App = () => {
                 <div className="grid grid-cols-2 gap-4 border-t border-slate-700/80 pt-3 mt-4 relative z-10">
                   <div>
                     <p className="text-[8px] font-black uppercase tracking-widest mb-1 text-slate-400">Tổng chi phí</p>
-                    <p className="text-sm font-black text-rose-400">-{formatN(stats.exp)}</p>
+                    <p className="text-sm font-black text-rose-400">-{formatN(dashboardSummary?.expense || 0)}</p>
                   </div>
                   <div className="text-right border-l border-slate-700/80 pl-4">
                     <p className="text-[8px] font-black uppercase tracking-widest mb-1 text-slate-400">Lợi nhuận ròng</p>
-                    <p className="text-sm font-black text-blue-400">{formatN(stats.rev - stats.exp)}</p>
+                    <p className="text-sm font-black text-blue-400">{formatN(dashboardSummary?.profit || 0)}</p>
                   </div>
                 </div>
               </div>
             )}
 
             <div className="grid grid-cols-2 gap-2">
-              <div className="bg-orange-400 p-4 rounded-xl text-white shadow-md relative overflow-hidden"><Zap className="w-8 h-8 absolute -right-1 -top-1 opacity-20" /><p className="text-[8px] font-black uppercase mb-1 opacity-80">Điện dự tính</p><p className="text-sm font-black">{formatN(stats.elecCost)}</p></div>
-              <div className="bg-sky-500 p-4 rounded-xl text-white shadow-md relative overflow-hidden"><Droplets className="w-8 h-8 absolute -right-1 -top-1 opacity-20" /><p className="text-[8px] font-black uppercase mb-1 opacity-80">Nước dự tính</p><p className="text-sm font-black">{formatN(stats.people * (config.priceWaterPerson || 0))}</p></div>
-              <div className="bg-purple-400 p-4 rounded-xl text-white shadow-md relative overflow-hidden"><Activity className="w-8 h-8 absolute -right-1 -top-1 opacity-20" /><p className="text-[8px] font-black uppercase mb-1 opacity-80">Dịch vụ</p><p className="text-sm font-black">{formatN(stats.people * (config.priceService || 0))}</p></div>
-              <div className="bg-emerald-500 p-4 rounded-xl text-white shadow-md relative overflow-hidden"><Wifi className="w-8 h-8 absolute -right-1 -top-1 opacity-20" /><p className="text-[8px] font-black uppercase mb-1 opacity-80">Internet</p><p className="text-sm font-black">{formatN((stats.total - stats.empty) * (config.priceNet || 0))}</p></div>
+              <div className="bg-orange-400 p-4 rounded-xl text-white shadow-md relative overflow-hidden"><Zap className="w-8 h-8 absolute -right-1 -top-1 opacity-20" /><p className="text-[8px] font-black uppercase mb-1 opacity-80">Điện dự tính</p><p className="text-sm font-black">{formatN(dashboardSummary?.expectedElecCost || 0)}</p></div>
+              <div className="bg-sky-500 p-4 rounded-xl text-white shadow-md relative overflow-hidden"><Droplets className="w-8 h-8 absolute -right-1 -top-1 opacity-20" /><p className="text-[8px] font-black uppercase mb-1 opacity-80">Nước dự tính</p><p className="text-sm font-black">{formatN(dashboardSummary?.expectedWaterCost || 0)}</p></div>
+              <div className="bg-purple-400 p-4 rounded-xl text-white shadow-md relative overflow-hidden"><Activity className="w-8 h-8 absolute -right-1 -top-1 opacity-20" /><p className="text-[8px] font-black uppercase mb-1 opacity-80">Dịch vụ</p><p className="text-sm font-black">{formatN(dashboardSummary?.expectedServiceCost || 0)}</p></div>
+              <div className="bg-emerald-500 p-4 rounded-xl text-white shadow-md relative overflow-hidden"><Wifi className="w-8 h-8 absolute -right-1 -top-1 opacity-20" /><p className="text-[8px] font-black uppercase mb-1 opacity-80">Internet</p><p className="text-sm font-black">{formatN(dashboardSummary?.expectedInternetCost || 0)}</p></div>
             </div>
 
             {isOwnerOrAdmin && (
@@ -2720,26 +2700,26 @@ const App = () => {
                     <div className="text-center mb-5 relative z-10">
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Lợi nhuận ròng</p>
                       <h3 className="text-4xl font-black tracking-tight tabular-nums text-transparent bg-clip-text bg-gradient-to-r from-blue-200 to-blue-400">
-                        {formatN(stats.rev - stats.exp)}
+                        {formatN(financeStats.rev - financeStats.exp)}
                       </h3>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3 relative z-10">
                       <div className="bg-white/5 border border-white/10 rounded-xl p-3.5">
                         <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Tổng Doanh Thu</p>
-                        <p className="text-lg font-black text-emerald-400">+{formatN(stats.rev)}</p>
+                        <p className="text-lg font-black text-emerald-400">+{formatN(financeStats.rev)}</p>
                       </div>
                       <div className="bg-white/5 border border-white/10 rounded-xl p-3.5">
                         <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Tổng Chi Phí</p>
-                        <p className="text-lg font-black text-rose-400 mb-2">-{formatN(stats.exp)}</p>
+                        <p className="text-lg font-black text-rose-400 mb-2">-{formatN(financeStats.exp)}</p>
                         <div className="space-y-1 border-t border-white/10 pt-2">
                           <div className="flex justify-between items-center text-[8px] font-bold">
                             <span className="text-slate-400">Phí cố định</span>
-                            <span className="text-slate-300">{formatN(stats.fixedCosts)}</span>
+                            <span className="text-slate-300">{formatN(financeStats.fixedCosts)}</span>
                           </div>
                           <div className="flex justify-between items-center text-[8px] font-bold">
                             <span className="text-slate-400">Phát sinh</span>
-                            <span className="text-slate-300">{formatN(stats.txExp)}</span>
+                            <span className="text-slate-300">{formatN(financeStats.txExp)}</span>
                           </div>
                         </div>
                       </div>
