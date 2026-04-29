@@ -191,6 +191,46 @@ const ToastNotification = ({ toast }) => {
   );
 };
 
+const ConfirmDialog = ({ dialog, onCancel, onConfirm }) => {
+  if (!dialog) return null;
+
+  return (
+    <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-200" onClick={onCancel}></div>
+      <div className="relative z-10 w-full max-w-sm bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="p-6 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mx-auto mb-4 shadow-inner">
+            <AlertTriangle className="w-8 h-8" />
+          </div>
+          <h3 className="text-base font-black text-slate-900 uppercase tracking-tight mb-2">
+            {dialog.title || 'Xác nhận xóa'}
+          </h3>
+          <p className="text-sm font-medium text-slate-500 leading-relaxed">
+            {dialog.message}
+          </p>
+        </div>
+        <div className="grid grid-cols-2 gap-3 bg-slate-50 p-4">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="py-3.5 rounded-xl bg-white border border-slate-200 text-slate-500 font-black uppercase text-[10px] tracking-widest active:scale-95 transition-all"
+          >
+            Hủy
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className="py-3.5 rounded-xl bg-red-600 text-white font-black uppercase text-[10px] tracking-widest border-b-1 border-red-800 shadow-lg shadow-red-200 active:scale-95 transition-all flex items-center justify-center gap-2"
+          >
+            <Trash2 className="w-4 h-4" />
+            Xóa
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const AuthView = ({ fetchApi, setIsLoggedIn, setUser, showToast }) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
@@ -370,6 +410,7 @@ const App = () => {
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const toastTimer = useRef(null);
+  const confirmResolveRef = useRef(null);
 
   // --- Modals State ---
   const [isAddRoomModalOpen, setIsAddRoomModalOpen] = useState(false);
@@ -388,6 +429,7 @@ const App = () => {
   const [isListening, setIsListening] = useState(false);
   const [aiFeedback, setAiFeedback] = useState("");
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState(null);
   const [savings, setSavings] = useState([]);
   const [isAddSavingModalOpen, setIsAddSavingModalOpen] = useState(false);
   const [editingSaving, setEditingSaving] = useState(null);
@@ -432,6 +474,21 @@ const App = () => {
 
   // --- Logic phân quyền dựa trên từng Nhà được chọn ---
   // Các quyền: 'SuperAdmin', 'Owner', 'Manager', 'Staff'
+  const requestConfirm = useCallback((dialog) => {
+    return new Promise(resolve => {
+      confirmResolveRef.current = resolve;
+      setConfirmDialog(dialog);
+    });
+  }, []);
+
+  const closeConfirmDialog = useCallback((confirmed) => {
+    if (confirmResolveRef.current) {
+      confirmResolveRef.current(confirmed);
+      confirmResolveRef.current = null;
+    }
+    setConfirmDialog(null);
+  }, []);
+
   const currentRole = selectedHouse?.userRole;
   const isOwnerOrAdmin = ['SuperAdmin', 'Owner'].includes(currentRole);
   const isManagerOrAbove = ['SuperAdmin', 'Owner', 'Manager'].includes(currentRole);
@@ -765,7 +822,11 @@ const App = () => {
   };
 
   const handleDeleteSaving = async (id) => {
-    if (!window.confirm("Bạn có chắc chắn muốn xóa sổ tiết kiệm này?")) return;
+    const confirmed = await requestConfirm({
+      title: 'Xóa sổ tiết kiệm',
+      message: 'Bạn có chắc chắn muốn xóa sổ tiết kiệm này? Dữ liệu đã xóa sẽ không thể khôi phục.'
+    });
+    if (!confirmed) return;
     try {
       await fetchApi(`/saving/${id}`, 'DELETE');
       await loadSavings();
@@ -916,7 +977,11 @@ const App = () => {
   };
 
   const handleDeleteHouse = async (houseId, houseName) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa cơ sở "${houseName}" và TOÀN BỘ dữ liệu liên quan không?`)) return;
+    const confirmed = await requestConfirm({
+      title: 'Xóa cơ sở',
+      message: `Bạn có chắc chắn muốn xóa cơ sở "${houseName}" và TOÀN BỘ dữ liệu liên quan không?`
+    });
+    if (!confirmed) return;
     try {
       await fetchApi(`/house/${houseId}`, 'DELETE');
       setHouses(houses.filter(h => h.id !== houseId));
@@ -926,7 +991,11 @@ const App = () => {
   };
 
   const handleDeleteRoom = async (roomId, roomCode) => {
-    if (!window.confirm(`Bạn có chắc muốn xóa phòng/MBKD "${roomCode}" không?`)) return;
+    const confirmed = await requestConfirm({
+      title: 'Xóa phòng',
+      message: `Bạn có chắc muốn xóa phòng/MBKD "${roomCode}" không?`
+    });
+    if (!confirmed) return;
     try {
       await fetchApi(`/room/${roomId}`, 'DELETE');
       await loadHouseData(selectedHouse?.id);
@@ -937,7 +1006,11 @@ const App = () => {
   };
 
   const handleDeleteTransaction = async (txId) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa phiếu thu chi này không?`)) return;
+    const confirmed = await requestConfirm({
+      title: 'Xóa phiếu thu chi',
+      message: 'Bạn có chắc chắn muốn xóa phiếu thu chi này không?'
+    });
+    if (!confirmed) return;
     try {
       await fetchApi(`/transaction/${txId}`, 'DELETE');
       await loadHouseData(selectedHouse?.id);
@@ -974,7 +1047,11 @@ const App = () => {
   };
 
   const handleDeleteMeter = async (meterId) => {
-    if (!window.confirm("Bạn có chắc muốn xóa công tơ này?")) return;
+    const confirmed = await requestConfirm({
+      title: 'Xóa công tơ',
+      message: 'Bạn có chắc muốn xóa công tơ này?'
+    });
+    if (!confirmed) return;
     try {
       await fetchApi(`/meter/${meterId}`, 'DELETE');
       await loadHouseData(selectedHouse?.id);
@@ -1754,6 +1831,11 @@ const App = () => {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center">
         <ToastNotification toast={toast} />
+        <ConfirmDialog
+          dialog={confirmDialog}
+          onCancel={() => closeConfirmDialog(false)}
+          onConfirm={() => closeConfirmDialog(true)}
+        />
 
         <div className="w-full max-w-sm flex flex-col h-screen relative overflow-hidden">
 
@@ -2151,6 +2233,11 @@ const App = () => {
   return (
     <div className="h-screen bg-slate-50 text-slate-900 font-sans flex flex-col max-w-lg mx-auto w-full relative border-x border-slate-100 shadow-2xl overflow-hidden">
       <ToastNotification toast={toast} />
+      <ConfirmDialog
+        dialog={confirmDialog}
+        onCancel={() => closeConfirmDialog(false)}
+        onConfirm={() => closeConfirmDialog(true)}
+      />
 
       {/* HEADER */}
       <header className="px-4 h-14 flex items-center justify-between shrink-0 bg-blue-600 text-white z-50 shadow-md relative">
@@ -2769,7 +2856,7 @@ const App = () => {
                 <div className="absolute top-0 right-0 w-40 h-40 bg-blue-600 rounded-full blur-3xl opacity-20 pointer-events-none"></div>
 
                 {/* Header Row: Label + Custom Dropdown */}
-                <div className="flex justify-between items-center relative z-10">
+                <div className="flex justify-between items-center relative z-50">
                   <button onClick={() => setIsFinanceStatsOpen(!isFinanceStatsOpen)} className="flex items-center gap-2 active:scale-95 transition-all text-left">
                     <div className="p-1.5 bg-blue-500/20 rounded-lg">
                       <Wallet className="w-4 h-4 text-blue-400" />
@@ -2781,10 +2868,10 @@ const App = () => {
                   </button>
 
                   {/* CUSTOM DROPDOWN UI */}
-                  <div className="relative">
+                  <div className="relative z-50">
                     <button
                       onClick={() => setIsMonthOpen(!isMonthOpen)}
-                      className="flex items-center gap-2 bg-white/10 border border-white/10 py-1.5 px-3 rounded-full text-[10px] font-bold uppercase tracking-wider hover:bg-white/20 transition-all active:scale-95"
+                      className="flex items-center gap-2 bg-blue-600 border border-blue-400 py-1.5 px-3 rounded-full text-[10px] font-black uppercase tracking-wider text-white shadow-lg shadow-blue-950/30 hover:bg-blue-500 transition-all active:scale-95"
                     >
                       {monthLabels[selectedMonth]}
                       <ChevronDown className={`w-3 h-3 transition-transform ${isMonthOpen ? 'rotate-180' : ''}`} />
@@ -2792,7 +2879,7 @@ const App = () => {
 
                     {/* Menu đổ xuống */}
                     {isMonthOpen && (
-                      <div className="absolute right-0 mt-2 w-44 bg-slate-800 border border-white/10 rounded-2xl shadow-2xl z-20 overflow-hidden animate-in zoom-in-95 duration-200 origin-top-right">
+                      <div className="absolute right-0 mt-2 w-44 bg-slate-900 border border-blue-500/40 rounded-2xl shadow-2xl z-[80] overflow-hidden animate-in zoom-in-95 duration-200 origin-top-right">
                         <div className="p-1">
                           {Object.keys(monthLabels).map((key) => (
                             <button
@@ -2818,15 +2905,15 @@ const App = () => {
                 </div>
 
                 {isFinanceStatsOpen && (
-                  <div className="animate-in slide-in-from-top-2 duration-200 mt-5">
-                    <div className="text-center mb-5 relative z-10">
+                  <div className="animate-in slide-in-from-top-2 duration-200 mt-5 relative z-0">
+                    <div className="text-center mb-5 relative z-0">
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Lợi nhuận ròng</p>
                       <h3 className="text-4xl font-black tracking-tight tabular-nums text-transparent bg-clip-text bg-gradient-to-r from-blue-200 to-blue-400">
                         {formatN(financeStats.rev - financeStats.exp)}
                       </h3>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 relative z-10">
+                    <div className="grid grid-cols-2 gap-3 relative z-0">
                       <div className="bg-white/5 border border-white/10 rounded-xl p-3.5">
                         <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Tổng Doanh Thu</p>
                         <p className="text-lg font-black text-emerald-400">+{formatN(financeStats.rev)}</p>
