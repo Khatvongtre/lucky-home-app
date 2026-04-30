@@ -1035,56 +1035,14 @@ const App = () => {
       if (updates.length === 0) return showToast("Chưa nhập số mới nào!", "error");
       await fetchApi('/meter/update', 'POST', updates);
 
-      const updatedMeterIds = updates.map(u => u.id);
-      const roomsToGenerate = rooms.filter(r =>
-        r.status === 'full' &&
-        meters.some(m => m.type === 'electric' && m.roomIds?.includes(r.id) && (m.newVal !== null && m.newVal !== ""))
-      );
+      const res = await fetchApi('/bill/generate', 'POST', {
+        houseId: selectedHouse?.id,
+        month: monthSelected,
+        year: yearSelected,
+        overwrite: true
+      });
 
-      if (roomsToGenerate.length > 0) {
-        const currentMonthFull = viewDate.toLocaleDateString('vi-VN', { month: '2-digit', year: 'numeric' });
-        const newBills = roomsToGenerate.map(room => {
-          const meterAll = calcMeterAll(room, meters, rooms, config);
-          const isPerson = config.waterCalcMethod === 'person';
-          const waterCost = isPerson ? (config.priceWaterPerson || 0) * (room.peopleCount || 1) : 0;
-          const serviceCost = (config.priceService || 0) * (room.peopleCount || 1);
-          const netCost = config.priceNet || 0;
-          const bikeCost = (room.eBikeCount || 0) * (config.priceEBike || 0);
-          const monthlyFeeCost = room.roomType === 'mbkd' ? (room.monthlyFee || 0) : 0;
-
-          const total = room.price + meterAll.elecRoomCost + meterAll.elecHeaterCost +
-            waterCost + serviceCost + netCost + bikeCost + monthlyFeeCost;
-
-          return {
-            id: 'b-' + Date.now() + Math.random().toString(36).substr(2, 4),
-            houseId: selectedHouse?.id,
-            roomId: room.roomCode || room.id,
-            month: monthSelected,
-            year: yearSelected,
-            currentMonthFull: currentMonthFull,
-            status: 'pending',
-            total: total,
-            meter: { old: meterAll.meterRoomOld, new: meterAll.meterRoomNew },
-            meterHeater: { old: meterAll.meterHeaterOld, new: meterAll.meterHeaterNew },
-            details: {
-              rent: room.price,
-              elec: meterAll.elecRoomCost,
-              heater: meterAll.elecHeaterCost,
-              water: waterCost,
-              internet: netCost,
-              service: serviceCost,
-              ebikes: bikeCost,
-              monthlyFee: monthlyFeeCost,
-              discount: 0
-            }
-          };
-        });
-
-        await fetchApi('/bill/generate-bulk', 'POST', newBills);
-        showToast(`Đã lưu chỉ số & tự động lập ${roomsToGenerate.length} hóa đơn!`, "success");
-      } else {
-        showToast(`Đã lưu chỉ số ${monthDisplay}!`, "success");
-      }
+      showToast(`Đã lưu chỉ số & tự động lập ${res.generatedCount} hóa đơn!`, "success");
 
       await loadHouseData(selectedHouse?.id);
     } catch (e) { showToast("Lỗi: " + e.message, "error"); }
@@ -1105,87 +1063,20 @@ const App = () => {
 
   const executeGenerateBills = async () => {
     setIsOverwriteModalOpen(false);
-    const currentMonthFull = new Date().toLocaleDateString('vi-VN', { month: '2-digit', year: 'numeric' });
     const now = new Date();
     const month = now.getMonth() + 1;
     const year = now.getFullYear();
 
-    const occupiedRooms = rooms.filter(r => r.status === 'full');
-    if (occupiedRooms.length === 0) return showToast("Không có phòng nào đang thuê!", "error");
-
-    const newBills = occupiedRooms.map(room => {
-      const meterAll = calcMeterAll(room, meters, rooms, config);
-      const isPerson = config.waterCalcMethod === 'person';
-      const waterCost = isPerson ? (config.priceWaterPerson || 100000) * (room.peopleCount ?? room.people ?? 1) : 0;
-      const serviceCost = (config.priceService || 0) * (room.peopleCount ?? room.people ?? 1);
-      const netCost = config.priceNet || 100000;
-      const bikeCost = (room.eBikeCount ?? room.ebikes ?? 0) * (config.priceEBike || 50000);
-      const discount = 0;
-
-      const monthlyFeeCost = room.roomType === 'mbkd' ? (room.monthlyFee || 0) : 0;
-      const total = room.price + meterAll.elecRoomCost + meterAll.elecHeaterCost + waterCost + serviceCost + netCost + bikeCost + monthlyFeeCost - discount;
-
-      return {
-        id: 'b-' + Date.now() + Math.random().toString(36).substr(2, 4),
-        houseId: selectedHouse?.id,
-        roomId: room.roomCode || room.id,
-        month: month,
-        currentMonthFull: currentMonthFull,
-        year: year,
-        status: 'pending',
-        total: total,
-        meter: { old: meterAll?.meterRoomOld || 0, new: meterAll?.meterRoomNew || 0 },
-        meterHeater: { old: meterAll?.meterHeaterOld || 0, new: meterAll?.meterHeaterNew || 0 },
-        details: {
-          rent: room.price,
-          elec: meterAll.elecRoomCost,
-          heater: meterAll.elecHeaterCost,
-          water: waterCost,
-          internet: netCost,
-          service: serviceCost,
-          ebikes: bikeCost,
-          monthlyFee: monthlyFeeCost,
-          discount: discount
-        }
-      };
-    });
-
     try {
-      await fetchApi('/bill/generate-bulk', 'POST', newBills);
+      await fetchApi('/bill/generate', 'POST', {
+        houseId: selectedHouse?.id,
+        month: month,
+        year: year,
+        overwrite: true
+      });
       await loadHouseData(selectedHouse?.id);
       showToast("Đã lập hóa đơn thành công!", "success");
     } catch (e) { showToast("Lỗi: " + e.message, "error"); }
-  };
-
-  const calcMeterAll = (room, meters, rooms, config) => {
-    const priceElec = config.priceElec || 4000;
-    const priceHeater = config.priceHeater || 4000;
-
-    const meterRoom = meters.find(m => m.type === "electric" && m.roomIds?.includes(room.id));
-    const elecRoomUsed = Math.max(0, (meterRoom?.newVal || 0) - (meterRoom?.oldVal || 0));
-    const elecRoomCost = elecRoomUsed * priceElec;
-    const meterRoomOld = meterRoom?.oldVal || 0;
-    const meterRoomNew = meterRoom?.newVal || 0;
-
-    const meterHeater = meters.find(m => m.type === "heater" && m.roomIds?.includes(room.id));
-    const elecHeaterUsed = Math.max(0, (meterHeater?.newVal || 0) - (meterHeater?.oldVal || 0));
-    let elecHeaterCost = elecHeaterUsed * priceHeater;
-    const meterHeaterOld = meterHeater?.oldVal || 0;
-    const meterHeaterNew = meterHeater?.newVal || 0;
-
-    if (meterHeater) {
-      const sharedRooms = rooms.filter(r => meterHeater.roomIds.includes(r.id));
-      const totalPeople = sharedRooms.reduce((sum, r) => sum + (r.peopleCount || 1), 0);
-      const roomPeople = room.peopleCount || 1;
-      const totalHeaterUsed = Math.max(0, (meterHeater.newVal || 0) - (meterHeater.oldVal || 0));
-
-      elecHeaterCost = totalPeople > 0 ? ((totalHeaterUsed * roomPeople) / totalPeople) * priceHeater : 0;
-    }
-
-    return {
-      elecRoomUsed, elecRoomCost, meterRoomOld, meterRoomNew,
-      elecHeaterUsed, elecHeaterCost, meterHeaterOld, meterHeaterNew,
-    };
   };
 
   const handleDiscountChange = (billId, val) => {
@@ -1263,6 +1154,20 @@ const App = () => {
       showToast("Đã có lỗi xảy ra ! (" + e.message + ")", "error");
       setBottomSheet(null);
     }
+  };
+
+  const handleDeleteBill = async (billId) => {
+    const confirmed = await requestConfirm({
+      title: 'Xóa hóa đơn',
+      message: 'Bạn có chắc chắn muốn xóa hóa đơn này không? Các chỉ số công tơ đã nhập sẽ không bị thay đổi.'
+    });
+    if (!confirmed) return;
+    try {
+      await fetchApi(`/bill/${billId}`, 'DELETE');
+      await loadHouseData(selectedHouse?.id);
+      showToast("Đã xóa hóa đơn thành công!", "success");
+      setBottomSheet(null);
+    } catch (e) { showToast("Lỗi xóa hóa đơn: " + e.message, "error"); }
   };
 
   const handleSaveConfig = async () => {
@@ -3340,10 +3245,25 @@ const App = () => {
                   {isGeneratingImage ? 'ĐANG TẠO ẢNH...' : 'COPY ẢNH CHO ZALO'}
                 </button>
 
-                {bottomSheet.data.status === 'pending' && isManagerOrAbove && (
-                  <button onClick={() => handlePayBill(bottomSheet.data.id)} className="w-full bg-emerald-600 text-white py-4 rounded-xl font-black text-[12px] uppercase active:scale-95 border-b-1 border-emerald-800 flex items-center justify-center gap-2">
-                    <CheckCircle2 className="w-5 h-5" /> Xác Nhận Đã Thu Tiền
-                  </button>
+                {isOwnerOrAdmin && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleDeleteBill(bottomSheet.data.id)}
+                      className={`bg-red-500 text-white py-4 rounded-xl font-black text-[11px] uppercase active:scale-95 border-b border-red-700 flex items-center justify-center gap-1.5 transition-all ${bottomSheet.data.status === 'pending' ? 'w-1/3' : 'w-full'
+                        }`}
+                    >
+                      <Trash2 className="w-4 h-4" /> Xóa
+                    </button>
+
+                    {bottomSheet.data.status === 'pending' && (
+                      <button
+                        onClick={() => handlePayBill(bottomSheet.data.id)}
+                        className="flex-1 bg-emerald-600 text-white py-4 rounded-xl font-black text-[11px] uppercase active:scale-95 border-b border-emerald-800 flex items-center justify-center gap-1.5 transition-all"
+                      >
+                        <CheckCircle2 className="w-4 h-4" /> Xác Nhận Đã Thu
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
