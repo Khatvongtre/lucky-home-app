@@ -2139,9 +2139,8 @@ const App = () => {
           <h2 className="text-sm font-black uppercase tracking-tighter mt-0.5">Lucky Home</h2>
         </div>
         <div className="flex items-center space-x-2">
-          <div className="flex flex-row items-center space-x-1 cursor-pointer active:opacity-80" onClick={() => { setIsHubMode(true); setSelectedHouse(null); }}>
-            <p className="text-[8px] font-light text-blue-100 uppercase tracking-widest truncate max-w-[100px] mt-0.5">{selectedHouse?.name || 'Tổng hợp'}</p>
-            <MoreHorizontal className="w-3.5 h-3.5 opacity-60" />
+          <div className="flex flex-row items-center space-x-1 cursor-pointer active:opacity-80" onClick={() => { setIsHubMode(false); setSelectedHouse(null); if (isGlobalTab) setActiveTab('dashboard'); }}>
+            <p className="text-[8px] font-bold text-blue-100 uppercase tracking-widest truncate max-w-[160px] mt-0.5">{selectedHouse?.name || 'Tổng hợp'}</p>
           </div>
           {isOwnerOrAdmin && (
             <div onClick={() => setActiveTab('settings')} className="w-8 h-8 rounded-full border border-white/30 overflow-hidden cursor-pointer active:scale-90 shadow-sm bg-white flex items-center justify-center">
