@@ -8,7 +8,7 @@ import {
   Activity, Wifi, Boxes, Search, MoreHorizontal, Droplets, Bike, ChevronLeft,
   Upload, Mail, Mic, MicOff, CreditCard, Calendar, Image as ImageIcon, Pencil, Loader2, AlertCircle,
   ChevronDown, Check, LucideEdit, Flame, AlertTriangle, Share2,
-  Edit, Trash2, ZapOff, PiggyBank, Landmark
+  Edit, Trash2, ZapOff, PiggyBank, Landmark, Bell, Target, PieChart
 } from 'lucide-react';
 
 import { toPng } from 'html-to-image';
@@ -70,16 +70,9 @@ const endContract = (startDateStr, months) => {
 
   try {
     const startDate = new Date(startDateStr);
-
-    // clone để tránh mutate
     const endDate = new Date(startDate);
-
-    // cộng tháng
     endDate.setMonth(endDate.getMonth() + months);
-
-    // trừ 1 ngày (vì hợp đồng thường tính đến hết ngày trước đó)
     endDate.setDate(endDate.getDate() - 1);
-
     return endDate;
   } catch (e) {
     return null;
@@ -89,11 +82,9 @@ const endContract = (startDateStr, months) => {
 const getSafeDate = (dStr) => {
   try {
     const d = dStr ? new Date(dStr) : new Date();
-
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
-
     return `${year}-${month}-${day}`;
   } catch {
     const d = new Date();
@@ -123,7 +114,6 @@ const parseVietQR = (qrString) => {
       const len = parseInt(qrString.substring(idx + 2, idx + 4), 10);
       const val = qrString.substring(idx + 4, idx + 4 + len);
 
-      // Thẻ 38 là Thông tin Tài khoản (Merchant Account Information)
       if (tag === '38') {
         let subIdx = 0;
         while (subIdx < val.length) {
@@ -131,7 +121,6 @@ const parseVietQR = (qrString) => {
           const subLen = parseInt(val.substring(subIdx + 2, subIdx + 4), 10);
           const subVal = val.substring(subIdx + 4, subIdx + 4 + subLen);
 
-          // Thẻ 01 bên trong 38 là Tổ chức thụ hưởng (Beneficiary Organization)
           if (subTag === '01') {
             let innerIdx = 0;
             while (innerIdx < subVal.length) {
@@ -139,8 +128,8 @@ const parseVietQR = (qrString) => {
               const innerLen = parseInt(subVal.substring(innerIdx + 2, innerIdx + 4), 10);
               const innerVal = subVal.substring(innerIdx + 4, innerIdx + 4 + innerLen);
 
-              if (innerTag === '00') bin = innerVal; // Mã BIN Ngân hàng
-              if (innerTag === '01') acc = innerVal; // Số tài khoản
+              if (innerTag === '00') bin = innerVal;
+              if (innerTag === '01') acc = innerVal;
               innerIdx += 4 + innerLen;
             }
           }
@@ -179,7 +168,6 @@ const Modal = ({ title, onClose, children }) => (
   </div>
 );
 
-// Component Hiển thị Thông báo
 const ToastNotification = ({ toast }) => {
   if (!toast) return null;
   const isError = toast.type === 'error';
@@ -234,10 +222,13 @@ const ConfirmDialog = ({ dialog, onCancel, onConfirm }) => {
 const AuthView = ({ fetchApi, setIsLoggedIn, setUser, showToast }) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [authForm, setAuthForm] = useState({ fullName: '', username: '', password: '' });
 
   const handleAuth = async (e, type) => {
     e.preventDefault();
+    if (isAuthLoading) return;
+    setIsAuthLoading(true);
     try {
       if (type === 'register') {
         await fetchApi('/auth/register', 'POST', authForm);
@@ -257,53 +248,82 @@ const AuthView = ({ fetchApi, setIsLoggedIn, setUser, showToast }) => {
     } catch (error) {
       console.log("Auth error:", error);
       showToast(error.message || "Lỗi xác thực", "error");
+    } finally {
+      setIsAuthLoading(false);
     }
   };
 
   return (
     <div className="w-full max-w-sm text-center">
-      <div className="w-20 h-20 bg-gradient-to-tr from-blue-600 to-indigo-500 rounded-3xl flex items-center justify-center shadow-2xl mx-auto mb-6 active:scale-95 transition-all">
-        <Building2 className="w-10 h-10 text-white" />
+      <div className="relative mb-7">
+        <div className="w-20 h-20 bg-blue-600 rounded-2xl flex items-center justify-center shadow-xl shadow-blue-200 mx-auto mb-5 active:scale-95 transition-all">
+          <Building2 className="w-10 h-10 text-white" />
+        </div>
+        <h1 className="text-4xl font-black text-blue-600 tracking-tighter uppercase mb-2">Lucky Home</h1>
+        <p className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Quản lý trọ toàn diện</p>
       </div>
-      <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 tracking-tighter uppercase mb-2">Lucky Home</h1>
-      <p className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-10">Quản lý trọ toàn diện</p>
 
-      {isForgotPassword ? (
-        <form className="space-y-3 text-left animate-in slide-in-from-bottom" onSubmit={(e) => handleAuth(e, 'forgot')}>
-          <p className="text-xs text-slate-500 mb-4 font-medium text-center">Vui lòng nhập SĐT/Tên đăng nhập để nhận lại mật khẩu.</p>
-          <div className="relative group"><Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" /><input type="text" placeholder="SĐT / Tên đăng nhập" className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-600 shadow-sm" value={authForm.username} onChange={e => setAuthForm({ ...authForm, username: e.target.value })} required /></div>
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-xl shadow-slate-200/70 p-4 text-left">
+        {!isForgotPassword && (
+          <div className="grid grid-cols-2 gap-1 bg-slate-100 p-1 rounded-xl mb-4">
+            <button
+              type="button"
+              disabled={isAuthLoading}
+              onClick={() => setIsRegistering(false)}
+              className={`py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${!isRegistering ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}
+            >
+              Đăng nhập
+            </button>
+            <button
+              type="button"
+              disabled={isAuthLoading}
+              onClick={() => setIsRegistering(true)}
+              className={`py-3 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${isRegistering ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400'}`}
+            >
+              Đăng ký
+            </button>
+          </div>
+        )}
 
-          <button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-4 rounded-xl font-black uppercase text-xs shadow-xl active:scale-95 transition-all mt-4 border-b-1 border-indigo-800 text-center">
-            Gửi yêu cầu
-          </button>
-          <button type="button" onClick={() => setIsForgotPassword(false)} className="w-full text-[10px] font-black text-slate-400 uppercase tracking-widest py-3 text-center hover:text-blue-600 transition-colors">
-            Quay lại Đăng nhập
-          </button>
-        </form>
-      ) : (
-        <form className="space-y-3 text-left animate-in slide-in-from-bottom" onSubmit={(e) => handleAuth(e, isRegistering ? 'register' : 'login')}>
-          {isRegistering && (
-            <div className="relative group"><User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" /><input type="text" placeholder="Họ và tên" className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-600 shadow-sm" value={authForm.fullName} onChange={e => setAuthForm({ ...authForm, fullName: e.target.value })} required /></div>
-          )}
-          <div className="relative group"><Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" /><input type="text" placeholder="SĐT / Tên đăng nhập" className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-600 shadow-sm" value={authForm.username} onChange={e => setAuthForm({ ...authForm, username: e.target.value })} required /></div>
-          <div className="relative group"><Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" /><input type="password" placeholder="Mật khẩu" className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-600 shadow-sm" value={authForm.password} onChange={e => setAuthForm({ ...authForm, password: e.target.value })} required /></div>
-
-          {!isRegistering && (
-            <div className="text-right">
-              <button type="button" onClick={() => setIsForgotPassword(true)} className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:underline transition-all">
-                Quên mật khẩu?
-              </button>
+        {isForgotPassword ? (
+          <form className="space-y-3 animate-in slide-in-from-bottom" onSubmit={(e) => handleAuth(e, 'forgot')}>
+            <div className="text-center pb-2">
+              <h2 className="text-base font-black text-slate-900 uppercase">Khôi phục mật khẩu</h2>
+              <p className="text-xs text-slate-500 mt-1 font-medium">Nhập SĐT hoặc tên đăng nhập của bạn</p>
             </div>
-          )}
+            <div className="relative group"><Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" /><input type="text" placeholder="SĐT / Tên đăng nhập" disabled={isAuthLoading} className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-600 focus:bg-white transition-all disabled:bg-slate-50 disabled:text-slate-400" value={authForm.username} onChange={e => setAuthForm({ ...authForm, username: e.target.value })} required /></div>
 
-          <button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-4 rounded-xl font-black uppercase text-xs shadow-xl active:scale-95 transition-all mt-4 border-b-1 border-indigo-800 text-center">
-            {isRegistering ? "Tạo Tài Khoản" : "Đăng Nhập"}
-          </button>
-          <button type="button" onClick={() => setIsRegistering(!isRegistering)} className="w-full text-[10px] font-black text-slate-400 uppercase tracking-widest py-3 text-center hover:text-blue-600 transition-colors">
-            {isRegistering ? "Đã có tài khoản? Đăng nhập" : "Chưa có tài khoản? Đăng ký"}
-          </button>
-        </form>
-      )}
+            <button type="submit" disabled={isAuthLoading} className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-xs shadow-lg shadow-blue-100 active:scale-95 transition-all mt-4 border-b-1 border-blue-800 text-center disabled:opacity-70 disabled:active:scale-100 flex items-center justify-center gap-2">
+              {isAuthLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+              {isAuthLoading ? 'Đang gửi...' : 'Gửi yêu cầu'}
+            </button>
+            <button type="button" disabled={isAuthLoading} onClick={() => setIsForgotPassword(false)} className="w-full text-[10px] font-black text-slate-400 uppercase tracking-widest py-3 text-center hover:text-blue-600 transition-colors disabled:opacity-50">
+              Quay lại đăng nhập
+            </button>
+          </form>
+        ) : (
+          <form className="space-y-3 animate-in slide-in-from-bottom" onSubmit={(e) => handleAuth(e, isRegistering ? 'register' : 'login')}>
+            <div className="relative group"><Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" /><input type="text" placeholder="SĐT / Tên đăng nhập" disabled={isAuthLoading} className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-600 focus:bg-white transition-all disabled:bg-slate-50 disabled:text-slate-400" value={authForm.username} onChange={e => setAuthForm({ ...authForm, username: e.target.value })} required /></div>
+            {isRegistering && (
+              <div className="relative group"><User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" /><input type="text" placeholder="Họ và tên" disabled={isAuthLoading} className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-600 focus:bg-white transition-all disabled:bg-slate-50 disabled:text-slate-400" value={authForm.fullName} onChange={e => setAuthForm({ ...authForm, fullName: e.target.value })} required /></div>
+            )}
+            <div className="relative group"><Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition-colors" /><input type="password" placeholder="Mật khẩu" disabled={isAuthLoading} className="w-full pl-12 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-600 focus:bg-white transition-all disabled:bg-slate-50 disabled:text-slate-400" value={authForm.password} onChange={e => setAuthForm({ ...authForm, password: e.target.value })} required /></div>
+
+            {!isRegistering && (
+              <div className="text-right">
+                <button type="button" disabled={isAuthLoading} onClick={() => setIsForgotPassword(true)} className="text-[10px] font-black text-blue-600 uppercase tracking-widest hover:underline transition-all disabled:opacity-50">
+                  Quên mật khẩu?
+                </button>
+              </div>
+            )}
+
+            <button type="submit" disabled={isAuthLoading} className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-xs shadow-lg shadow-blue-100 active:scale-95 transition-all mt-4 border-b-1 border-blue-800 text-center disabled:opacity-70 disabled:active:scale-100 flex items-center justify-center gap-2">
+              {isAuthLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+              {isAuthLoading ? (isRegistering ? "Đang tạo..." : "Đang đăng nhập...") : (isRegistering ? "Tạo tài khoản" : "Đăng nhập")}
+            </button>
+          </form>
+        )}
+      </div>
     </div>
   );
 };
@@ -402,10 +422,11 @@ const App = () => {
   const [changePasswordForm, setChangePasswordForm] = useState({ oldPassword: '', newPassword: '' });
 
   // --- App State ---
+  const [isHubMode, setIsHubMode] = useState(true); // NEW: Manage global HUB screen visibility
   const [selectedHouse, setSelectedHouse] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showQuickMenu, setShowQuickMenu] = useState(false);
-  const [toast, setToast] = useState(null); // { text, type }
+  const [toast, setToast] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
@@ -452,28 +473,24 @@ const App = () => {
   const [config, setConfig] = useState({});
   const [aiMessages, setAiMessages] = useState([{ role: 'assistant', text: 'Chào bạn! Tôi là trợ lý AI. Hệ thống đang sẵn sàng.' }]);
 
-
   // --- OTHER
   const [isOverwriteModalOpen, setIsOverwriteModalOpen] = useState(false);
   // --- A. STATE QUẢN LÝ ---
   const [viewDate, setViewDate] = useState(new Date());
-  const [txType, setTxType] = useState('in'); // 'in' hoặc 'out'
-  const [selectedCat, setSelectedCat] = useState('OTHER'); // Lưu KEY
+  const [txType, setTxType] = useState('in');
+  const [selectedCat, setSelectedCat] = useState('OTHER');
   const [isCatOpen, setIsCatOpen] = useState(false);
   const [isMonthOpen, setIsMonthOpen] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState('this-month');
   const [isFinanceStatsOpen, setIsFinanceStatsOpen] = useState(true);
   const [isSavingsStatsOpen, setIsSavingsStatsOpen] = useState(true);
 
-  // Hàm hiển thị thông báo với Type (success/error)
   const showToast = useCallback((text, type = 'success') => {
     setToast({ text: String(text), type });
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), 3000);
   }, []);
 
-  // --- Logic phân quyền dựa trên từng Nhà được chọn ---
-  // Các quyền: 'SuperAdmin', 'Owner', 'Manager', 'Staff'
   const requestConfirm = useCallback((dialog) => {
     return new Promise(resolve => {
       confirmResolveRef.current = resolve;
@@ -490,10 +507,19 @@ const App = () => {
   }, []);
 
   const currentRole = selectedHouse?.userRole;
-  const isOwnerOrAdmin = ['SuperAdmin', 'Owner'].includes(currentRole);
-  const isManagerOrAbove = ['SuperAdmin', 'Owner', 'Manager'].includes(currentRole);
+  const effectiveRole = currentRole || user?.role;
+  const isOwnerOrAdmin = ['SuperAdmin', 'Owner'].includes(currentRole) || user?.role === 'Owner';
+  const isManagerOrAbove = ['SuperAdmin', 'Owner', 'Manager'].includes(currentRole) || user?.role === 'Owner';
+  const canAccessFinance = ['SuperAdmin', 'Owner', 'Manager', 'Staff'].includes(effectiveRole) || user?.role === 'Owner';
+  const canViewProfit = ['SuperAdmin', 'Owner', 'Manager'].includes(effectiveRole) || user?.role === 'Owner';
+  const canManageTransactions = ['SuperAdmin', 'Owner', 'Manager'].includes(effectiveRole) || user?.role === 'Owner';
+  const getRoleLabel = (role) => ({
+    SuperAdmin: 'Quản trị viên',
+    Owner: 'Chủ nhà',
+    Manager: 'Quản lý',
+    Staff: 'Nhân viên'
+  }[role] || role || 'Tài khoản');
 
-  // --- STATE QUÉT QR ---
   const qrFileRef = useRef(null);
   const [isScanningQR, setIsScanningQR] = useState(false);
 
@@ -506,7 +532,8 @@ const App = () => {
     setIsLoggedIn(false);
     setUser(null);
     setSelectedHouse(null);
-    // Reset thêm các state dữ liệu để bảo mật
+    setIsHubMode(true); // Đảm bảo reset lại màn hình về Hub
+    setActiveTab('dashboard');
     setHouses([]);
     setRooms([]);
     setBills([]);
@@ -549,9 +576,8 @@ const App = () => {
     try {
       const res = await fetch(`${API_URL}${endpoint}`, { method, headers, body: body ? JSON.stringify(body) : null });
 
-      // Nếu lỗi 401 (Unauthorized) hoặc 403 (Forbidden) - Thường là do hết hạn hoặc token fake
       if (res.status === 401 || res.status === 403) {
-        handleLogout(); // Xóa sạch localStorage và reset state
+        handleLogout();
         const result = await res.json().catch(() => ({}));
         throw new Error(result.message || "Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.");
       }
@@ -598,44 +624,36 @@ const App = () => {
   const loadDashboardData = useCallback(async (houseId) => {
     const month = viewDate.getMonth() + 1;
     const year = viewDate.getFullYear();
-
     const [summaryData] = await Promise.all([
       fetchApi(`/management/dashboard/summary/${houseId}?year=${year}&month=${month}`),
     ]);
-
     setDashboardSummary(summaryData);
   }, [fetchApi, viewDate]);
 
   const loadRoomsData = useCallback(async (houseId) => {
     const month = viewDate.getMonth() + 1;
     const year = viewDate.getFullYear();
-
     const [roomsData] = await Promise.all([
       fetchApi(`/room/${houseId}`),
     ]);
-
     setRooms(roomsData);
   }, [fetchApi, parseMeters, viewDate]);
 
   const loadMetersData = useCallback(async (houseId) => {
     const month = viewDate.getMonth() + 1;
     const year = viewDate.getFullYear();
-
     const [metersData] = await Promise.all([
       fetchApi(`/meter/${houseId}?year=${year}&month=${month}`)
     ]);
-
     setMeters(parseMeters(metersData));
   }, [fetchApi, parseMeters, viewDate]);
 
   const loadBillsData = useCallback(async (houseId) => {
     const month = viewDate.getMonth() + 1;
     const year = viewDate.getFullYear();
-
     const [billsResult] = await Promise.all([
       fetchApi(`/bill/${houseId}?year=${year}&month=${month}`)
     ]);
-
     const billsData = Array.isArray(billsResult) ? billsResult : (billsResult?.bills || []);
     setBillStats({
       totalRooms: billsResult?.totalRooms ?? 0,
@@ -657,7 +675,6 @@ const App = () => {
         await loadSavings();
         return;
       }
-
       if (!houseId) return;
 
       switch (tab) {
@@ -686,107 +703,47 @@ const App = () => {
       showToast(e.message, 'error');
     }
   }, [
-    activeTab,
-    selectedHouse,
-    loadSavings,
-    loadDashboardData,
-    loadRoomsData,
-    loadMetersData,
-    loadBillsData,
-    loadTransactions,
-    showToast
+    activeTab, selectedHouse, loadSavings, loadDashboardData,
+    loadRoomsData, loadMetersData, loadBillsData, loadTransactions, showToast
   ]);
 
   const loadHouseData = useCallback(async (houseId, tab = activeTab) => {
     await loadTabData(tab, houseId);
   }, [activeTab, loadTabData]);
 
-
-  // Kiểm tra token khi mới vào web
   useEffect(() => {
     const token = localStorage.getItem('smartstay_token');
     const savedUser = localStorage.getItem('smartstay_user');
 
     if (token && savedUser) {
-      // 1. Tạm thời set login từ local
       setUser(JSON.parse(savedUser));
       setIsLoggedIn(true);
-
-      // 2. Kiểm tra "sức khỏe" của token với backend (Tùy chọn nhưng nên có)
-      // Bạn có thể tạo 1 endpoint /auth/me hoặc đơn giản là gọi /house
       loadHouses()
         .then(data => setHouses(data))
-        .catch(err => {
-          // Nếu lỗi ở đây (thường là 401), fetchApi sẽ tự gọi handleLogout()
-          console.error("Session expired on load");
-        });
+        .catch(err => console.error("Session expired on load"));
     } else {
       handleLogout();
     }
 
-    // Load html2canvas...
     if (!window.html2canvas) {
       const script = document.createElement('script');
       script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
       script.async = true;
       document.body.appendChild(script);
     }
-  }, [loadHouses, handleLogout]); // Thêm các phụ thuộc vào đây
+  }, [loadHouses, handleLogout]);
 
-  // Lấy danh sách nhà
   useEffect(() => {
     if (isLoggedIn && !selectedHouse) {
-      loadHouses()
-        .then(data => setHouses(data))
-        .catch(err => {
-          showToast(err.message, 'error');
-        });
+      loadHouses().then(data => setHouses(data)).catch(err => showToast(err.message, 'error'));
     }
   }, [isLoggedIn, selectedHouse, loadHouses, showToast]);
-
-  const LOAD_ALL_HOUSE_DATA_LEGACY = useCallback(async (houseId) => {
-    try {
-      const now = new Date();
-      const month = viewDate.getMonth() + 1;
-      const year = viewDate.getFullYear();
-
-      setMeters([]);
-      setBills([]);
-
-      // Cập nhật lại danh sách nhà để đồng bộ Doanh thu / Chi phí mới nhất
-      const updatedHouses = await fetchApi('/house');
-      setHouses(updatedHouses);
-      const h = updatedHouses.find(x => x.id === houseId);
-      if (h) {
-        setConfig({ ...h });
-        setSelectedHouse(h);
-      }
-
-      const summaryData = await fetchApi(`/management/dashboard/summary/${houseId}?year=${year}&month=${month}`);
-      setDashboardSummary(summaryData);
-
-      const roomsData = await fetchApi(`/room/${houseId}`);
-      setRooms(roomsData);
-
-      const metersData = await fetchApi(`/meter/${houseId}?year=${year}&month=${month}`);
-      setMeters(metersData.map(m => ({ ...m, roomIds: JSON.parse(m.roomIdsJson || '[]') })));
-
-      const billsData = await fetchApi(`/bill/${houseId}?year=${year}&month=${month}`);
-      setBills(billsData.map(b => ({
-        ...b, roomId: b.roomCode, details: JSON.parse(b.detailsJson || '{}'), meter: JSON.parse(b.meterInfoJson || '{}'), heaterMeter: b.heaterInfoJson ? JSON.parse(b.heaterInfoJson) : null
-      })));
-
-    } catch (e) {
-      showToast(e.message, 'error');
-    }
-  }, [houses, fetchApi, user, rooms.length, showToast, viewDate]);
 
   useEffect(() => {
     if (isLoggedIn && activeTab !== 'finance') {
       loadTabData(activeTab, selectedHouse?.id);
     }
   }, [isLoggedIn, activeTab, selectedHouse?.id, viewDate, selectedMonth, loadTabData]);
-  // Thêm activeTab vào dependency để mỗi khi bấm chuyển Tab nó sẽ refresh lại dữ liệu mới nhất từ DB
 
   const handleOpenShare = (e, house) => {
     e.stopPropagation();
@@ -850,8 +807,6 @@ const App = () => {
   const handleAddHouse = async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
-
-    // Thu thập toàn bộ dữ liệu từ form
     const houseData = {
       name: fd.get('name'),
       address: fd.get('address'),
@@ -868,31 +823,23 @@ const App = () => {
 
     try {
       if (editingHouse) {
-        // Cập nhật nhà hiện tại (BẠN CẦN CHUẨN BỊ API PUT Ở BACKEND)
         await fetchApi(`/house/${editingHouse.id}`, 'PUT', houseData);
         setHouses(houses.map(h => h.id === editingHouse.id ? { ...h, ...houseData } : h));
         showToast("Cập nhật cơ sở thành công!", "success");
       } else {
-        // Thêm nhà mới
         const res = await fetchApi('/house', 'POST', houseData);
         setHouses([...houses, res]);
         showToast("Tạo cơ sở thành công!", "success");
       }
-      // [QUAN TRỌNG]: Thay vì tự setHouses thủ công, hãy gọi lại API lấy danh sách mới nhất
-      // Điều này đảm bảo house mới có đầy đủ UserRole và các trường thống kê từ Backend
       const data = await fetchApi('/house', 'GET');
       setHouses(data);
-
       setIsAiCreateHouseOpen(false);
       setEditingHouse(null);
     }
-    catch (e) {
-      showToast("Lỗi: " + e.message, "error");
-    }
+    catch (e) { showToast("Lỗi: " + e.message, "error"); }
   };
-  // --- HÀM XỬ LÝ NHẬN DIỆN GIỌNG NÓI ---
+
   const handleMicClick = () => {
-    // Kiểm tra xem trình duyệt có hỗ trợ không
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
       showToast("Trình duyệt của bạn không hỗ trợ nhận diện giọng nói", "error");
@@ -900,7 +847,7 @@ const App = () => {
     }
 
     const recognition = new SpeechRecognition();
-    recognition.lang = 'vi-VN'; // Set tiếng Việt
+    recognition.lang = 'vi-VN';
     recognition.interimResults = false;
     recognition.maxAlternatives = 1;
 
@@ -917,7 +864,6 @@ const App = () => {
 
     recognition.onresult = (event) => {
       const transcript = event.results[0][0].transcript;
-      // Nối tiếp văn bản nếu đang có sẵn chữ
       setAiPrompt(prev => prev ? prev + " " + transcript : transcript);
       setIsListening(false);
     };
@@ -928,10 +874,7 @@ const App = () => {
       showToast("Lỗi nhận diện giọng nói hoặc chưa cấp quyền Mic", "error");
     };
 
-    recognition.onend = () => {
-      setIsListening(false);
-    };
-
+    recognition.onend = () => { setIsListening(false); };
     recognition.start();
   };
 
@@ -950,8 +893,8 @@ const App = () => {
     const payload = {
       houseId: selectedHouse?.id,
       roomCode: fd.get('rid'),
-      roomType: fd.get('roomType') || 'room', // <-- THÊM MỚI
-      monthlyFee: parseN(fd.get('monthlyFee') || '0'), // <-- THÊM MỚI
+      roomType: fd.get('roomType') || 'room',
+      monthlyFee: parseN(fd.get('monthlyFee') || '0'),
       price: parseN(fd.get('price')),
       peopleCount: Number(fd.get('people')),
       people: Number(fd.get('people')),
@@ -968,12 +911,10 @@ const App = () => {
     try {
       await fetchApi('/room', 'POST', payload);
       await loadHouseData(selectedHouse?.id);
-      showToast("Lưu phòng thành công!", "success");
+      showToast("Lưu phòng thành thành công!", "success");
       setIsAddRoomModalOpen(false);
       setEditingRoom(null);
-    } catch (e) {
-      showToast("Lỗi: " + e.message, "error");
-    }
+    } catch (e) { showToast("Lỗi: " + e.message, "error"); }
   };
 
   const handleDeleteHouse = async (houseId, houseName) => {
@@ -1006,6 +947,10 @@ const App = () => {
   };
 
   const handleDeleteTransaction = async (txId) => {
+    if (!canManageTransactions) {
+      showToast("Bạn không có quyền xóa phiếu thu chi.", "error");
+      return;
+    }
     const confirmed = await requestConfirm({
       title: 'Xóa phiếu thu chi',
       message: 'Bạn có chắc chắn muốn xóa phiếu thu chi này không?'
@@ -1041,9 +986,7 @@ const App = () => {
       await loadHouseData(selectedHouse?.id);
       setIsAddMeterModalOpen(false);
       setEditingMeter(null);
-    } catch (err) {
-      showToast("Lỗi: " + err.message, "error");
-    }
+    } catch (err) { showToast("Lỗi: " + err.message, "error"); }
   };
 
   const handleDeleteMeter = async (meterId) => {
@@ -1058,22 +1001,16 @@ const App = () => {
       setIsAddMeterModalOpen(false);
       setEditingMeter(null);
       showToast("Đã xóa công tơ", "success");
-    } catch (err) {
-      showToast("Lỗi: " + err.message, "error");
-    }
+    } catch (err) { showToast("Lỗi: " + err.message, "error"); }
   };
 
   const handleSaveMeterMapping = async () => {
     if (!mappingMeter) return;
     try {
-      await fetchApi(`/meter/${mappingMeter.id}/map`, 'PUT', {
-        roomIds: mappingMeter.roomIds
-      });
+      await fetchApi(`/meter/${mappingMeter.id}/map`, 'PUT', { roomIds: mappingMeter.roomIds });
       showToast("Đã cập nhật sơ đồ công tơ!", "success");
       setMappingMeter(null);
-    } catch (e) {
-      showToast("Lỗi lưu sơ đồ: " + e.message, "error");
-    }
+    } catch (e) { showToast("Lỗi lưu sơ đồ: " + e.message, "error"); }
   };
 
   const handleSaveMetersAndGenerateBills = async () => {
@@ -1081,7 +1018,6 @@ const App = () => {
       const monthSelected = viewDate.getMonth() + 1;
       const yearSelected = viewDate.getFullYear();
 
-      // 1. Lọc và đóng gói dữ liệu công tơ để lưu
       const updates = meters
         .filter(m => (m.newVal !== null && m.newVal !== "" && m.newVal !== undefined))
         .map(m => ({
@@ -1097,12 +1033,8 @@ const App = () => {
         }));
 
       if (updates.length === 0) return showToast("Chưa nhập số mới nào!", "error");
-
-      // 2. Gửi lệnh lưu chỉ số công tơ
       await fetchApi('/meter/update', 'POST', updates);
 
-      // 3. TỰ ĐỘNG LẬP HÓA ĐƠN cho các phòng đã có số mới
-      // Lọc những phòng mà công tơ điện (electric) vừa được cập nhật newVal
       const updatedMeterIds = updates.map(u => u.id);
       const roomsToGenerate = rooms.filter(r =>
         r.status === 'full' &&
@@ -1111,7 +1043,6 @@ const App = () => {
 
       if (roomsToGenerate.length > 0) {
         const currentMonthFull = viewDate.toLocaleDateString('vi-VN', { month: '2-digit', year: 'numeric' });
-
         const newBills = roomsToGenerate.map(room => {
           const meterAll = calcMeterAll(room, meters, rooms, config);
           const isPerson = config.waterCalcMethod === 'person';
@@ -1149,41 +1080,31 @@ const App = () => {
           };
         });
 
-        // Gửi lệnh tạo hóa đơn hàng loạt (Bulk Update/Insert)
         await fetchApi('/bill/generate-bulk', 'POST', newBills);
         showToast(`Đã lưu chỉ số & tự động lập ${roomsToGenerate.length} hóa đơn!`, "success");
       } else {
         showToast(`Đã lưu chỉ số ${monthDisplay}!`, "success");
       }
 
-      // 4. Reload dữ liệu để đảm bảo quay lại là có thông tin mới nhất
       await loadHouseData(selectedHouse?.id);
-
-    } catch (e) {
-      showToast("Lỗi: " + e.message, "error");
-    }
+    } catch (e) { showToast("Lỗi: " + e.message, "error"); }
   };
 
-  // --- HÀM 1: Bấm nút "Lập hóa đơn" ở giao diện chính ---
   const handleGenerateClick = () => {
     const now = new Date();
     const month = now.getMonth() + 1;
     const year = now.getFullYear();
 
-    // Kiểm tra xem tháng này đã có hóa đơn chưa
     const alreadyGenerated = bills.some(b => b.month === month && b.year === year);
-
     if (alreadyGenerated) {
-      setIsOverwriteModalOpen(true); // Nếu có rồi thì hiện Modal "đẹp"
+      setIsOverwriteModalOpen(true);
     } else {
-      executeGenerateBills(); // Nếu chưa có thì chạy thẳng luôn
+      executeGenerateBills();
     }
   };
 
-  // --- HÀM 2: Logic tạo hóa đơn thực tế (chuyển từ hàm cũ sang) ---
   const executeGenerateBills = async () => {
-    setIsOverwriteModalOpen(false); // Đóng modal nếu đang mở
-
+    setIsOverwriteModalOpen(false);
     const currentMonthFull = new Date().toLocaleDateString('vi-VN', { month: '2-digit', year: 'numeric' });
     const now = new Date();
     const month = now.getMonth() + 1;
@@ -1233,83 +1154,54 @@ const App = () => {
       await fetchApi('/bill/generate-bulk', 'POST', newBills);
       await loadHouseData(selectedHouse?.id);
       showToast("Đã lập hóa đơn thành công!", "success");
-    } catch (e) {
-      showToast("Lỗi: " + e.message, "error");
-    }
+    } catch (e) { showToast("Lỗi: " + e.message, "error"); }
   };
 
   const calcMeterAll = (room, meters, rooms, config) => {
     const priceElec = config.priceElec || 4000;
     const priceHeater = config.priceHeater || 4000;
 
-    // =====================
-    // 1. Điện phòng (electric)
-    // =====================
     const meterRoom = meters.find(m => m.type === "electric" && m.roomIds?.includes(room.id));
     const elecRoomUsed = Math.max(0, (meterRoom?.newVal || 0) - (meterRoom?.oldVal || 0));
     const elecRoomCost = elecRoomUsed * priceElec;
     const meterRoomOld = meterRoom?.oldVal || 0;
     const meterRoomNew = meterRoom?.newVal || 0;
 
-    // =====================
-    // 2. BNL (heater - dùng chung)
-    // =====================
     const meterHeater = meters.find(m => m.type === "heater" && m.roomIds?.includes(room.id));
     const elecHeaterUsed = Math.max(0, (meterHeater?.newVal || 0) - (meterHeater?.oldVal || 0));
     let elecHeaterCost = elecHeaterUsed * priceHeater;
     const meterHeaterOld = meterHeater?.oldVal || 0;
     const meterHeaterNew = meterHeater?.newVal || 0;
 
-    // 👉 chia đều theo phòng (có thể đổi sang theo người)
-    let heaterUsedPerRoom = 0;
-
     if (meterHeater) {
       const sharedRooms = rooms.filter(r => meterHeater.roomIds.includes(r.id));
-
       const totalPeople = sharedRooms.reduce((sum, r) => sum + (r.peopleCount || 1), 0);
       const roomPeople = room.peopleCount || 1;
       const totalHeaterUsed = Math.max(0, (meterHeater.newVal || 0) - (meterHeater.oldVal || 0));
 
       elecHeaterCost = totalPeople > 0 ? ((totalHeaterUsed * roomPeople) / totalPeople) * priceHeater : 0;
-      console.log(`Tổng ${roomPeople} / ${totalPeople} người. Tiêu thụ BNL: ${totalHeaterUsed} => Phân bổ cho phòng này: ${elecHeaterCost}`);
     }
-    // =====================
-    // 3. Tổng
-    // =====================
+
     return {
-      elecRoomUsed,
-      elecRoomCost,
-      meterRoomOld,
-      meterRoomNew,
-      elecHeaterUsed,
-      elecHeaterCost,
-      meterHeaterOld,
-      meterHeaterNew,
+      elecRoomUsed, elecRoomCost, meterRoomOld, meterRoomNew,
+      elecHeaterUsed, elecHeaterCost, meterHeaterOld, meterHeaterNew,
     };
   };
 
-  // ==========================================
-  // XỬ LÝ NHẬP GIẢM GIÁ (DISCOUNT) TẠI BOTTOM SHEET
-  // ==========================================
   const handleDiscountChange = (billId, val) => {
     const dVal = parseN(String(val)) || 0;
-
-    // 1. Tìm hóa đơn cần cập nhật (Đồng bộ ngay lập tức để input không bị delay)
     const targetBill = bills.find(b => b.id === billId);
     if (!targetBill) return;
 
-    // 2. Tính lại tổng tiền
     const baseTotal = targetBill.details.rent + targetBill.details.elec + (targetBill.details.heater || 0) + targetBill.details.water + (targetBill.details.internet || 0) + (targetBill.details.service || 0) + (targetBill.details.ebikes || 0);
     const newTotal = Math.max(0, baseTotal - dVal);
 
-    // 3. Chuẩn bị Object hóa đơn mới
     const updatedBillData = {
       ...targetBill,
       total: newTotal,
       details: { ...targetBill.details, discount: dVal }
     };
 
-    // 4. Update cả 2 State cùng lúc
     setBills(prev => prev.map(b => b.id === billId ? updatedBillData : b));
 
     if (bottomSheet && bottomSheet.data.id === billId) {
@@ -1326,16 +1218,17 @@ const App = () => {
           total: billToUpdate.total,
           details: billToUpdate.details
         });
-
         await loadHouseData(selectedHouse?.id);
       }
-    } catch (e) {
-      showToast("Đã có lỗi xảy ra ! (" + e.message + ")", "error");
-    }
+    } catch (e) { showToast("Đã có lỗi xảy ra ! (" + e.message + ")", "error"); }
   };
 
   const handleAddTx = async (e) => {
     e.preventDefault();
+    if (editingTransaction && !canManageTransactions) {
+      showToast("Bạn không có quyền sửa phiếu thu chi.", "error");
+      return;
+    }
     const fd = new FormData(e.target);
     const payload = {
       houseId: selectedHouse?.id,
@@ -1357,10 +1250,7 @@ const App = () => {
       await loadHouseData(selectedHouse?.id);
       setIsAddTransactionModalOpen(false);
       setEditingTransaction(null);
-    }
-    catch (e) {
-      showToast("Lỗi: " + e.message, "error");
-    }
+    } catch (e) { showToast("Lỗi: " + e.message, "error"); }
   };
 
   const handlePayBill = async (billId) => {
@@ -1379,9 +1269,7 @@ const App = () => {
     try {
       await fetchApi(`/house/${selectedHouse?.id}/config`, 'PUT', config);
       showToast("Đã lưu cấu hình lên máy chủ!", "success");
-    } catch (e) {
-      showToast("Đã có lỗi xảy ra ! (" + e.message + ")", "error");
-    }
+    } catch (e) { showToast("Đã có lỗi xảy ra ! (" + e.message + ")", "error"); }
   };
 
   const handleAiChat = async (e) => {
@@ -1401,7 +1289,6 @@ const App = () => {
 
   const handleShareZaloImage = async (billData) => {
     if (!billData) return;
-    // Dùng ID động theo id hóa đơn để tránh trùng lặp DOM khi chụp ảnh
     const el = document.getElementById(`hidden-receipt-export-${billData.id}`);
 
     if (!el) {
@@ -1412,7 +1299,6 @@ const App = () => {
     setIsGeneratingImage(true);
 
     try {
-      // Đợi ảnh QR load xong
       const qrImg = el.querySelector('img');
       if (qrImg && !qrImg.complete) {
         await new Promise((resolve) => {
@@ -1421,51 +1307,36 @@ const App = () => {
         });
       }
 
-      await new Promise(r => setTimeout(r, 400)); // Nghỉ 400ms cho DOM ổn định
+      await new Promise(r => setTimeout(r, 400));
 
       let canvas = null;
 
-      // 3. ƯU TIÊN: toPng với cấu hình ép nền trắng và bật sáng
       try {
         const dataUrl = await toPng(el, {
           pixelRatio: 2.5,
           cacheBust: true,
-          backgroundColor: '#ffffff', // Bắt buộc để tránh viền đen
-          style: {
-            opacity: '1' // Trả lại độ sáng cho ảnh được chụp
-          }
+          backgroundColor: '#ffffff',
+          style: { opacity: '1' }
         });
 
         const img = new Image();
         img.src = dataUrl;
 
-        await new Promise(resolve => {
-          img.onload = resolve;
-        });
+        await new Promise(resolve => { img.onload = resolve; });
 
         canvas = document.createElement('canvas');
         canvas.width = img.width;
         canvas.height = img.height;
         canvas.getContext('2d').drawImage(img, 0, 0);
-
       } catch (err) {
         console.warn("toPng lỗi → fallback html2canvas", err);
       }
 
-      // ===== FALLBACK =====
       if (!canvas) {
-        if (!window.html2canvas) {
-          throw new Error("Thiếu html2canvas");
-        }
-
-        canvas = await window.html2canvas(el, {
-          scale: 2.5,
-          useCORS: true,
-          backgroundColor: null, // 🔥 QUAN TRỌNG
-        });
+        if (!window.html2canvas) throw new Error("Thiếu html2canvas");
+        canvas = await window.html2canvas(el, { scale: 2.5, useCORS: true, backgroundColor: null });
       }
 
-      // ===== 🔥 AUTO CROP =====
       const cropCanvas = (canvas) => {
         const ctx = canvas.getContext('2d');
         const { width, height } = canvas;
@@ -1487,37 +1358,17 @@ const App = () => {
 
         const w = right - left;
         const h = bottom - top;
-
         const cropped = document.createElement('canvas');
         cropped.width = w;
         cropped.height = h;
 
-        cropped.getContext('2d').drawImage(
-          canvas,
-          left,
-          top,
-          w,
-          h,
-          0,
-          0,
-          w,
-          h
-        );
-
+        cropped.getContext('2d').drawImage(canvas, left, top, w, h, 0, 0, w, h);
         return cropped;
       };
 
       const finalCanvas = cropCanvas(canvas);
-
-      // ===== COPY =====
-      const blob = await new Promise(resolve =>
-        finalCanvas.toBlob(resolve, 'image/png')
-      );
-
-      await navigator.clipboard.write([
-        new ClipboardItem({ 'image/png': blob })
-      ]);
-
+      const blob = await new Promise(resolve => finalCanvas.toBlob(resolve, 'image/png'));
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
       showToast("Đã copy ảnh vào clipboard!", "success");
 
     } catch (e) {
@@ -1528,7 +1379,6 @@ const App = () => {
     }
   };
 
-  // --- HÀM XỬ LÝ NHẬN DIỆN ẢNH QR MỚI ---
   const handleUploadQR = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1539,7 +1389,6 @@ const App = () => {
     reader.onload = (event) => {
       const img = new Image();
       img.onload = () => {
-        // Vẽ ảnh lên canvas tạm để lấy dữ liệu pixel
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         canvas.width = img.width;
@@ -1547,17 +1396,11 @@ const App = () => {
         ctx.drawImage(img, 0, 0, img.width, img.height);
         const imageData = ctx.getImageData(0, 0, img.width, img.height);
 
-        // Quét mã QR
         const code = jsQR(imageData.data, imageData.width, imageData.height);
         if (code) {
           const { bin, acc } = parseVietQR(code.data);
           if (bin && acc) {
-            setConfig(prev => ({
-              ...prev,
-              bankBin: bin,
-              bankAcc: acc,
-              bankName: getBankNameFromBin(bin)
-            }));
+            setConfig(prev => ({ ...prev, bankBin: bin, bankAcc: acc, bankName: getBankNameFromBin(bin) }));
             showToast("Tuyệt vời! Đã nhận diện thành công mã VietQR.", "success");
           } else {
             showToast("QR không đúng chuẩn VietQR hoặc không có số tài khoản.", "error");
@@ -1570,14 +1413,10 @@ const App = () => {
       img.src = event.target.result;
     };
     reader.readAsDataURL(file);
-    e.target.value = null; // Reset để có thể up lại cùng 1 ảnh
+    e.target.value = null;
   };
 
-  const monthLabels = {
-    'this-month': 'Tháng này',
-    'last-month': 'Tháng trước',
-    'all': 'Tất cả'
-  };
+  const monthLabels = { 'this-month': 'Tháng này', 'last-month': 'Tháng trước', 'all': 'Tất cả' };
 
   const currentRooms = useMemo(() => rooms.filter(r => r.roomCode?.toLowerCase().includes(searchQuery.toLowerCase()) || r.id?.toLowerCase().includes(searchQuery.toLowerCase())), [rooms, searchQuery]);
   const currentMeters = useMemo(() => meters.filter(m => m.id?.toLowerCase().includes(searchQuery.toLowerCase()) || m.name?.toLowerCase().includes(searchQuery.toLowerCase())), [meters, searchQuery]);
@@ -1637,128 +1476,44 @@ const App = () => {
     });
   }, [rooms]);
 
-
-
-  // --- B. LOGIC CHỌN THÁNG ---
-
-  // Hàm lùi tháng (Chỉ làm nhiệm vụ đổi State)
-  const handlePrevMonth = () => {
-    setViewDate(prev => {
-      const d = new Date(prev);
-      d.setMonth(d.getMonth() - 1);
-      return d;
-    });
-  };
-
-  // Hàm tiến tháng (Chỉ làm nhiệm vụ đổi State)
-  const handleNextMonth = () => {
-    setViewDate(prev => {
-      const d = new Date(prev);
-      d.setMonth(d.getMonth() + 1);
-      return d;
-    });
-  };
-
-  // TỰ ĐỘNG tải lại dữ liệu khi viewDate hoặc selectedHouse thay đổi
-  // useEffect(() => {
-  //   const fetchMetersByDate = async () => {
-  //     if (!selectedHouse?.id) return;
-
-  //     const monthSelected = viewDate.getMonth() + 1;
-  //     const yearSelected = viewDate.getFullYear();
-  //     const houseIdSelected = selectedHouse.id;
-
-  //     try {
-  //       // Gọi API lấy dữ liệu theo tháng/năm đã chọn
-  //       const metersData = await fetchApi(
-  //         `/meter/${houseIdSelected}?year=${yearSelected}&month=${monthSelected}`
-  //       );
-
-  //       // Cập nhật State meters
-  //       setMeters(metersData.map(m => ({
-  //         ...m,
-  //         roomIds: JSON.parse(m.roomIdsJson || '[]')
-  //       })));
-  //     } catch (error) {
-  //       console.error("Lỗi khi tải dữ liệu công tơ:", error);
-  //       // showToast("Không thể tải dữ liệu tháng này", "error");
-  //     }
-  //   };
-
-  //   fetchMetersByDate();
-  // }, [viewDate, selectedHouse?.id]); // Chạy lại mỗi khi đổi tháng hoặc đổi nhà
-
-  // Biến hiển thị
+  const handlePrevMonth = () => { setViewDate(prev => { const d = new Date(prev); d.setMonth(d.getMonth() - 1); return d; }); };
+  const handleNextMonth = () => { setViewDate(prev => { const d = new Date(prev); d.setMonth(d.getMonth() + 1); return d; }); };
   const monthDisplay = `Tháng ${viewDate.getMonth() + 1}, ${viewDate.getFullYear()}`;
 
-  // --- C. TÍNH TOÁN TỔNG HỢP (Đặt sau khi đã có hàm và state) ---
   const summary = useMemo(() => {
-    // Nếu không có dữ liệu, trả về tất cả bằng 0
-    if (!currentMeters || currentMeters.length === 0) {
-      return { kwh: 0, heater: 0, money: 0 };
-    }
-
-    let totalKwh = 0;
-    let totalHeater = 0;
-
+    if (!currentMeters || currentMeters.length === 0) return { kwh: 0, heater: 0, money: 0 };
+    let totalKwh = 0, totalHeater = 0;
     currentMeters.forEach(m => {
-      // KIỂM TRA NGHIÊM NGẶT: Nếu 1 trong 2 ô trống thì bỏ qua không cộng vào tổng
       const isOldEmpty = m.oldVal === null || m.oldVal === "";
       const isNewEmpty = m.newVal === null || m.newVal === "";
-
       if (!isOldEmpty && !isNewEmpty) {
         const vOld = parseN(m.oldVal);
         const vNew = parseN(m.newVal);
-
-        // Chỉ cộng nếu số mới >= số cũ
         const diff = vNew >= vOld ? (vNew - vOld) : 0;
-
         totalKwh += diff;
-
-        // Nếu là loại bình nóng lạnh thì cộng thêm vào mục heater
-        if (m.type === 'heater') {
-          totalHeater += diff;
-        }
+        if (m.type === 'heater') totalHeater += diff;
       }
     });
-
-    // Tính tổng tiền dựa trên tổng kWh hợp lệ
-    const totalMoney = totalKwh * (config?.priceElec || 3500);
-
-    return {
-      kwh: totalKwh,
-      heater: totalHeater,
-      money: totalMoney
-    };
+    return { kwh: totalKwh, heater: totalHeater, money: totalKwh * (config?.priceElec || 3500) };
   }, [currentMeters, config?.priceElec]);
-  // Hàm này sẽ tự động chạy lại mỗi khi bạn nhập số vào bất kỳ ô nào
 
-  // --- LOGIC TẢI GIAO DỊCH THEO LOẠI ---
   useEffect(() => {
     const loadTransactions = async () => {
       if (activeTab !== 'finance' || !selectedHouse?.id) return;
-
       try {
-        // Truyền tham số type vào URL (ví dụ: ?type=this_month)
-        const txData = await fetchApi(
-          `/transaction/${selectedHouse.id}?type=${selectedMonth}`
-        );
-
-        // Cập nhật danh sách giao dịch
+        const txData = await fetchApi(`/transaction/${selectedHouse.id}?type=${selectedMonth}`);
         setTransactions(txData);
-
-      } catch (e) {
-        console.error("Lỗi khi tải giao dịch:", e.message);
-        // showToast("Không thể tải dữ liệu tài chính", "error");
-      }
+      } catch (e) { console.error("Lỗi khi tải giao dịch:", e.message); }
     };
-
     loadTransactions();
-  }, [activeTab, selectedMonth, selectedHouse?.id]); // Chạy lại khi đang ở tab Thu chi
+  }, [activeTab, selectedMonth, selectedHouse?.id]);
 
   // ==========================================
   // RENDER QUYẾT ĐỊNH LUỒNG
   // ==========================================
+
+  // Các tab hiển thị độc lập, không cần thiết phải ở trong một House cụ thể
+  const isGlobalTab = ['savings', 'ai', 'settings', 'profile'].includes(activeTab);
 
   // 1. CHƯA ĐĂNG NHẬP -> HIỂN THỊ FORM LOGIN/REGISTER
   if (!isLoggedIn) {
@@ -1770,9 +1525,264 @@ const App = () => {
     );
   }
 
-  // 2. ĐÃ ĐĂNG NHẬP NHƯNG CHƯA CHỌN CƠ SỞ -> CHỌN CƠ SỞ
-  if (isLoggedIn && !selectedHouse) {
-    // --- LOGIC TÌM KIẾM & THỐNG KÊ ---
+  // 2. MÀN HÌNH HUB TỔNG QUAN (Ngay sau khi đăng nhập)
+  if (isLoggedIn && isHubMode) {
+    const hubStats = houses.reduce((acc, h) => {
+      acc.totalHouses += 1;
+      acc.totalRooms += h.totalRooms || 0;
+      acc.emptyRooms += h.emptyRooms || 0;
+      acc.revenue += h.revenue || 0;
+      acc.profit += h.profit || ((h.revenue || 0) - (h.expense || 0));
+      return acc;
+    }, { totalHouses: 0, totalRooms: 0, emptyRooms: 0, revenue: 0, profit: 0 });
+
+    const occupancyRate = hubStats.totalRooms > 0
+      ? Math.round(((hubStats.totalRooms - hubStats.emptyRooms) / hubStats.totalRooms) * 100)
+      : 0;
+    const recentHouses = houses.slice(0, 3);
+
+    return (
+      <div className="h-screen bg-slate-100 text-slate-900 font-sans flex flex-col max-w-lg mx-auto w-full relative border-x border-slate-200 shadow-2xl overflow-hidden">
+        <ToastNotification toast={toast} />
+
+        <div className="shrink-0 bg-white border-b border-slate-200 px-5 pt-8 pb-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Lucky Home</p>
+              <h1 className="text-xl font-black text-indigo-700 tracking-tight truncate mt-1">
+                {user?.fullName || 'Tài khoản quản lý'}
+              </h1>
+              <p className="text-[12px] font-semibold text-slate-500 mt-1">
+                Tổng quan vận hành và lối vào nhanh
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                className="w-10 h-10 rounded-full bg-slate-50 border border-slate-200 text-slate-600 flex items-center justify-center active:scale-95 transition-all"
+                aria-label="Thông báo"
+              >
+                <Bell className="w-5 h-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => { setIsHubMode(false); setActiveTab('profile'); setSelectedHouse(null); }}
+                className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-sm active:scale-95 transition-all"
+                aria-label="Tài khoản"
+              >
+                <User className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-4 gap-2">
+            {[
+              { label: 'Cơ sở', value: hubStats.totalHouses, tone: 'text-blue-700 bg-blue-50' },
+              { label: 'Phòng', value: hubStats.totalRooms, tone: 'text-slate-700 bg-slate-50' },
+              { label: 'Trống', value: hubStats.emptyRooms, tone: 'text-amber-700 bg-amber-50' },
+              { label: 'Lấp đầy', value: `${occupancyRate}%`, tone: 'text-emerald-700 bg-emerald-50' }
+            ].map(item => (
+              <div key={item.label} className={`rounded-xl border border-slate-200 p-2.5 text-center ${item.tone}`}>
+                <p className="text-[15px] font-black tabular-nums leading-none">{item.value}</p>
+                <p className="text-[7px] font-black uppercase tracking-widest mt-1.5 opacity-70">{item.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-4 pt-4 pb-24 space-y-4 no-scrollbar">
+          <section className="bg-slate-900 text-white rounded-xl p-4 shadow-lg">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Vận hành tháng này</p>
+                <h2 className="text-2xl font-black text-emerald-400 mt-2 tabular-nums">
+                  {formatN(hubStats.revenue)}
+                </h2>
+                <p className="text-[11px] font-bold text-slate-400 mt-1">Doanh thu ghi nhận từ các cơ sở</p>
+              </div>
+              <div className="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
+                <TrendingUp className="w-5 h-5 text-emerald-300" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-white/10">
+              <div>
+                <p className="text-[8px] font-black uppercase tracking-widest text-slate-500">Lợi nhuận</p>
+                <p className="text-sm font-black text-blue-300 tabular-nums mt-1">{formatN(hubStats.profit)}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[8px] font-black uppercase tracking-widest text-slate-500">Phòng đang thuê</p>
+                <p className="text-sm font-black text-white tabular-nums mt-1">{hubStats.totalRooms - hubStats.emptyRooms}/{hubStats.totalRooms}</p>
+              </div>
+            </div>
+          </section>
+
+          {hubStats.totalHouses === 0 && (
+            <section className="bg-white rounded-xl border border-blue-100 shadow-sm overflow-hidden">
+              <div className="p-4 border-b border-slate-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-black text-blue-800 uppercase">Bắt đầu nhanh</h3>
+                    <p className="text-[11px] font-semibold text-slate-500 mt-0.5">Thiết lập app theo đúng luồng quản lý</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-3 space-y-2">
+                {[
+                  { icon: Building2, title: 'Tạo cơ sở đầu tiên', desc: 'Nhập thông tin nhà, hợp đồng và phí dịch vụ', action: () => { setActiveTab('dashboard'); setIsHubMode(false); setEditingHouse(null); setIsAiCreateHouseOpen(true); } },
+                  { icon: Sparkles, title: 'Tạo nhanh bằng AI', desc: 'Mô tả căn nhà để app tự dựng dữ liệu ban đầu', action: () => { setActiveTab('dashboard'); setIsHubMode(false); setIsAiPromptModalOpen(true); setAiPrompt(""); setIsListening(false); } },
+                  { icon: User, title: 'Cập nhật tài khoản', desc: 'Đổi mật khẩu để bảo vệ phiên đăng nhập', action: () => { setIsHubMode(false); setActiveTab('profile'); setSelectedHouse(null); } }
+                ].map(item => (
+                  <button
+                    key={item.title}
+                    type="button"
+                    onClick={item.action}
+                    className="w-full p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center gap-3 text-left active:scale-[0.99] transition-all"
+                  >
+                    <div className="w-9 h-9 rounded-full bg-white text-blue-600 flex items-center justify-center shrink-0 shadow-sm">
+                      <item.icon className="w-4.5 h-4.5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[12px] font-black text-indigo-700 uppercase truncate">{item.title}</p>
+                      <p className="text-[10px] font-semibold text-slate-500 mt-0.5 leading-snug">{item.desc}</p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+
+          <section className="grid grid-cols-2 gap-3">
+            {[
+              { label: 'Quản lý cơ sở', desc: `${hubStats.totalHouses} cơ sở`, icon: Building2, tone: 'bg-blue-600 text-white', action: () => { setIsHubMode(false); setActiveTab('dashboard'); } },
+              { label: 'Sổ chi tiêu', desc: 'Đang phát triển', icon: CircleDollarSign, tone: 'bg-white text-orange-600', action: () => showToast('Chức năng sổ chi tiêu đang phát triển', 'success') },
+              { label: 'Sổ tiết kiệm', desc: 'Theo dõi tiền gửi', icon: PiggyBank, tone: 'bg-white text-emerald-600', action: () => { setIsHubMode(false); setActiveTab('savings'); setSelectedHouse(null); } },
+              { label: 'AI Chat', desc: 'Hỗ trợ thao tác', icon: Sparkles, tone: 'bg-white text-indigo-600', action: () => { setIsHubMode(false); setActiveTab('ai'); setSelectedHouse(null); } }
+            ].map(item => (
+              <button
+                key={item.label}
+                type="button"
+                onClick={item.action}
+                className={`${item.tone} min-h-[112px] rounded-xl border border-slate-200 p-4 text-left shadow-sm active:scale-[0.98] transition-all flex flex-col justify-between`}
+              >
+                <div className="w-10 h-10 rounded-xl bg-black/5 flex items-center justify-center">
+                  <item.icon className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-[13px] font-black uppercase leading-tight">{item.label}</h3>
+                  <p className="text-[10px] font-bold opacity-70 mt-1">{item.desc}</p>
+                </div>
+              </button>
+            ))}
+          </section>
+
+          <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-4 flex items-center justify-between border-b border-slate-100">
+              <div>
+                <h3 className="text-sm font-black text-blue-700 uppercase">Cơ sở của bạn</h3>
+                <p className="text-[11px] font-semibold text-slate-500 mt-0.5">Chọn nhanh để vào dashboard</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setIsHubMode(false); setActiveTab('dashboard'); }}
+                className="text-[10px] font-black text-blue-600 uppercase flex items-center gap-1"
+              >
+                Tất cả <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <div className="divide-y divide-slate-100">
+              {recentHouses.length === 0 && (
+                <div className="p-5 text-center">
+                  <Building2 className="w-10 h-10 mx-auto text-slate-300 mb-3" />
+                  <p className="text-xs font-bold text-slate-500">Bạn chưa có cơ sở nào.</p>
+                  <button
+                    type="button"
+                    onClick={() => { setActiveTab('dashboard'); setIsHubMode(false); setEditingHouse(null); setIsAiCreateHouseOpen(true); }}
+                    className="mt-4 px-4 py-2.5 rounded-xl bg-blue-600 text-white text-[10px] font-black uppercase"
+                  >
+                    Tạo cơ sở đầu tiên
+                  </button>
+                </div>
+              )}
+
+              {recentHouses.map(h => {
+                const usedRooms = Math.max((h.totalRooms || 0) - (h.emptyRooms || 0), 0);
+                return (
+                  <button
+                    key={h.id}
+                    type="button"
+                    onClick={() => { setSelectedHouse(h); setConfig({ ...h }); setIsHubMode(false); setActiveTab('dashboard'); setSearchQuery(''); }}
+                    className="w-full p-3.5 flex items-center gap-3 text-left active:bg-slate-50 transition-colors"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                      <Building2 className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-[13px] font-black text-blue-800 uppercase truncate">{h.name}</h4>
+                        <span className="text-[7px] font-black px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 uppercase shrink-0">{h.userRole || user?.role}</span>
+                      </div>
+                      <p className="text-[10px] font-semibold text-slate-500 mt-0.5 truncate">{h.address || 'Chưa cập nhật địa chỉ'}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-[12px] font-black text-emerald-700 tabular-nums">{usedRooms}/{h.totalRooms || 0}</p>
+                      <p className="text-[7px] font-black text-slate-400 uppercase mt-0.5">đã thuê</p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => { setActiveTab('dashboard'); setIsHubMode(false); setEditingHouse(null); setIsAiCreateHouseOpen(true); }}
+              className="rounded-xl bg-white border border-slate-200 p-3.5 flex items-center gap-3 text-left active:scale-[0.98] transition-all"
+            >
+              <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                <PlusCircle className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-[11px] font-black text-blue-700 uppercase">Thêm cơ sở</p>
+                <p className="text-[9px] font-bold text-slate-500 mt-0.5">Nhập thủ công</p>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setActiveTab('dashboard'); setIsHubMode(false); setIsAiPromptModalOpen(true); setAiPrompt(""); setIsListening(false); }}
+              className="rounded-xl bg-white border border-slate-200 p-3.5 flex items-center gap-3 text-left active:scale-[0.98] transition-all"
+            >
+              <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-[11px] font-black text-indigo-700 uppercase">Tạo bằng AI</p>
+                <p className="text-[9px] font-bold text-slate-500 mt-0.5">Từ mô tả nhà</p>
+              </div>
+            </button>
+          </section>
+
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="w-full bg-white border border-red-100 text-red-600 py-4 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 shadow-sm active:scale-[0.98] transition-all"
+          >
+            <LogOut className="w-4 h-4" /> Đăng xuất
+          </button>
+        </div>
+
+      </div>
+    );
+  }
+
+  // 3. ĐÃ ĐĂNG NHẬP NHƯNG CHƯA CHỌN CƠ SỞ (Đang ở mode Quản lý nhà)
+  if (isLoggedIn && !selectedHouse && !isGlobalTab) {
     const filteredHouses = houses.filter(h =>
       h.name?.toLowerCase().includes(houseSearchQuery.toLowerCase()) ||
       h.address?.toLowerCase().includes(houseSearchQuery.toLowerCase())
@@ -1792,38 +1802,31 @@ const App = () => {
       return acc;
     }, { totalHouses: 0, totalRooms: 0, emptyRooms: 0, totalRevenue: 0, totalExpense: 0, totalProfit: 0 });
 
-    // --- LOGIC TÍNH NGÀY ĐẾN HẠN NÂNG CAO (HỖ TRỢ ĐÓNG NHIỀU THÁNG) ---
     const getAdvancedDueInfo = (startDate, paymentDay, paymentPeriod) => {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      const period = paymentPeriod || 1; // Mặc định 1 tháng/lần
-      const day = paymentDay || 5;       // Mặc định ngày mùng 5
+      const period = paymentPeriod || 1;
+      const day = paymentDay || 5;
 
-      // Lấy mốc thời gian bắt đầu
       let start = new Date();
       if (startDate) {
         const d = new Date(startDate);
         if (!isNaN(d.getTime())) start = d;
       }
 
-      // Tính số tháng đã trôi qua từ lúc bắt đầu đến hiện tại
       let monthsDiff = (today.getFullYear() - start.getFullYear()) * 12 + (today.getMonth() - start.getMonth());
       if (monthsDiff < 0) monthsDiff = 0;
 
-      // Tính xem đã qua bao nhiêu chu kỳ, từ đó tìm ra tháng của kỳ đóng tiền hiện tại
       let periodsPassed = Math.floor(monthsDiff / period);
       let targetMonth = start.getMonth() + (periodsPassed * period);
 
-      // Ngày hạn đóng tiền của kỳ này
       let dueDate = new Date(start.getFullYear(), targetMonth, day);
 
-      // Nếu hôm nay đã vượt qua hạn đóng tiền của kỳ này, chuyển sang tính cho kỳ tiếp theo
       if (today > dueDate) {
         dueDate = new Date(start.getFullYear(), targetMonth + period, day);
       }
 
-      // Tính số ngày còn lại
       const diffDays = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
       return { daysLeft: diffDays, dueDate };
     };
@@ -1838,12 +1841,14 @@ const App = () => {
         />
 
         <div className="w-full max-w-sm flex flex-col h-screen relative overflow-hidden">
-
-          {/* PHẦN FIXED/STICKY TOP */}
           <div className="sticky top-0 z-20 bg-slate-50 pt-4 px-3 pb-2 space-y-3 shadow-sm border-b border-slate-200">
-            {/* Header */}
             <div className="flex justify-between items-center">
-              <h2 className="text-[18px] font-black text-slate-900 uppercase tracking-tighter border-l-4 border-blue-600 pl-3">Chọn Cơ Sở</h2>
+              <div className="flex items-center space-x-2">
+                <button onClick={() => setIsHubMode(true)} className="p-1.5 text-slate-600 hover:bg-slate-200 rounded-lg transition-all active:scale-95">
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                <h2 className="text-[18px] font-black text-slate-900 uppercase tracking-tighter border-l-4 border-blue-600 pl-3">Chọn Cơ Sở</h2>
+              </div>
               <div className="flex items-center space-x-2">
                 <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-1 rounded-md uppercase">{user?.role}</span>
                 <button onClick={handleLogout} className="p-1.5 bg-red-50 text-red-500 rounded-lg active:scale-90 transition-all hover:bg-red-100 hover:text-red-600">
@@ -1852,7 +1857,6 @@ const App = () => {
               </div>
             </div>
 
-            {/* Box Thống kê */}
             <div className="bg-slate-900 rounded-xl p-3.5 text-white shadow-xl border-b-1 border-blue-600">
               <div className="flex justify-between items-center mb-3 px-2 border-b border-slate-700 pb-3">
                 <div className="text-left">
@@ -1884,7 +1888,6 @@ const App = () => {
               </div>
             </div>
 
-            {/* Ô Search */}
             <div className="relative group">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
@@ -1897,7 +1900,6 @@ const App = () => {
             </div>
           </div>
 
-          {/* DANH SÁCH NHÀ */}
           <div className="flex-1 overflow-y-auto no-scrollbar px-3 pt-3 pb-28 space-y-2.5 relative">
             {filteredHouses.length === 0 && (
               <p className="text-xs text-slate-400 italic text-center mt-8">Không tìm thấy cơ sở nào.</p>
@@ -1905,20 +1907,13 @@ const App = () => {
 
             {filteredHouses.map(h => {
               const payInfo = getAdvancedDueInfo(h.startDate, h.paymentDay, h.paymentPeriod);
-
               const isUrgentPay = payInfo.daysLeft <= 3;
               const isWarningPay = payInfo.daysLeft <= 7;
-              const shouldShowPayInfo = payInfo.daysLeft <= 30; // Chỉ hiện nếu hạn đóng tiền <= 10 ngày
+              const shouldShowPayInfo = payInfo.daysLeft <= 30;
               const isFull = h.emptyRooms === 0;
 
-              // Xác định màu nền của toàn bộ Card dựa trên mức độ ưu tiên
-              const cardStyle = isUrgentPay
-                ? 'bg-red-50/50 border-red-100'
-                : isFull
-                  ? 'bg-emerald-50/30 border-emerald-100'
-                  : 'bg-white border-slate-100';
+              const cardStyle = isUrgentPay ? 'bg-red-50/50 border-red-100' : isFull ? 'bg-emerald-50/30 border-emerald-100' : 'bg-white border-slate-100';
 
-              // Chuyển đổi vai trò sang Tiếng Việt và màu sắc tương ứng
               const getRoleDisplay = (role) => {
                 switch (role) {
                   case 'SuperAdmin': return { text: 'Quản trị viên', class: 'bg-purple-100 text-purple-600' };
@@ -1998,7 +1993,6 @@ const App = () => {
                       </div>
                     </div>
 
-                    {/* LOGIC MỚI: Chỉ hiển thị nếu hạn đóng tiền <= 10 ngày */}
                     {shouldShowPayInfo && (
                       <div className={`flex items-center text-[10px] font-bold px-2 py-1 rounded-md ${isUrgentPay ? 'text-red-700 bg-red-100/50' :
                         isWarningPay ? 'text-amber-700 bg-amber-100/50' :
@@ -2014,7 +2008,6 @@ const App = () => {
             })}
           </div>
 
-          {/* VÙNG NÚT CỐ ĐỊNH Ở ĐÁY */}
           <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-slate-50 via-slate-50 to-transparent z-30 pointer-events-none">
             <div className="flex flex-col gap-2 pointer-events-auto">
               <button
@@ -2036,7 +2029,6 @@ const App = () => {
           </div>
         </div>
 
-        {/* MODAL PHÂN QUYỀN VÀ CHIA SẺ CƠ SỞ */}
         {isShareModalOpen && (
           <Modal title="PHÂN QUYỀN & CHIA SẺ CƠ SỞ" onClose={() => { setIsShareModalOpen(false); setSharingHouse(null); }}>
             <form onSubmit={handleAssignRole} className="space-y-4 text-left">
@@ -2072,11 +2064,9 @@ const App = () => {
           </Modal>
         )}
 
-        {/* MODAL THÊM/SỬA NHÀ (FORM GIỮ NGUYÊN) */}
         {isAiCreateHouseOpen && (
           <Modal title={editingHouse ? "SỬA THÔNG TIN CƠ SỞ" : "TẠO CƠ SỞ MỚI"} onClose={() => { setIsAiCreateHouseOpen(false); setEditingHouse(null); }}>
             <form onSubmit={handleAddHouse} className="space-y-4 text-left">
-              {/* Form giữ nguyên y như phiên bản trước */}
               <div className="space-y-3">
                 <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Tên Cơ Sở</label><input name="name" defaultValue={editingHouse?.name || ''} required placeholder="VD: Lucky Cầu Giấy" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
                 <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Địa chỉ</label><input name="address" defaultValue={editingHouse?.address || ''} required placeholder="VD: Số 10, Ngõ 12..." className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
@@ -2102,20 +2092,15 @@ const App = () => {
           </Modal>
         )}
 
-        {/* MODAL TẠO NHÀ BẰNG AI (GIỮ NGUYÊN) */}
         {isAiPromptModalOpen && (
           <Modal title="TRỢ LÝ AI TẠO NHÀ" onClose={() => { setIsAiPromptModalOpen(false); setIsListening(false); setAiFeedback(""); }}>
             <div className="space-y-4 text-left">
-
-              {/* Lời nhắn phản hồi của AI (Chỉ hiện khi AI hỏi lại) */}
               {aiFeedback && (
                 <div className="bg-indigo-50 border border-indigo-200 p-3 rounded-xl flex items-start space-x-2 animate-in slide-in-from-top-2">
                   <Sparkles className="w-4 h-4 text-indigo-500 mt-0.5 shrink-0" />
                   <p className="text-xs font-black text-indigo-700 leading-snug">{aiFeedback}</p>
                 </div>
               )}
-
-              {/* BOX TRẠNG THÁI NHẬN DIỆN (LÀM THÔNG MINH) */}
               <div className="flex flex-wrap gap-2 p-3 bg-slate-900 rounded-xl shadow-inner border border-white/5">
                 <div className="flex flex-col items-center flex-1">
                   <p className="text-[7px] font-black text-slate-500 uppercase mb-1">Địa chỉ</p>
@@ -2137,7 +2122,6 @@ const App = () => {
                 </div>
               </div>
 
-              {/* VÙNG 1: Ô nhập liệu và Mic */}
               <div className="relative">
                 <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center mb-2">
                   <Sparkles className="w-3.5 h-3.5 mr-1" /> {aiFeedback ? "Bạn hãy bổ sung thêm ở dưới:" : "Bạn muốn tạo nhà thế nào?"}
@@ -2149,7 +2133,6 @@ const App = () => {
                     placeholder="VD: 180 Nam Dư, Vĩnh Hưng, Hà Nội Nhà 4 tầng 6 phòng giá 3.5tr..."
                     className="w-full p-3.5 pr-12 bg-indigo-50/50 border border-indigo-100 rounded-xl font-bold text-[13px] outline-none focus:border-indigo-400 focus:bg-white transition-all resize-none min-h-[100px] text-slate-700 leading-relaxed shadow-inner"
                   />
-                  {/* Nút Mic */}
                   <button
                     type="button"
                     onClick={handleMicClick}
@@ -2164,7 +2147,6 @@ const App = () => {
                 {isListening && <p className="text-[9px] font-bold text-red-500 italic mt-1 text-right animate-pulse">Đang nghe...</p>}
               </div>
 
-              {/* VÙNG 2: Các mẫu có sẵn (Quick Templates) */}
               <div className="pt-2 border-t border-dashed border-slate-200">
                 <h4 className="text-[9px] font-black text-slate-400 uppercase mb-2.5 tracking-widest">Mẫu thực tế chuyên sâu</h4>
                 <div className="flex flex-col gap-2">
@@ -2185,7 +2167,6 @@ const App = () => {
                 </div>
               </div>
 
-              {/* VÙNG 3: Nút Submit */}
               <button
                 onClick={async () => {
                   if (!aiPrompt.trim()) {
@@ -2196,15 +2177,11 @@ const App = () => {
                   showToast("AI đang xử lý... vui lòng đợi!", "success");
 
                   try {
-                    // Gọi API Backend đã tạo
                     const res = await fetchApi('/house/ai-generate', 'POST', { prompt: aiPrompt });
-
                     if (res.isSuccess === false) {
-                      // Bị thiếu thông tin, hiện thông báo đòi nhập thêm
                       setAiFeedback(res.message);
                       showToast("AI cần thêm thông tin!", "error");
                     } else {
-                      // Tạo thành công
                       const updatedHouses = await fetchApi('/house', 'GET');
                       setHouses(updatedHouses);
                       showToast("Phép màu đã xảy ra! Nhà đã được tạo.", "success");
@@ -2212,9 +2189,7 @@ const App = () => {
                       setAiPrompt("");
                       setAiFeedback("");
                     }
-                  } catch (e) {
-                    showToast("Lỗi khi tạo AI: " + e.message, "error");
-                  }
+                  } catch (e) { showToast("Lỗi khi tạo AI: " + e.message, "error"); }
                 }}
                 className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 rounded-xl font-black uppercase text-[11px] flex items-center justify-center gap-2 border-b-1 border-indigo-800 text-center mt-4 active:scale-95 transition-all"
               >
@@ -2227,9 +2202,7 @@ const App = () => {
     );
   }
 
-
-
-  // 3. ĐÃ VÀO TRONG APP -> RENDER GIAO DIỆN CHÍNH
+  // 4. MAIN APP (Khi đã chọn cơ sở, hoặc truy cập Tab có tính Global như Tiết Kiệm)
   return (
     <div className="h-screen bg-slate-50 text-slate-900 font-sans flex flex-col max-w-lg mx-auto w-full relative border-x border-slate-100 shadow-2xl overflow-hidden">
       <ToastNotification toast={toast} />
@@ -2242,11 +2215,18 @@ const App = () => {
       {/* HEADER */}
       <header className="px-4 h-14 flex items-center justify-between shrink-0 bg-blue-600 text-white z-50 shadow-md relative">
         <div className="flex items-center space-x-2">
-          <button onClick={() => activeTab === 'dashboard' ? setSelectedHouse(null) : setActiveTab('dashboard')} className="p-1.5 bg-white/10 rounded-lg active:scale-90 transition-all flex items-center justify-center">
+          <button onClick={() => {
+            if (!selectedHouse || activeTab === 'dashboard') {
+              setIsHubMode(true);
+              setSelectedHouse(null);
+            } else {
+              setActiveTab('dashboard');
+            }
+          }} className="p-1.5 bg-white/10 rounded-lg active:scale-90 transition-all flex items-center justify-center">
             <ChevronLeft className="w-4 h-4" />
           </button>
           <h2 className="text-[10px] font-black uppercase tracking-widest text-blue-50 mt-0.5">
-            {activeTab === 'dashboard' ? 'Trang chủ' : activeTab === 'rooms' ? 'Phòng' : activeTab === 'meters_list' ? 'Chốt số điện' : activeTab === 'bills' ? 'Hóa đơn' : activeTab === 'finance' ? 'Thu chi' : activeTab === 'savings' ? 'Sổ tiết kiệm' : activeTab === 'ai' ? 'Chat AI' : 'Cài đặt'}
+            {activeTab === 'dashboard' ? 'Trang chủ' : activeTab === 'rooms' ? 'Phòng' : activeTab === 'meters_list' ? 'Chốt số điện' : activeTab === 'bills' ? 'Hóa đơn' : activeTab === 'finance' ? 'Thu chi' : activeTab === 'savings' ? 'Sổ tiết kiệm' : activeTab === 'ai' ? 'Chat AI' : activeTab === 'profile' ? 'Tài khoản' : 'Cài đặt'}
           </h2>
         </div>
         <div className="absolute left-1/2 -translate-x-1/2 hidden sm:flex items-center space-x-1.5">
@@ -2254,8 +2234,8 @@ const App = () => {
           <h2 className="text-sm font-black uppercase tracking-tighter mt-0.5">Lucky Home</h2>
         </div>
         <div className="flex items-center space-x-2">
-          <div className="flex flex-row items-center space-x-1 cursor-pointer active:opacity-80" onClick={() => setSelectedHouse(null)}>
-            <p className="text-[8px] font-light text-blue-100 uppercase tracking-widest truncate max-w-[100px] mt-0.5">{selectedHouse.name}</p>
+          <div className="flex flex-row items-center space-x-1 cursor-pointer active:opacity-80" onClick={() => { setIsHubMode(true); setSelectedHouse(null); }}>
+            <p className="text-[8px] font-light text-blue-100 uppercase tracking-widest truncate max-w-[100px] mt-0.5">{selectedHouse?.name || 'Tổng hợp'}</p>
             <MoreHorizontal className="w-3.5 h-3.5 opacity-60" />
           </div>
           {isOwnerOrAdmin && (
@@ -2311,7 +2291,7 @@ const App = () => {
               <div className="bg-white p-2 rounded-xl border border-slate-100 shadow-sm flex flex-col items-center"><p className="text-[13px] font-black text-orange-600">{dashboardSummary?.totalEbikes || 0}</p><p className="text-[7px] font-bold text-slate-400 uppercase mt-1">Xe điện</p></div>
             </div>
 
-            {isOwnerOrAdmin && (
+            {canViewProfit && (
               <div className="bg-slate-900 p-5 rounded-xl text-white shadow-xl relative overflow-hidden border-b-1 border-emerald-500">
                 <div className="absolute -right-4 -top-4 w-32 h-32 bg-emerald-500 rounded-full blur-3xl opacity-20 pointer-events-none"></div>
                 <div className="flex justify-between items-start mb-2 relative z-10">
@@ -2371,7 +2351,6 @@ const App = () => {
         {/* --- SỔ TIẾT KIỆM --- */}
         {activeTab === 'savings' && (
           <div className="animate-in fade-in pb-20">
-            {/* Sticky Header with Totals */}
             <div className="sticky top-0 z-30 bg-slate-50/80 backdrop-blur-md px-1">
               <div className="bg-slate-900 p-6 rounded-xl text-white shadow-xl relative border-b-8 border-slate-950">
                 <div className="flex justify-between items-center">
@@ -2418,7 +2397,6 @@ const App = () => {
               </div>
             </div>
 
-            {/* List */}
             <div className="px-1 mt-4 pb-4">
               {currentSavings.length === 0 && (
                 <p className="text-xs text-slate-400 italic text-center mt-10">Chưa có sổ tiết kiệm nào.</p>
@@ -2491,8 +2469,8 @@ const App = () => {
                         {items.map(s => {
                           const endDate = new Date(s.startDate);
                           const tMonths = s.termMonths || 0;
-                          endDate.setMonth(endDate.getMonth() + Math.floor(tMonths)); // Cộng phần nguyên (tháng)
-                          endDate.setDate(endDate.getDate() + Math.round((tMonths - Math.floor(tMonths)) * 30)); // Cộng phần dư (ngày)
+                          endDate.setMonth(endDate.getMonth() + Math.floor(tMonths));
+                          endDate.setDate(endDate.getDate() + Math.round((tMonths - Math.floor(tMonths)) * 30));
                           const daysLeft = Math.ceil((endDate - new Date()) / (1000 * 60 * 60 * 24));
                           const isMatured = daysLeft <= 0;
                           const interest = Math.round((s.amount || 0) * ((s.interestRate || 0) / 100) * ((s.termMonths || 0) / 12));
@@ -2560,7 +2538,7 @@ const App = () => {
             <div className="grid grid-cols-2 gap-2">
               {currentRooms.length === 0 && <p className="text-xs text-slate-400 italic mt-5 col-span-2 text-center">Chưa có phòng nào. Bấm Thêm phòng mới bên dưới.</p>}
               {currentRooms.map(r => {
-                const payDays = getDueInfo(r.paymentDate).daysLeft;
+                const payDays = getDueInfo(r.paymentDate)?.daysLeft || 0;
                 const contractEndDate = endContract(r.contractStart, r.months);
                 const endDays = diffDays(contractEndDate);
                 const isPayUrgent = r.status === 'full' && payDays <= 3;
@@ -2610,7 +2588,6 @@ const App = () => {
               })}
             </div>
 
-            {/* NÚT THÊM PHÒNG CHO NGƯỜI DÙNG */}
             {isManagerOrAbove && (
               <button onClick={() => { setEditingRoom(null); setIsAddRoomModalOpen(true); }} className="w-full mt-6 bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all">
                 <PlusCircle className="w-4 h-4 text-white" /> Thêm Phòng Mới
@@ -2620,42 +2597,30 @@ const App = () => {
         )}
 
         {/* --- HÓA ĐƠN --- */}
-        {/* MODAL XÁC NHẬN GHI ĐÈ HÓA ĐƠN */}
         {isOverwriteModalOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            {/* Overlay mờ phía sau */}
             <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300"></div>
 
-            {/* Nội dung Modal */}
             <div className="bg-white w-full max-w-sm rounded-[32px] shadow-2xl relative z-10 overflow-hidden animate-in zoom-in-95 duration-300">
               <div className="p-8 text-center">
-                {/* Icon Cảnh báo */}
                 <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-6">
                   <AlertTriangle className="w-10 h-10 text-orange-500 animate-bounce" />
                 </div>
-
-                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight mb-3">
-                  Phát hiện trùng lặp!
-                </h3>
+                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight mb-3">Phát hiện trùng lặp!</h3>
                 <p className="text-sm text-slate-500 font-medium leading-relaxed px-2">
                   Hóa đơn <span className="font-bold text-blue-600">Tháng {new Date().getMonth() + 1}</span> đã tồn tại trên hệ thống. Bạn có muốn xóa bản cũ và tạo lại không?
                 </p>
               </div>
 
-              {/* Nút bấm điều hướng */}
               <div className="flex p-4 gap-3 bg-slate-50">
                 <button
                   onClick={() => setIsOverwriteModalOpen(false)}
                   className="flex-1 py-4 bg-white text-slate-400 font-black uppercase text-[10px] rounded-2xl border border-slate-200 active:scale-95 transition-all"
-                >
-                  Để sau
-                </button>
+                >Để sau</button>
                 <button
                   onClick={executeGenerateBills}
                   className="flex-1 py-4 bg-blue-600 text-white font-black uppercase text-[10px] rounded-2xl active:scale-95 transition-all border-b-1 border-blue-800"
-                >
-                  Đồng ý tạo lại
-                </button>
+                >Đồng ý tạo lại</button>
               </div>
             </div>
           </div>
@@ -2663,17 +2628,13 @@ const App = () => {
 
         {activeTab === 'bills' && (
           <div className="space-y-4 pb-20 animate-in fade-in">
-
-            {/* STICKY HEADER: CHỌN THÁNG & THỐNG KÊ */}
             <div className="sticky top-0 z-30 bg-indigo-600 rounded-xl p-4 space-y-4 shadow-lg">
-              {/* Bộ chọn tháng */}
               <div className="bg-white p-1 rounded-xl flex items-center">
                 <button onClick={handlePrevMonth} className="p-3 text-indigo-600"><ChevronLeft /></button>
                 <div className="flex-1 text-center font-black uppercase text-xs">Hóa đơn {monthDisplay}</div>
                 <button onClick={handleNextMonth} className="p-3 text-indigo-600"><ChevronRight /></button>
               </div>
 
-              {/* Box thông số */}
               <div className="grid grid-cols-3 gap-2">
                 <div className="bg-white p-3 rounded-xl text-center">
                   <p className="text-[7px] font-black text-slate-400 uppercase">Đã thu</p>
@@ -2690,7 +2651,6 @@ const App = () => {
               </div>
             </div>
 
-            {/* DANH SÁCH HÓA ĐƠN */}
             <div className="space-y-2">
               {currentBills.length === 0 ? (
                 <div className="py-20 text-center text-slate-400 italic text-xs">
@@ -2704,7 +2664,6 @@ const App = () => {
                     className={`bg-white p-3.5 rounded-xl border-2 shadow-sm flex items-center justify-between active:scale-[0.98] transition-all cursor-pointer ${bill.status === 'paid' ? 'border-emerald-100/60' : 'border-rose-100'
                       }`}
                   >
-                    {/* Box bên trái: Icon + Thông tin phòng */}
                     <div className="flex items-center space-x-3">
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-inner shrink-0 ${bill.status === 'paid' ? 'bg-emerald-50 text-emerald-500' : 'bg-rose-50 text-rose-500'
                         }`}>
@@ -2722,7 +2681,6 @@ const App = () => {
                       </div>
                     </div>
 
-                    {/* Box bên phải: Tổng tiền */}
                     <div className="text-right">
                       <p className={`font-black text-[15px] tracking-tight tabular-nums ${bill.status === 'paid' ? 'text-emerald-600' : 'text-rose-600'
                         }`}>
@@ -2742,14 +2700,9 @@ const App = () => {
         {/* --- CHỐT SỐ --- */}
         {activeTab === 'meters_list' && (
           <div className="space-y-4 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-500">
-
-            {/* --- PHẦN CỐ ĐỊNH: CHỌN THÁNG & TỔNG HỢP --- */}
             <div className="sticky top-0 z-30 bg-blue-600 rounded-xl border border-blue-600 backdrop-blur-md p-4 space-y-4">
-              {/* BỘ CHỌN THÁNG */}
               <div className="bg-white p-1 rounded-xl border border-slate-100 shadow-sm flex items-center">
-                <button type="button" onClick={handlePrevMonth} className="p-3 hover:bg-slate-50 rounded-xl text-blue-600 active:scale-90 transition-all">
-                  <ChevronLeft className="w-5 h-5" />
-                </button>
+                <button type="button" onClick={handlePrevMonth} className="p-3 hover:bg-slate-50 rounded-xl text-blue-600 active:scale-90 transition-all"><ChevronLeft className="w-5 h-5" /></button>
                 <div className="flex-1 text-center">
                   <p className="text-[8px] font-black uppercase text-blue-600">Kỳ chốt số điện</p>
                   <div className="flex items-center justify-center gap-2 bg-blue-600 px-4 py-1.5 rounded-full w-fit mx-auto">
@@ -2757,38 +2710,31 @@ const App = () => {
                     <span className="text-xs font-black text-white uppercase">{monthDisplay}</span>
                   </div>
                 </div>
-                <button type="button" onClick={handleNextMonth} className="p-3 hover:bg-slate-50 rounded-xl text-blue-600 active:scale-90 transition-all">
-                  <ChevronRight className="w-5 h-5" />
-                </button>
+                <button type="button" onClick={handleNextMonth} className="p-3 hover:bg-slate-50 rounded-xl text-blue-600 active:scale-90 transition-all"><ChevronRight className="w-5 h-5" /></button>
               </div>
 
-              {/* BẢNG TỔNG HỢP */}
               <div className="grid grid-cols-3 gap-2">
                 <div className="bg-white p-3 rounded-xl text-center">
                   <p className="text-[7px] font-black text-rose-400 uppercase mb-1">Tổng điện</p>
                   <div className="flex items-baseline gap-1 text-rose-600 justify-center">
-                    <span className="text-sm font-black">{formatN(summary.kwh)}</span>
-                    <span className="text-[7px] font-bold">kWh</span>
+                    <span className="text-sm font-black">{formatN(summary.kwh)}</span><span className="text-[7px] font-bold">kWh</span>
                   </div>
                 </div>
                 <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm text-center">
                   <p className="text-[7px] font-black text-orange-400 uppercase mb-1">Nóng lạnh</p>
                   <div className="flex items-baseline gap-1 text-orange-600 justify-center">
-                    <span className="text-sm font-black">{formatN(summary.heater)}</span>
-                    <span className="text-[7px] font-bold">kWh</span>
+                    <span className="text-sm font-black">{formatN(summary.heater)}</span><span className="text-[7px] font-bold">kWh</span>
                   </div>
                 </div>
                 <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm text-center">
                   <p className="text-[7px] font-black text-emerald-500 uppercase mb-1">Tổng tiền</p>
                   <div className="flex items-baseline gap-0.5 text-emerald-600 justify-center">
-                    <span className="text-sm font-black">{formatN(summary.money)}</span>
-                    <span className="text-[7px] font-bold">đ</span>
+                    <span className="text-sm font-black">{formatN(summary.money)}</span><span className="text-[7px] font-bold">đ</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* DANH SÁCH CÔNG TƠ */}
             <div className="space-y-3 px-0.5">
               {(!currentMeters || currentMeters.length === 0) && (
                 <div className="py-20 text-center">
@@ -2797,19 +2743,14 @@ const App = () => {
                 </div>
               )}
               {currentMeters?.map(m => {
-                // --- LOGIC KIỂM TRA TÍNH HỢP LỆ ---
-                // Kiểm tra xem các ô có thực sự trống (null/rỗng) hay không
                 const isOldEmpty = m.oldVal === null || m.oldVal === "";
                 const isNewEmpty = m.newVal === null || m.newVal === "";
-
                 let consumption = 0;
                 let totalPrice = 0;
 
-                // CHỈ TÍNH KHI CẢ 2 Ô ĐỀU KHÔNG TRỐNG
                 if (!isOldEmpty && !isNewEmpty) {
                   const vOld = parseN(m.oldVal);
                   const vNew = parseN(m.newVal);
-                  // Nếu số mới >= số cũ thì tính, không thì mặc định 0
                   consumption = vNew >= vOld ? (vNew - vOld) : 0;
                   totalPrice = consumption * (config.priceElec || 0);
                 }
@@ -2824,24 +2765,18 @@ const App = () => {
                         <div>
                           <p className="text-[11px] font-black uppercase text-rose-800 leading-none">{m.name}</p>
                           <p className="text-[8px] font-bold text-blue-400 mt-1">
-                            {/* Kết quả sẽ là 0 nếu số cũ đang trống trơn */}
                             Tổng: {formatN(consumption)} số - Tiền: {formatN(totalPrice)} đ
                           </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <button onClick={() => { setEditingMeter(m); setIsAddMeterModalOpen(true); }} className="p-2 bg-slate-50 text-slate-400 rounded-xl hover:text-blue-600 transition-all">
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => setMappingMeter(m)} className="p-2 bg-slate-50 text-slate-400 rounded-xl active:bg-orange-50 active:text-orange-500 transition-all">
-                          <Boxes className="w-4 h-4" />
-                        </button>
+                        <button onClick={() => { setEditingMeter(m); setIsAddMeterModalOpen(true); }} className="p-2 bg-slate-50 text-slate-400 rounded-xl hover:text-blue-600 transition-all"><Edit className="w-4 h-4" /></button>
+                        <button onClick={() => setMappingMeter(m)} className="p-2 bg-slate-50 text-slate-400 rounded-xl active:bg-orange-50 active:text-orange-500 transition-all"><Boxes className="w-4 h-4" /></button>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="text-[8px] font-black text-slate-400 uppercase mb-1 block px-1">Số cũ</label>
-                        {/* Ô này nếu để trống thì dòng trên sẽ hiện 0 số */}
                         <input type="number" value={m.oldVal || ''} onChange={(e) => handleUpdateOldMeterUI(m.id, e.target.value)} className="w-full bg-slate-50 border-2 border-transparent p-3 rounded-xl font-black text-slate-500 text-center text-sm outline-none focus:border-purple-200 transition-all shadow-inner" />
                       </div>
                       <div>
@@ -2854,7 +2789,6 @@ const App = () => {
               })}
             </div>
 
-            {/* NÚT LƯU CỐ ĐỊNH Ở DƯỚI */}
             {currentMeters?.length > 0 && (
               <div className="fixed bottom-[4.5rem] left-1/2 -translate-x-1/2 w-full max-w-lg px-4 z-40">
                 <button
@@ -2869,14 +2803,12 @@ const App = () => {
         )}
 
         {/* --- THU CHI --- */}
-        {activeTab === 'finance' && isManagerOrAbove && (
+        {activeTab === 'finance' && canAccessFinance && (
           <div className="animate-in fade-in pb-20">
-            {/* BOX TỔNG HỢP - STICKY */}
             <div className="sticky top-0 z-30 bg-slate-50 pb-4 -mt-4 -mx-4 px-5">
               <div className="bg-slate-900 p-5 rounded-2xl text-white shadow-2xl relative border-b-1 border-blue-600 overflow-hidden">
                 <div className="absolute top-0 right-0 w-40 h-40 bg-blue-600 rounded-full blur-3xl opacity-20 pointer-events-none"></div>
 
-                {/* Header Row: Label + Custom Dropdown */}
                 <div className="flex justify-between items-center relative z-50">
                   <button onClick={() => setIsFinanceStatsOpen(!isFinanceStatsOpen)} className="flex items-center gap-2 active:scale-95 transition-all text-left">
                     <div className="p-1.5 bg-blue-500/20 rounded-lg">
@@ -2888,7 +2820,6 @@ const App = () => {
                     </p>
                   </button>
 
-                  {/* CUSTOM DROPDOWN UI */}
                   <div className="relative z-50">
                     <button
                       onClick={() => setIsMonthOpen(!isMonthOpen)}
@@ -2898,7 +2829,6 @@ const App = () => {
                       <ChevronDown className={`w-3 h-3 transition-transform ${isMonthOpen ? 'rotate-180' : ''}`} />
                     </button>
 
-                    {/* Menu đổ xuống */}
                     {isMonthOpen && (
                       <div className="absolute right-0 mt-2 w-44 bg-slate-900 border border-blue-500/40 rounded-2xl shadow-2xl z-[80] overflow-hidden animate-in zoom-in-95 duration-200 origin-top-right">
                         <div className="p-1">
@@ -2906,14 +2836,8 @@ const App = () => {
                             <button
                               key={key}
                               type="button"
-                              onClick={() => {
-                                setSelectedMonth(key); // Cập nhật state -> Kích hoạt useEffect gọi API
-                                setIsMonthOpen(false);
-                              }}
-                              className={`w-full flex items-center justify-between px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-all rounded-xl mb-0.5 last:mb-0 ${selectedMonth === key
-                                ? 'bg-blue-600 text-white'
-                                : 'text-slate-400 hover:bg-white/5 hover:text-white'
-                                }`}
+                              onClick={() => { setSelectedMonth(key); setIsMonthOpen(false); }}
+                              className={`w-full flex items-center justify-between px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-all rounded-xl mb-0.5 last:mb-0 ${selectedMonth === key ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
                             >
                               <span>{monthLabels[key]}</span>
                               {selectedMonth === key && <Check className="w-3.5 h-3.5" />}
@@ -2927,12 +2851,14 @@ const App = () => {
 
                 {isFinanceStatsOpen && (
                   <div className="animate-in slide-in-from-top-2 duration-200 mt-5 relative z-0">
-                    <div className="text-center mb-5 relative z-0">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Lợi nhuận ròng</p>
-                      <h3 className="text-4xl font-black tracking-tight tabular-nums text-transparent bg-clip-text bg-gradient-to-r from-blue-200 to-blue-400">
-                        {formatN(financeStats.rev - financeStats.exp)}
-                      </h3>
-                    </div>
+                    {canViewProfit && (
+                      <div className="text-center mb-5 relative z-0">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Lợi nhuận ròng</p>
+                        <h3 className="text-4xl font-black tracking-tight tabular-nums text-transparent bg-clip-text bg-gradient-to-r from-blue-200 to-blue-400">
+                          {formatN(financeStats.rev - financeStats.exp)}
+                        </h3>
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-2 gap-3 relative z-0">
                       <div className="bg-white/5 border border-white/10 rounded-xl p-3.5">
@@ -2959,7 +2885,6 @@ const App = () => {
               </div>
             </div>
 
-            {/* DANH SÁCH GIAO DỊCH - SCROLLABLE */}
             <div className="mt-4 space-y-2 px-1">
               {currentTransactions.length === 0 && (
                 <p className="text-xs text-slate-400 italic text-center mt-10">Chưa có giao dịch thu chi nào.</p>
@@ -2983,15 +2908,17 @@ const App = () => {
                     <p className={`font-black text-sm text-right tabular-nums ${t.type === 'in' ? 'text-emerald-600' : 'text-rose-600'}`}>
                       {t.type === 'in' ? '+' : '-'}{formatN(t.amount)}
                     </p>
-                    <button onClick={() => {
-                      setEditingTransaction(t);
-                      setTxType(t.type);
-                      const catKey = Object.keys(TRANSACTION_CATEGORIES).find(k => TRANSACTION_CATEGORIES[k].id === t.category) || 'OTHER';
-                      setSelectedCat(catKey);
-                      setIsAddTransactionModalOpen(true);
-                    }} className="p-1.5 bg-slate-50 text-slate-400 rounded-md hover:text-blue-600 transition-colors">
-                      <Edit className="w-3.5 h-3.5" />
-                    </button>
+                    {canManageTransactions && (
+                      <button onClick={() => {
+                        setEditingTransaction(t);
+                        setTxType(t.type);
+                        const catKey = Object.keys(TRANSACTION_CATEGORIES).find(k => TRANSACTION_CATEGORIES[k].id === t.category) || 'OTHER';
+                        setSelectedCat(catKey);
+                        setIsAddTransactionModalOpen(true);
+                      }} className="p-1.5 bg-slate-50 text-slate-400 rounded-md hover:text-blue-600 transition-colors">
+                        <Edit className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -3002,14 +2929,11 @@ const App = () => {
         {isAddTransactionModalOpen && (
           <Modal title="Ghi sổ thu chi" onClose={() => setIsAddTransactionModalOpen(false)}>
             <form onSubmit={handleAddTx} className="space-y-5 text-left p-1">
-
-              {/* 1. CHỌN LOẠI THU/CHI */}
               <div className="bg-slate-100 p-1.5 rounded-xl flex gap-1.5">
                 <button
                   type="button"
                   onClick={() => setTxType('in')}
-                  className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase transition-all flex items-center justify-center gap-2 ${txType === 'in' ? 'bg-white text-emerald-600' : 'text-slate-400'
-                    }`}
+                  className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase transition-all flex items-center justify-center gap-2 ${txType === 'in' ? 'bg-white text-emerald-600' : 'text-slate-400'}`}
                 >
                   <div className={`w-2 h-2 rounded-full ${txType === 'in' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
                   Thu vào (+)
@@ -3017,15 +2941,13 @@ const App = () => {
                 <button
                   type="button"
                   onClick={() => setTxType('out')}
-                  className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase transition-all flex items-center justify-center gap-2 ${txType === 'out' ? 'bg-white text-rose-600' : 'text-slate-400'
-                    }`}
+                  className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase transition-all flex items-center justify-center gap-2 ${txType === 'out' ? 'bg-white text-rose-600' : 'text-slate-400'}`}
                 >
                   <div className={`w-2 h-2 rounded-full ${txType === 'out' ? 'bg-rose-500 animate-pulse' : 'bg-slate-300'}`} />
                   Chi ra (-)
                 </button>
               </div>
 
-              {/* 2. NHẬP SỐ TIỀN */}
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Số tiền (VND)</label>
                 <div className="relative">
@@ -3039,46 +2961,32 @@ const App = () => {
                 </div>
               </div>
 
-              {/* 3. CHỌN DANH MỤC (COMBOBOX) */}
               <div className="space-y-2 relative">
                 <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Danh mục</label>
 
-                {/* Nút bấm hiển thị mục đang chọn */}
                 <button
                   type="button"
                   onClick={() => setIsCatOpen(!isCatOpen)}
                   className="w-full p-4 bg-slate-50 rounded-xl font-bold text-sm text-left flex justify-between items-center border-2 border-transparent hover:border-slate-200 transition-all shadow-inner active:scale-[0.99]"
                 >
-                  {/* TRUY XUẤT LABEL: Nếu selectedCat chưa có giá trị, mặc định hiện 'RENT' */}
                   <span className="text-slate-700">
                     {TRANSACTION_CATEGORIES[selectedCat]?.label || TRANSACTION_CATEGORIES['RENT'].label}
                   </span>
                   <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-300 ${isCatOpen ? 'rotate-180' : ''}`} />
                 </button>
 
-                {/* PHẦN ĐỔ XUỐNG (MENU) */}
                 {isCatOpen && (
                   <>
-                    {/* Lớp phủ kín màn hình để click ra ngoài là đóng */}
                     <div className="fixed inset-0 z-[60]" onClick={() => setIsCatOpen(false)}></div>
-
                     <div className="absolute left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-2xl z-[70] overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-top">
                       <div className="max-h-60 overflow-y-auto p-1">
-                        {/* LẶP QUA CÁC KEY: RENT, ELEC, WATER... */}
                         {Object.keys(TRANSACTION_CATEGORIES).map((key) => (
                           <button
                             key={key}
                             type="button"
-                            onClick={() => {
-                              setSelectedCat(key); // Lưu KEY (ví dụ: 'RENT') vào state
-                              setIsCatOpen(false); // Đóng menu
-                            }}
-                            className={`w-full px-4 py-3.5 text-left text-sm font-bold flex justify-between items-center transition-colors rounded-xl mb-0.5 last:mb-0 ${selectedCat === key
-                              ? 'bg-blue-50 text-blue-600'
-                              : 'text-slate-600 hover:bg-slate-50 hover:text-blue-500'
-                              }`}
+                            onClick={() => { setSelectedCat(key); setIsCatOpen(false); }}
+                            className={`w-full px-4 py-3.5 text-left text-sm font-bold flex justify-between items-center transition-colors rounded-xl mb-0.5 last:mb-0 ${selectedCat === key ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50 hover:text-blue-500'}`}
                           >
-                            {/* HIỂN THỊ TIẾNG VIỆT TẠI ĐÂY */}
                             <span>{TRANSACTION_CATEGORIES[key].label}</span>
                             {selectedCat === key && <Check className="w-4 h-4 text-blue-600" />}
                           </button>
@@ -3089,7 +2997,6 @@ const App = () => {
                 )}
               </div>
 
-              {/* 4. NỘI DUNG CHI TIẾT */}
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Nội dung chi tiết</label>
                 <textarea
@@ -3099,19 +3006,15 @@ const App = () => {
                 />
               </div>
 
-              {/* 5. NÚT XÁC NHẬN */}
               <div className="flex gap-2 pt-3">
-                {editingTransaction && (
-                  <button type="button" onClick={() => handleDeleteTransaction(editingTransaction.id)} className="flex-1 bg-red-500 text-white py-4 rounded-xl font-black uppercase text-[11px] active:scale-95 border-b-1 border-red-200">
-                    Xóa
-                  </button>
+                {editingTransaction && canManageTransactions && (
+                  <button type="button" onClick={() => handleDeleteTransaction(editingTransaction.id)} className="flex-1 bg-red-500 text-white py-4 rounded-xl font-black uppercase text-[11px] active:scale-95 border-b-1 border-red-200">Xóa</button>
                 )}
                 <button type="submit" className={`flex-[2] text-white py-4 rounded-xl font-black uppercase text-[11px] transition-all active:scale-95 border-b-1 ${txType === 'in' ? 'bg-emerald-600 border-emerald-800' : 'bg-rose-600 border-rose-800'}`}>
                   {editingTransaction ? 'Lưu thay đổi' : 'Xác nhận'}
                 </button>
               </div>
 
-              {/* DỮ LIỆU GỬI XUỐNG C# (ID SỐ) */}
               <input type="hidden" name="type" value={txType} />
               <input type="hidden" name="category" value={TRANSACTION_CATEGORIES[selectedCat]?.id ?? 0} />
             </form>
@@ -3135,6 +3038,60 @@ const App = () => {
               <input name="q" placeholder="Hỏi AI Lucky Home..." disabled={isAiLoading} className="flex-1 bg-slate-100 border-none rounded-lg px-3 text-xs font-bold outline-none focus:bg-blue-50 transition-colors" />
               <button type="submit" disabled={isAiLoading} className="p-2.5 bg-blue-600 text-white rounded-lg active:scale-90 flex items-center justify-center disabled:opacity-50"><Send className="w-4 h-4" /></button>
             </form>
+          </div>
+        )}
+
+        {/* --- TÀI KHOẢN --- */}
+        {activeTab === 'profile' && (
+          <div className="min-h-[calc(100vh-170px)] flex flex-col animate-in fade-in pb-6">
+            <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5 mb-4">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-sm">
+                  <User className="w-7 h-7" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-black text-base text-slate-900 uppercase tracking-tight truncate">
+                    {user?.fullName || user?.username || 'Tài khoản'}
+                  </h3>
+                  <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mt-1">
+                    {getRoleLabel(user?.role)}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
+              <div className="bg-blue-600 px-5 py-4">
+                <h4 className="text-[10px] font-black text-white uppercase tracking-widest">Đổi mật khẩu</h4>
+              </div>
+              <form onSubmit={handleChangePassword} className="p-5">
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-slate-400 uppercase px-1">Mật khẩu cũ</label>
+                    <input type="password" value={changePasswordForm.oldPassword || ''} onChange={e => setChangePasswordForm({ ...changePasswordForm, oldPassword: e.target.value })} className="w-full bg-slate-50 p-3 rounded-xl font-bold text-xs outline-none focus:border-rose-600 border border-transparent transition-all" required />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-slate-400 uppercase px-1">Mật khẩu mới</label>
+                    <input type="password" value={changePasswordForm.newPassword || ''} onChange={e => setChangePasswordForm({ ...changePasswordForm, newPassword: e.target.value })} className="w-full bg-slate-50 p-3 rounded-xl font-bold text-xs outline-none focus:border-rose-600 border border-transparent transition-all" required />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-black text-slate-400 uppercase px-1">Xác nhận mật khẩu mới</label>
+                    <input type="password" value={changePasswordForm.confirmNewPassword || ''} onChange={e => setChangePasswordForm({ ...changePasswordForm, confirmNewPassword: e.target.value })} className="w-full bg-slate-50 p-3 rounded-xl font-bold text-xs outline-none focus:border-rose-600 border border-transparent transition-all" required />
+                  </div>
+                  <button type="submit" className="w-full bg-rose-600 text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 border-b-1 border-rose-800 active:translate-y-1 transition-all">
+                    <Lock className="w-4 h-4" /> Xác nhận đổi mật khẩu
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="mt-4 w-full bg-white border border-red-100 text-red-600 py-4 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 shadow-sm active:scale-[0.98] transition-all"
+            >
+              <LogOut className="w-4 h-4" /> Đăng xuất
+            </button>
           </div>
         )}
 
@@ -3182,7 +3139,6 @@ const App = () => {
             </div>
 
             <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden text-center">
-              {/* HEADER CÓ THÊM NÚT TẢI ẢNH */}
               <div className="bg-blue-600 px-5 py-3 flex items-center justify-between gap-3">
                 <button
                   onClick={() => setSettingsExpanded(prev => ({ ...prev, qr: !prev.qr }))}
@@ -3192,7 +3148,6 @@ const App = () => {
                   <ChevronDown className={`w-4 h-4 text-white transition-transform duration-300 ${settingsExpanded.qr ? 'rotate-180' : ''}`} />
                 </button>
 
-                {/* Input file ẩn đi */}
                 <input type="file" accept="image/*" ref={qrFileRef} className="hidden" onChange={handleUploadQR} />
 
                 <button
@@ -3256,7 +3211,7 @@ const App = () => {
         )}
 
         {/* LỖI PHÂN QUYỀN */}
-        {(activeTab === 'finance' || activeTab === 'settings') && !isManagerOrAbove && (
+        {((activeTab === 'finance' && !canAccessFinance) || (activeTab === 'settings' && !isManagerOrAbove)) && (
           <div className="flex flex-col items-center justify-center h-64 text-center">
             <ShieldCheck className="w-16 h-16 text-slate-300 mb-4" />
             <h3 className="text-lg font-black text-slate-800 uppercase">Không có quyền truy cập</h3>
@@ -3266,55 +3221,58 @@ const App = () => {
         )}
       </main>
 
-      {/* FOOTER TAB BAR */}
-      <div className="fixed bottom-0 left-0 right-0 z-[70] pointer-events-none">
-        <div className="bg-white border-t border-slate-100 h-14 flex items-center justify-around px-2 pointer-events-auto shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
-          {[
-            { id: 'dashboard', icon: LayoutDashboard, label: 'Trang chủ' },
-            shouldShowMeterBanner
-              ? { id: 'meters_list', icon: Boxes, label: 'Chốt số' }
-              : { id: 'rooms', icon: Home, label: 'Phòng' },
-            { id: 'spacer', icon: null, label: '' },
-            { id: 'bills', icon: FileText, label: 'Hóa đơn' },
-            { id: 'finance', icon: Wallet, label: 'Thu Chi', hidden: !isManagerOrAbove },
-            { id: 'ai', icon: Sparkles, label: 'AI Chat', hidden: isManagerOrAbove }
-          ].filter(i => !i.hidden).map((item, i) => (
-            item.id === 'spacer' ? <div key={i} className="w-12" /> : (
-              <button key={item.id} onClick={() => { setActiveTab(item.id); setSearchQuery(""); }} className={`flex flex-col items-center justify-center px-1 transition-all ${activeTab === item.id ? 'text-blue-600 scale-105' : 'text-slate-400 opacity-60'}`}>
-                <div className={`p-1.5 rounded-lg ${activeTab === item.id ? 'bg-blue-50 shadow-inner' : ''} flex items-center justify-center`}><item.icon className="w-4.5 h-4.5" strokeWidth={activeTab === item.id ? 3 : 2} /></div>
-                <span className={`text-[6px] font-black uppercase mt-1 transition-all ${activeTab === item.id ? 'opacity-100' : 'opacity-0'}`}>{item.label}</span>
-              </button>
-            )
-          ))}
-        </div>
-        <button onClick={() => setShowQuickMenu(!showQuickMenu)} className={`absolute -top-5 left-1/2 -translate-x-1/2 w-14 h-14 rounded-[1.4rem] flex items-center justify-center transition-all duration-500 active:scale-90 pointer-events-auto border-[4px] border-white ${showQuickMenu ? 'bg-slate-800 rotate-45' : 'bg-blue-600'}`}><Plus className="w-7 h-7 text-white stroke-[4px]" /></button>
-      </div>
-
-      {/* QUICK MENU */}
-      <div className={`fixed inset-0 z-[500] transition-opacity duration-300 ${showQuickMenu ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-        <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowQuickMenu(false)} />
-        <div className={`absolute bottom-0 left-0 right-0 max-w-lg mx-auto bg-white rounded-t-[2.5rem] p-8 pb-36 transition-transform duration-500 transform ${showQuickMenu ? 'translate-y-0' : 'translate-y-full'}`}>
-          <div className="grid grid-cols-3 gap-6">
-            {[
-              { label: 'Thêm Phòng', icon: UserCheck, color: 'text-emerald-600 bg-emerald-50', action: () => { setEditingRoom(null); setIsAddRoomModalOpen(true); setShowQuickMenu(false); } },
-              shouldShowMeterBanner
-                ? { label: 'Phòng', icon: Home, color: 'text-blue-600 bg-blue-50', action: () => { setActiveTab('rooms'); setShowQuickMenu(false); } }
-                : { label: 'Chốt số điện', icon: Boxes, color: 'text-orange-600 bg-orange-50', action: () => { setActiveTab('meters_list'); setShowQuickMenu(false); } },
-              { label: 'Hóa Đơn', icon: Receipt, color: 'text-purple-600 bg-purple-50', action: () => { setActiveTab('bills'); setShowQuickMenu(false); } },
-              { label: 'AI Chat', icon: Sparkles, color: 'text-indigo-600 bg-indigo-50', action: () => { setActiveTab('ai'); setShowQuickMenu(false); } },
-              { label: 'Thu chi', icon: CircleDollarSign, color: 'text-rose-600 bg-rose-50', action: () => { setIsAddTransactionModalOpen(true); setShowQuickMenu(false); }, hidden: user?.role !== 'Owner' },
-              { label: 'Sổ tiết kiệm', icon: PiggyBank, color: 'text-amber-600 bg-amber-50', action: () => { setActiveTab('savings'); setShowQuickMenu(false); } },
-              { label: 'Cài Đặt', icon: Settings, color: 'text-slate-600 bg-slate-50', action: () => { setActiveTab('settings'); setShowQuickMenu(false); }, hidden: user?.role !== 'Owner' },
-              { label: 'Đăng Xuất', icon: LogOut, color: 'text-red-600 bg-red-50', action: () => handleLogout() }
-            ].filter(i => !i.hidden).map((item, i) => (
-              <button key={i} onClick={() => item.action()} className="flex flex-col items-center space-y-2 active:scale-90 transition-all">
-                <div className={`w-14 h-14 ${item.color} rounded-xl flex items-center justify-center`}><item.icon className="w-6 h-6" strokeWidth={1.5} /></div>
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter text-center leading-tight">{item.label}</span>
-              </button>
-            ))}
+      {!['savings', 'profile'].includes(activeTab) && (
+        <>
+          {/* FOOTER TAB BAR */}
+          <div className="fixed bottom-0 left-0 right-0 z-[70] pointer-events-none">
+            <div className="bg-white border-t border-slate-100 h-14 flex items-center justify-around px-2 pointer-events-auto shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
+              {[
+                { id: 'dashboard', icon: LayoutDashboard, label: 'Trang chủ' },
+                shouldShowMeterBanner
+                  ? { id: 'meters_list', icon: Boxes, label: 'Chốt số' }
+                  : { id: 'rooms', icon: Home, label: 'Phòng' },
+                { id: 'spacer', icon: null, label: '' },
+                { id: 'bills', icon: FileText, label: 'Hóa đơn' },
+                { id: 'finance', icon: Wallet, label: 'Thu Chi', hidden: !canAccessFinance },
+                { id: 'ai', icon: Sparkles, label: 'AI Chat', hidden: canAccessFinance }
+              ].filter(i => !i.hidden).map((item, i) => (
+                item.id === 'spacer' ? <div key={i} className="w-12" /> : (
+                  <button key={item.id} onClick={() => { setActiveTab(item.id); setSearchQuery(""); }} className={`flex flex-col items-center justify-center px-1 transition-all ${activeTab === item.id ? 'text-blue-600 scale-105' : 'text-slate-400 opacity-60'}`}>
+                    <div className={`p-1.5 rounded-lg ${activeTab === item.id ? 'bg-blue-50 shadow-inner' : ''} flex items-center justify-center`}><item.icon className="w-4.5 h-4.5" strokeWidth={activeTab === item.id ? 3 : 2} /></div>
+                    <span className={`text-[6px] font-black uppercase mt-1 transition-all ${activeTab === item.id ? 'opacity-100' : 'opacity-0'}`}>{item.label}</span>
+                  </button>
+                )
+              ))}
+            </div>
+            <button onClick={() => setShowQuickMenu(!showQuickMenu)} className={`absolute -top-5 left-1/2 -translate-x-1/2 w-14 h-14 rounded-[1.4rem] flex items-center justify-center transition-all duration-500 active:scale-90 pointer-events-auto border-[4px] border-white ${showQuickMenu ? 'bg-slate-800 rotate-45' : 'bg-blue-600'}`}><Plus className="w-7 h-7 text-white stroke-[4px]" /></button>
           </div>
-        </div>
-      </div>
+
+          {/* QUICK MENU */}
+          <div className={`fixed inset-0 z-[500] transition-opacity duration-300 ${showQuickMenu ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowQuickMenu(false)} />
+            <div className={`absolute bottom-0 left-0 right-0 max-w-lg mx-auto bg-white rounded-t-[2.5rem] p-8 pb-36 transition-transform duration-500 transform ${showQuickMenu ? 'translate-y-0' : 'translate-y-full'}`}>
+              <div className="grid grid-cols-3 gap-6">
+                {[
+                  { label: 'Thêm Phòng', icon: UserCheck, color: 'text-emerald-600 bg-emerald-50', action: () => { setEditingRoom(null); setIsAddRoomModalOpen(true); setShowQuickMenu(false); } },
+                  shouldShowMeterBanner
+                    ? { label: 'Phòng', icon: Home, color: 'text-blue-600 bg-blue-50', action: () => { setActiveTab('rooms'); setShowQuickMenu(false); } }
+                    : { label: 'Chốt số điện', icon: Boxes, color: 'text-orange-600 bg-orange-50', action: () => { setActiveTab('meters_list'); setShowQuickMenu(false); } },
+                  { label: 'Hóa Đơn', icon: Receipt, color: 'text-purple-600 bg-purple-50', action: () => { setActiveTab('bills'); setShowQuickMenu(false); } },
+                  { label: 'AI Chat', icon: Sparkles, color: 'text-indigo-600 bg-indigo-50', action: () => { setActiveTab('ai'); setShowQuickMenu(false); } },
+                  { label: 'Thu chi', icon: CircleDollarSign, color: 'text-rose-600 bg-rose-50', action: () => { setIsAddTransactionModalOpen(true); setShowQuickMenu(false); }, hidden: user?.role !== 'Owner' },
+                  { label: 'Cài Đặt', icon: Settings, color: 'text-slate-600 bg-slate-50', action: () => { setActiveTab('settings'); setShowQuickMenu(false); }, hidden: user?.role !== 'Owner' },
+                  { label: 'Đăng Xuất', icon: LogOut, color: 'text-red-600 bg-red-50', action: () => handleLogout() }
+                ].filter(i => !i.hidden).map((item, i) => (
+                  <button key={i} onClick={() => item.action()} className="flex flex-col items-center space-y-2 active:scale-90 transition-all">
+                    <div className={`w-14 h-14 ${item.color} rounded-xl flex items-center justify-center`}><item.icon className="w-6 h-6" strokeWidth={1.5} /></div>
+                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter text-center leading-tight">{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* BIÊN LAI CHI TIẾT VÀ ẢNH HÓA ĐƠN ẨN */}
       {bottomSheet && bottomSheet.type === 'bill' && (
