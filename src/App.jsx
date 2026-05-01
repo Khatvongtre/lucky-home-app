@@ -891,6 +891,7 @@ const App = () => {
     } catch (err) { }
 
     const payload = {
+      id: editingRoom ? editingRoom.id : crypto.randomUUID(),
       houseId: selectedHouse?.id,
       roomCode: fd.get('rid'),
       roomType: fd.get('roomType') || 'room',
