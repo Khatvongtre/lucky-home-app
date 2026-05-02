@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 
 import { toPng } from 'html-to-image';
+import { domToCanvas } from 'modern-screenshot';
 import jsQR from 'jsqr';
 
 // ==========================================
@@ -1198,23 +1199,28 @@ const App = () => {
 
     setIsGeneratingImage(true);
 
-    // Đợi React cập nhật DOM (ẩn ô input giảm giá, thay bằng text tĩnh)
-    await new Promise(r => setTimeout(r, 250));
+    // Đợi 600ms để đảm bảo animation (duration-500) chạy xong hoàn toàn, tránh chụp phải ảnh mờ/trắng
+    await new Promise(r => setTimeout(r, 600));
 
     const el = document.getElementById(`receipt-export-${billData.id}`);
 
     if (!el) {
-      showToast("Giao diện chưa sẵn sàng, vui lòng thử lại sau 1 giây", "error");
+      showToast("Giao diện chưa sẵn sàng, vui lòng thử lại sau", "error");
       setIsGeneratingImage(false);
       return;
     }
 
-    try {
-      // HACK: Thay đổi siêu nhỏ width để bẻ cache của html-to-image
-      const originalWidth = el.style.width;
-      el.style.width = `${el.offsetWidth + Math.random() * 0.01}px`;
+    // KHẮC PHỤC TRIỆT ĐỂ: Kỹ thuật Deep Clone - Tạo bản sao tách biệt khỏi giao diện cũ
+    // Tránh việc trình duyệt lấy nhầm cache ảnh của lần tạo trước đó
+    const clone = el.cloneNode(true);
+    const wrapper = document.createElement('div');
+    Object.assign(wrapper.style, { position: 'absolute', top: '-9999px', left: '-9999px', width: '420px', pointerEvents: 'none' });
+    wrapper.appendChild(clone);
+    document.body.appendChild(wrapper);
 
-      const qrImg = el.querySelector('img');
+    try {
+      // Đảm bảo ảnh QR tải xong
+      const qrImg = clone.querySelector('img');
       if (qrImg && !qrImg.complete) {
         await new Promise((resolve) => {
           qrImg.onload = resolve;
@@ -1222,36 +1228,28 @@ const App = () => {
         });
       }
 
-      await new Promise(r => setTimeout(r, 100));
-
       let canvas = null;
 
+      // Ưu tiên modern-screenshot để xử lý triệt để lỗi lệch CSS & cache ảnh cũ
       try {
-        const dataUrl = await toPng(el, {
-          pixelRatio: 2.5,
-          cacheBust: true,
-          backgroundColor: '#ffffff',
-          style: { opacity: '1' }
+        // Hỗ trợ đợi font chữ load xong để không bị lệch chữ
+        await document.fonts.ready;
+        await new Promise(r => setTimeout(r, 200)); // Đợi thêm một chút để DOM clone ổn định
+
+        canvas = await domToCanvas(clone, {
+          scale: 2.5,
+          backgroundColor: '#ffffff'
         });
-
-        const img = new Image();
-        img.src = dataUrl;
-
-        await new Promise(resolve => { img.onload = resolve; });
-
-        canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        canvas.getContext('2d').drawImage(img, 0, 0);
       } catch (err) {
-        console.warn("toPng lỗi → fallback html2canvas", err);
+        console.warn("modern-screenshot lỗi → fallback html2canvas", err);
       }
 
-      el.style.width = originalWidth;
-
-      if (!canvas) {
-        if (!window.html2canvas) throw new Error("Thiếu html2canvas");
-        canvas = await window.html2canvas(el, { scale: 2.5, useCORS: true, backgroundColor: null });
+      if (!canvas && window.html2canvas) {
+        canvas = await window.html2canvas(clone, {
+          scale: 2.5,
+          useCORS: true,
+          backgroundColor: '#ffffff'
+        });
       }
 
       const cropCanvas = (canvas) => {
@@ -1264,7 +1262,7 @@ const App = () => {
         for (let y = 0; y < height; y++) {
           for (let x = 0; x < width; x++) {
             const i = (y * width + x) * 4;
-            if (data[i + 3] > 0) {
+            if (data[i + 3] > 0) { // Check alpha
               if (top === null) top = y;
               if (left === null || x < left) left = x;
               if (right === null || x > right) right = x;
@@ -1273,8 +1271,12 @@ const App = () => {
           }
         }
 
-        const w = right - left;
-        const h = bottom - top;
+        // Chống crash ngầm nếu ảnh hoàn toàn trong suốt (thường do thư viện lỗi chụp trắng)
+        if (top === null) return canvas;
+
+        const w = right - left + 1;
+        const h = bottom - top + 1;
+
         const cropped = document.createElement('canvas');
         cropped.width = w;
         cropped.height = h;
@@ -1285,6 +1287,9 @@ const App = () => {
 
       const finalCanvas = cropCanvas(canvas);
       const blob = await new Promise(resolve => finalCanvas.toBlob(resolve, 'image/png'));
+
+      if (!blob) throw new Error("Không thể tạo dữ liệu ảnh (Kích thước = 0).");
+
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
       showToast("Đã copy ảnh vào clipboard!", "success");
 
@@ -1292,6 +1297,9 @@ const App = () => {
       console.error(e);
       showToast("Lỗi khi tạo ảnh: " + e.message, "error");
     } finally {
+      if (document.body.contains(wrapper)) {
+        document.body.removeChild(wrapper);
+      }
       setIsGeneratingImage(false);
     }
   };
@@ -3192,14 +3200,12 @@ const App = () => {
 
       {/* BIÊN LAI CHI TIẾT VÀ ẢNH HÓA ĐƠN ẨN */}
       {bottomSheet && bottomSheet.type === 'bill' && (
-        <div className="fixed inset-0 z-[600] flex items-end justify-center">
+        <div className="fixed inset-0 z-[600] flex items-center justify-center">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setBottomSheet(null)} />
-          <div className="bg-white w-full max-w-md rounded-t-xl p-6 pb-12 shadow-2xl animate-in slide-in-from-bottom duration-500 relative max-h-[96vh] flex flex-col no-scrollbar overflow-y-auto">
-            <div className="w-14 h-1.5 bg-slate-100 rounded-full mx-auto mb-6 shrink-0" />
-            <div className="flex justify-between items-center mb-6 shrink-0"><h3 className="text-base font-black uppercase text-slate-900 flex items-center tracking-widest"><Receipt className="w-6 h-6 mr-3 text-blue-600" /> Hóa đơn thu tiền</h3><button onClick={() => setBottomSheet(null)} className="p-2 bg-slate-100 rounded-full text-slate-400"><X className="w-5 h-5" /></button></div>
-
-            <div className="space-y-6 overflow-y-auto no-scrollbar pb-10">
+          <div className="bg-white w-full max-w-lg h-full p-6 shadow-2xl animate-in slide-in-from-bottom duration-500 relative flex flex-col no-scrollbar overflow-hidden">
+            <div className="flex-1 space-y-6 overflow-y-auto no-scrollbar pb-4">
               <div
+                key={`receipt-export-${bottomSheet.data.id}-${bottomSheet.data.total}-${bottomSheet.data.details.discount}`}
                 id={`receipt-export-${bottomSheet.data.id}`}
                 className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm"
                 style={{
@@ -3324,12 +3330,12 @@ const App = () => {
                 </div>
               </div>
 
-              <div className="pb-4 text-center">
+              <div className="pb-4 text-center mt-4">
                 <p className="text-[12px] text-slate-400 font-medium italic">Cảm ơn quý khách đã tin tưởng Lucky Home!</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-4">
+            <div className="grid grid-cols-1 gap-4 shrink-0 mt-4">
               <button disabled={isGeneratingImage} onClick={() => handleShareZaloImage(bottomSheet.data)} className="w-full bg-[#0068FF] text-white py-4 rounded-xl font-black text-[12px] uppercase active:scale-95 border-b-1 border-[#004BBF] flex items-center justify-center gap-2 transition-all disabled:opacity-70">
                 {isGeneratingImage ? <Loader2 className="w-5 h-5 animate-spin" /> : <ImageIcon className="w-5 h-5" />}
                 {isGeneratingImage ? 'ĐANG TẠO ẢNH...' : 'COPY ẢNH CHO ZALO'}
@@ -3339,8 +3345,7 @@ const App = () => {
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleDeleteBill(bottomSheet.data.id)}
-                    className={`bg-red-500 text-white py-4 rounded-xl font-black text-[11px] uppercase active:scale-95 border-b border-red-700 flex items-center justify-center gap-1.5 transition-all ${bottomSheet.data.status === 'pending' ? 'w-1/3' : 'w-full'
-                      }`}
+                    className={`bg-red-500 text-white py-4 rounded-xl font-black text-[11px] uppercase active:scale-95 border-b border-red-700 flex items-center justify-center gap-1.5 transition-all ${bottomSheet.data.status === 'pending' ? 'w-1/3' : 'w-full'}`}
                   >
                     <Trash2 className="w-4 h-4" /> Xóa
                   </button>
@@ -3355,117 +3360,110 @@ const App = () => {
                   )}
                 </div>
               )}
+              <button onClick={() => setBottomSheet(null)} className="w-full bg-slate-100 text-slate-600 py-4 rounded-xl font-black text-[12px] uppercase active:scale-95 flex items-center justify-center gap-2 transition-all border border-slate-200">
+                <X className="w-5 h-5" /> Đóng
+              </button>
             </div>
           </div>
         </div>
-      )
-      }
+      )}
 
       {/* MODALS PHỤ TRỢ (Mở bằng nút + ở Quick Menu hoặc Search Bar) */}
-      {
-        isAddRoomModalOpen && (
-          <Modal title={editingRoom ? "Cập nhật phòng" : "Thêm phòng mới"} onClose={() => setIsAddRoomModalOpen(false)}>
-            <AddRoomForm onSave={handleAddRoom} onDelete={handleDeleteRoom} editingRoom={editingRoom} sharedHeaters={meters.filter(m => m.type === 'heater' && m.houseId === selectedHouse?.id)} formatN={formatN} parseN={parseN} />
-          </Modal>
-        )
-      }
+      {isAddRoomModalOpen && (
+        <Modal title={editingRoom ? "Cập nhật phòng" : "Thêm phòng mới"} onClose={() => setIsAddRoomModalOpen(false)}>
+          <AddRoomForm onSave={handleAddRoom} onDelete={handleDeleteRoom} editingRoom={editingRoom} sharedHeaters={meters.filter(m => m.type === 'heater' && m.houseId === selectedHouse?.id)} formatN={formatN} parseN={parseN} />
+        </Modal>
+      )}
 
-      {
-        mappingMeter && (
-          <Modal title={`Chọn phòng: ${mappingMeter.name}`} onClose={() => setMappingMeter(null)}>
-            <div className="space-y-4 text-left">
-              <p className="text-[10px] font-black text-slate-400 uppercase px-1">Chọn các phòng sử dụng chung công tơ này:</p>
-              <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto no-scrollbar py-2">
-                {rooms.filter(r => r.houseId === selectedHouse?.id).map(r => {
-                  const isSelected = mappingMeter.roomIds.includes(r.id);
-                  return (
-                    <button key={r.id} onClick={() => {
-                      const newIds = isSelected ? mappingMeter.roomIds.filter(id => id !== r.id) : [...mappingMeter.roomIds, r.id];
-                      setMeters(prev => prev.map(m => m.id === mappingMeter.id ? { ...m, roomIds: newIds } : m));
-                      setMappingMeter({ ...mappingMeter, roomIds: newIds });
-                    }} className={`p-3 rounded-xl border-2 font-black text-xs flex justify-between items-center transition-all ${isSelected ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-slate-50 text-slate-400 border-slate-100 hover:border-blue-200'}`}>
-                      <span>Phòng {r.roomCode}</span>{isSelected && <CheckCircle2 className="w-3 h-3" />}
-                    </button>
-                  )
-                })}
-              </div>
-              <button onClick={handleSaveMeterMapping} className="w-full bg-blue-600 text-white py-3.5 rounded-xl font-black uppercase text-[10px] shadow-lg active:scale-95 transition-all border-b-1 border-blue-800 text-center">Hoàn tất</button>
+      {mappingMeter && (
+        <Modal title={`Chọn phòng: ${mappingMeter.name}`} onClose={() => setMappingMeter(null)}>
+          <div className="space-y-4 text-left">
+            <p className="text-[10px] font-black text-slate-400 uppercase px-1">Chọn các phòng sử dụng chung công tơ này:</p>
+            <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto no-scrollbar py-2">
+              {rooms.filter(r => r.houseId === selectedHouse?.id).map(r => {
+                const isSelected = mappingMeter.roomIds.includes(r.id);
+                return (
+                  <button key={r.id} onClick={() => {
+                    const newIds = isSelected ? mappingMeter.roomIds.filter(id => id !== r.id) : [...mappingMeter.roomIds, r.id];
+                    setMeters(prev => prev.map(m => m.id === mappingMeter.id ? { ...m, roomIds: newIds } : m));
+                    setMappingMeter({ ...mappingMeter, roomIds: newIds });
+                  }} className={`p-3 rounded-xl border-2 font-black text-xs flex justify-between items-center transition-all ${isSelected ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-slate-50 text-slate-400 border-slate-100 hover:border-blue-200'}`}>
+                    <span>Phòng {r.roomCode}</span>{isSelected && <CheckCircle2 className="w-3 h-3" />}
+                  </button>
+                )
+              })}
             </div>
-          </Modal>
-        )
-      }
+            <button onClick={handleSaveMeterMapping} className="w-full bg-blue-600 text-white py-3.5 rounded-xl font-black uppercase text-[10px] shadow-lg active:scale-95 transition-all border-b-1 border-blue-800 text-center">Hoàn tất</button>
+          </div>
+        </Modal>
+      )}
 
-      {
-        isAddMeterModalOpen && (
-          <Modal title={editingMeter ? "Cập nhật công tơ" : "Thêm công tơ mới"} onClose={() => { setIsAddMeterModalOpen(false); setEditingMeter(null); }}>
-            <form onSubmit={handleSaveMeter} className="space-y-4 text-left">
-              <div className="space-y-1"><label className="text-[7px] font-black text-slate-400 uppercase px-1">Tên mô tả</label><input name="name" defaultValue={editingMeter?.name || ''} placeholder="VD: BNL Tầng 1" required className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
-              <div className="space-y-1"><label className="text-[7px] font-black text-slate-400 uppercase px-1">Loại thiết bị</label><select name="type" defaultValue={editingMeter?.type || 'electric'} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none appearance-none focus:border-blue-600"><option value="electric">Điện phòng</option><option value="heater">Bình nóng lạnh chung</option></select></div>
-              <div className="space-y-1"><label className="text-[7px] font-black text-slate-400 uppercase px-1">Chỉ số đầu</label><input name="val" type="number" defaultValue={editingMeter?.oldVal || '0'} required className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
-              <div className="flex gap-2 mt-4">
-                {editingMeter && (
-                  <button type="button" onClick={() => handleDeleteMeter(editingMeter.id)} className="flex-1 bg-red-500 text-white py-3.5 rounded-xl font-black uppercase text-[10px] border-b-1 border-red-200 active:translate-y-1 transition-all text-center">Xóa</button>
-                )}
-                <button type="submit" className="flex-[2] bg-orange-600 text-white py-3.5 rounded-xl font-black uppercase text-[10px] border-b-1 border-orange-800 active:translate-y-1 transition-all text-center">{editingMeter ? 'Lưu thay đổi' : 'Tạo công tơ'}</button>
-              </div>
-            </form>
-          </Modal>
-        )
-      }
-
-      {/* MODAL THÊM SỔ TIẾT KIỆM */}
-      {
-        isAddSavingModalOpen && (
-          <Modal title={editingSaving ? "Cập nhật sổ tiết kiệm" : "Thêm sổ tiết kiệm"} onClose={() => setIsAddSavingModalOpen(false)}>
-            <form onSubmit={handleAddSaving} className="space-y-4 text-left p-1">
-              {savingCalc.amount > 0 && savingCalc.rate > 0 && savingCalc.months > 0 && (
-                <div className="p-3.5 bg-emerald-50 border border-emerald-100 rounded-xl flex justify-between items-center animate-in slide-in-from-top-2">
-                  <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Tiền lãi dự tính</span>
-                  <span className="text-base font-black text-emerald-600">+{formatN(Math.round((savingCalc.amount * (savingCalc.rate / 100) * (savingCalc.months / 12))))} đ</span>
-                </div>
+      {isAddMeterModalOpen && (
+        <Modal title={editingMeter ? "Cập nhật công tơ" : "Thêm công tơ mới"} onClose={() => { setIsAddMeterModalOpen(false); setEditingMeter(null); }}>
+          <form onSubmit={handleSaveMeter} className="space-y-4 text-left">
+            <div className="space-y-1"><label className="text-[7px] font-black text-slate-400 uppercase px-1">Tên mô tả</label><input name="name" defaultValue={editingMeter?.name || ''} placeholder="VD: BNL Tầng 1" required className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
+            <div className="space-y-1"><label className="text-[7px] font-black text-slate-400 uppercase px-1">Loại thiết bị</label><select name="type" defaultValue={editingMeter?.type || 'electric'} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none appearance-none focus:border-blue-600"><option value="electric">Điện phòng</option><option value="heater">Bình nóng lạnh chung</option></select></div>
+            <div className="space-y-1"><label className="text-[7px] font-black text-slate-400 uppercase px-1">Chỉ số đầu</label><input name="val" type="number" defaultValue={editingMeter?.oldVal || '0'} required className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
+            <div className="flex gap-2 mt-4">
+              {editingMeter && (
+                <button type="button" onClick={() => handleDeleteMeter(editingMeter.id)} className="flex-1 bg-red-500 text-white py-3.5 rounded-xl font-black uppercase text-[10px] border-b-1 border-red-200 active:translate-y-1 transition-all text-center">Xóa</button>
               )}
+              <button type="submit" className="flex-[2] bg-orange-600 text-white py-3.5 rounded-xl font-black uppercase text-[10px] border-b-1 border-orange-800 active:translate-y-1 transition-all text-center">{editingMeter ? 'Lưu thay đổi' : 'Tạo công tơ'}</button>
+            </div>
+          </form>
+        </Modal>
+      )}
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Ngân hàng / Tên sổ</label>
-                <div className="relative group">
-                  <Landmark className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-amber-500 transition-colors" />
-                  <input type="text" name="bankName" list="bank-names-list" required defaultValue={editingSaving?.bankName} placeholder="VD: Vietcombank, Sổ tiết kiệm 1..." className="w-full pl-10 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-amber-500 shadow-inner" />
-                  <datalist id="bank-names-list">
-                    {uniqueBankNames.map((name, idx) => (
-                      <option key={idx} value={name} />
-                    ))}
-                  </datalist>
-                </div>
+      {isAddSavingModalOpen && (
+        <Modal title={editingSaving ? "Cập nhật sổ tiết kiệm" : "Thêm sổ tiết kiệm"} onClose={() => setIsAddSavingModalOpen(false)}>
+          <form onSubmit={handleAddSaving} className="space-y-4 text-left p-1">
+            {savingCalc.amount > 0 && savingCalc.rate > 0 && savingCalc.months > 0 && (
+              <div className="p-3.5 bg-emerald-50 border border-emerald-100 rounded-xl flex justify-between items-center animate-in slide-in-from-top-2">
+                <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Tiền lãi dự tính</span>
+                <span className="text-base font-black text-emerald-600">+{formatN(Math.round((savingCalc.amount * (savingCalc.rate / 100) * (savingCalc.months / 12))))} đ</span>
               </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Số tiền gửi (VNĐ)</label>
-                <input type="text" name="amount" required defaultValue={editingSaving ? formatN(editingSaving.amount) : ''} onInput={(e) => { e.target.value = formatN(parseN(e.target.value)); setSavingCalc(prev => ({ ...prev, amount: parseN(e.target.value) })); }} placeholder="0" className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-black text-xl text-slate-800 outline-none focus:border-amber-500 shadow-inner" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Lãi suất (%/năm)</label><input type="number" step="0.1" name="interestRate" required defaultValue={editingSaving?.interestRate} onChange={(e) => setSavingCalc(prev => ({ ...prev, rate: Number(e.target.value) }))} placeholder="VD: 5.5" className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-amber-500 shadow-inner" /></div>
-                <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Kỳ hạn (Tháng)</label><input type="number" step="any" name="termMonths" required defaultValue={editingSaving?.termMonths} onChange={(e) => setSavingCalc(prev => ({ ...prev, months: Number(e.target.value) }))} placeholder="VD: 6, hoặc 0.5..." className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-amber-500 shadow-inner" /></div>
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Ngày gửi</label>
-                <input type="date" name="startDate" required defaultValue={getSafeDate(editingSaving?.startDate)} className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-amber-500 shadow-inner" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Ghi chú thêm</label>
-                <textarea name="note" rows="2" defaultValue={editingSaving?.note} placeholder="Tùy chọn..." className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-sm outline-none focus:border-amber-500 shadow-inner resize-none"></textarea>
-              </div>
+            )}
 
-              <div className="flex gap-2 pt-3">
-                {editingSaving && (
-                  <button type="button" onClick={() => handleDeleteSaving(editingSaving.id)} className="flex-1 bg-red-500 text-white py-4 rounded-xl font-black uppercase text-[11px] active:scale-95 border-b-1 border-red-200 transition-all">Xóa sổ</button>
-                )}
-                <button type="submit" className={`flex-[2] text-white py-4 rounded-xl font-black uppercase text-[11px] shadow-lg transition-all active:scale-95 border-b-1 bg-slate-900 border-slate-950 hover:bg-slate-800`}>
-                  {editingSaving ? 'Lưu thay đổi' : 'Thêm sổ tiết kiệm'}
-                </button>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Ngân hàng / Tên sổ</label>
+              <div className="relative group">
+                <Landmark className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-amber-500 transition-colors" />
+                <input type="text" name="bankName" list="bank-names-list" required defaultValue={editingSaving?.bankName} placeholder="VD: Vietcombank, Sổ tiết kiệm 1..." className="w-full pl-10 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-amber-500 shadow-inner" />
+                <datalist id="bank-names-list">
+                  {uniqueBankNames.map((name, idx) => (
+                    <option key={idx} value={name} />
+                  ))}
+                </datalist>
               </div>
-            </form>
-          </Modal>
-        )
-      }
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Số tiền gửi (VNĐ)</label>
+              <input type="text" name="amount" required defaultValue={editingSaving ? formatN(editingSaving.amount) : ''} onInput={(e) => { e.target.value = formatN(parseN(e.target.value)); setSavingCalc(prev => ({ ...prev, amount: parseN(e.target.value) })); }} placeholder="0" className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-black text-xl text-slate-800 outline-none focus:border-amber-500 shadow-inner" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Lãi suất (%/năm)</label><input type="number" step="0.1" name="interestRate" required defaultValue={editingSaving?.interestRate} onChange={(e) => setSavingCalc(prev => ({ ...prev, rate: Number(e.target.value) }))} placeholder="VD: 5.5" className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-amber-500 shadow-inner" /></div>
+              <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Kỳ hạn (Tháng)</label><input type="number" step="any" name="termMonths" required defaultValue={editingSaving?.termMonths} onChange={(e) => setSavingCalc(prev => ({ ...prev, months: Number(e.target.value) }))} placeholder="VD: 6, hoặc 0.5..." className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-amber-500 shadow-inner" /></div>
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Ngày gửi</label>
+              <input type="date" name="startDate" required defaultValue={getSafeDate(editingSaving?.startDate)} className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-amber-500 shadow-inner" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Ghi chú thêm</label>
+              <textarea name="note" rows="2" defaultValue={editingSaving?.note} placeholder="Tùy chọn..." className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-sm outline-none focus:border-amber-500 shadow-inner resize-none"></textarea>
+            </div>
+
+            <div className="flex gap-2 pt-3">
+              {editingSaving && (
+                <button type="button" onClick={() => handleDeleteSaving(editingSaving.id)} className="flex-1 bg-red-500 text-white py-4 rounded-xl font-black uppercase text-[11px] active:scale-95 border-b-1 border-red-200 transition-all">Xóa sổ</button>
+              )}
+              <button type="submit" className={`flex-[2] text-white py-4 rounded-xl font-black uppercase text-[11px] shadow-lg transition-all active:scale-95 border-b-1 bg-slate-900 border-slate-950 hover:bg-slate-800`}>
+                {editingSaving ? 'Lưu thay đổi' : 'Thêm sổ tiết kiệm'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
 
       <style>{`
         .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -3474,7 +3472,7 @@ const App = () => {
         input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
         textarea, input, select { outline: none; }
       `}</style>
-    </div >
+    </div>
   );
 }
 
