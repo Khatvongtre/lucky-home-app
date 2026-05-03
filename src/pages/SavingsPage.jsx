@@ -13,7 +13,6 @@ const SavingsPage = ({
     unselectedSavingsBanks,
     setUnselectedSavingsBanks,
     setEditingSaving,
-    setSavingCalc,
     setIsAddSavingModalOpen,
 }) => {
     return (
@@ -147,7 +146,7 @@ const SavingsPage = ({
                                         const progress = totalDays > 0 ? Math.min(100, (passedDays / totalDays) * 100) : 100;
 
                                         return (
-                                            <div key={s.id} onClick={() => { setEditingSaving(s); setSavingCalc({ amount: s.amount || 0, rate: s.interestRate || 0, months: s.termMonths || 0 }); setIsAddSavingModalOpen(true); }} className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm active:scale-[0.98] transition-all cursor-pointer relative overflow-hidden ml-2 border-l-4 border-l-amber-500">
+                                            <div key={s.id} onClick={() => { setEditingSaving(s); setIsAddSavingModalOpen(true); }} className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm active:scale-[0.98] transition-all cursor-pointer relative overflow-hidden ml-2 border-l-4 border-l-amber-500">
                                                 {isMatured && <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[8px] font-black px-2 py-1 rounded-bl-lg uppercase z-10 shadow-sm">Đã đến hạn</div>}
                                                 <div className="flex justify-between items-center mb-3">
                                                     <div className="flex items-center space-x-3 w-[60%]">

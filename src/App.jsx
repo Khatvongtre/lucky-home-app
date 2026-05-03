@@ -33,96 +33,18 @@ import FinancePage from './pages/FinancePage';
 import SavingsPage from './pages/SavingsPage';
 import AiChatPage from './pages/AiChatPage';
 import ProfilePage from './pages/ProfilePage';
+import AddRoomForm from './components/rooms/AddRoomForm';
+import AddMeterForm from './components/meters/AddMeterForm';
+import AddSavingForm from './components/savings/AddSavingForm';
+import AddTransactionForm from './components/finance/AddTransactionForm';
+import BillReceipt from './components/bills/BillReceipt';
+import AddHouseForm from './components/houses/AddHouseForm';
 
 // ==========================================
 // CẤU HÌNH API BACKEND (.NET 8)
 // ==========================================
 const API_URL = import.meta.env.VITE_API_URL;
 console.log("API URL:", API_URL);
-
-const AddRoomForm = ({ onSave, onDelete, editingRoom, sharedHeaters, formatN, parseN }) => {
-  const [heaterType, setHeaterType] = useState(editingRoom?.heaterMeterId ? 'shared' : 'private');
-  const [status, setStatus] = useState(editingRoom?.status || 'full');
-  const [roomType, setRoomType] = useState(editingRoom?.roomType || 'room');
-
-  return (
-    <form onSubmit={onSave} className="space-y-4 text-left">
-      <div className="space-y-2">
-        <label className="text-[8px] font-black text-slate-400 uppercase px-1">Trạng thái phòng</label>
-        <div className="flex p-1 bg-slate-100 rounded-xl gap-1">
-          <button type="button" onClick={() => setStatus('full')} className={`flex-1 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all ${status === 'full' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-600'}`}>Đã chốt</button>
-          <button type="button" onClick={() => setStatus('empty')} className={`flex-1 py-2.5 rounded-lg text-[10px] font-black uppercase transition-all ${status === 'empty' ? 'bg-red-500 text-white' : 'text-slate-400 hover:text-slate-600'}`}>Đang trống</button>
-        </div>
-        <input type="hidden" name="status" value={status} />
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 text-left">
-        <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Mã phòng / Tên MB</label><input name="rid" defaultValue={editingRoom?.roomCode || editingRoom?.id || ''} required className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
-        <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Giá thuê</label><input name="price" type="text" defaultValue={formatN(editingRoom?.price || 0)} required className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-black text-xs outline-none focus:border-blue-600" onInput={(e) => e.target.value = formatN(parseN(e.target.value))} /></div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 text-left">
-        <div className="space-y-1">
-          <label className="text-[8px] font-black text-slate-400 uppercase px-1">Loại hình</label>
-          <select name="roomType" value={roomType} onChange={(e) => setRoomType(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600 appearance-none">
-            <option value="room">Phòng trọ</option>
-            <option value="mbkd">Mặt bằng kinh doanh</option>
-          </select>
-        </div>
-        {roomType === 'mbkd' && (
-          <div className="space-y-1 animate-in zoom-in-95">
-            <label className="text-[8px] font-black text-slate-400 uppercase px-1">Phí DV hàng tháng</label>
-            <input name="monthlyFee" type="text" defaultValue={formatN(editingRoom?.monthlyFee || 0)} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-black text-xs outline-none focus:border-blue-600 text-blue-700" onInput={(e) => e.target.value = formatN(parseN(e.target.value))} placeholder="Thu hàng tháng" />
-          </div>
-        )}
-      </div>
-
-      <div className={`grid grid-cols-2 gap-3 text-left transition-all duration-300 ${status === 'empty' ? 'opacity-40 grayscale pointer-events-none' : ''}`}>
-        <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Số cư dân</label><input name="people" type="number" defaultValue={editingRoom?.peopleCount ?? editingRoom?.people ?? 2} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
-        <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Xe điện</label><input name="ebikes" type="number" defaultValue={editingRoom?.eBikeCount ?? editingRoom?.eBikes ?? 0} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
-      </div>
-
-      <div className={`space-y-1 text-left transition-all duration-300 ${status === 'empty' ? 'opacity-40 grayscale pointer-events-none' : ''}`}>
-        <label className="text-[8px] font-black text-slate-400 uppercase px-1">Ngày ký HĐ</label>
-        <input name="start" type="date" defaultValue={getSafeDate(editingRoom?.contractStart)} required={status === 'full'} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" />
-      </div>
-
-      <div className={`grid grid-cols-2 gap-3 text-left transition-all duration-300 ${status === 'empty' ? 'opacity-40 grayscale pointer-events-none' : ''}`}>
-        <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Hạn đóng (Ngày)</label><input name="payDay" type="number" defaultValue={editingRoom?.paymentDate || 5} min="1" max="31" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
-        <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Thời hạn (Tháng)</label><input name="months" type="number" defaultValue={editingRoom?.months || 12} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
-      </div>
-
-      <div className="space-y-1 text-left">
-        <label className="text-[8px] font-black text-slate-400 uppercase px-1">Công tơ BNL</label>
-        <select name="heaterType" value={heaterType} onChange={(e) => setHeaterType(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600 appearance-none">
-          <option value="private">Dùng riêng / Không có</option>
-          <option value="shared">Dùng chung tổng</option>
-        </select>
-      </div>
-
-      {heaterType === 'shared' && (
-        <div className="space-y-1 animate-in slide-in-from-top-2 text-left">
-          <label className="text-[8px] font-black text-blue-600 uppercase px-1">Chọn công tơ tổng</label>
-          <select name="heaterMeterId" defaultValue={editingRoom?.heaterMeterId || ''} className="w-full p-3 bg-blue-50 border border-blue-200 rounded-xl font-black text-xs outline-none focus:border-blue-600 text-blue-700">
-            {sharedHeaters && sharedHeaters.map(m => <option key={m.id} value={m.id}>{m.name} ({m.id})</option>)}
-            {(!sharedHeaters || sharedHeaters.length === 0) && <option value="">Không có công tơ BNL nào</option>}
-          </select>
-        </div>
-      )}
-
-      <div className="flex gap-2 mt-4">
-        {editingRoom && (
-          <button type="button" onClick={() => onDelete(editingRoom.id, editingRoom.roomCode)} className="flex-1 bg-red-500 text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest border-b-1 border-red-200 active:translate-y-1 transition-all text-center">
-            Xóa
-          </button>
-        )}
-        <button type="submit" className="flex-[2] bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest border-b-1 border-blue-800 active:translate-y-1 transition-all text-center">
-          {status === 'full' ? 'Lưu phòng' : 'Lưu phòng trống'}
-        </button>
-      </div>
-    </form>
-  );
-};
 
 // ==========================================
 // ỨNG DỤNG CHÍNH
@@ -166,7 +88,6 @@ const App = () => {
   const [savings, setSavings] = useState([]);
   const [isAddSavingModalOpen, setIsAddSavingModalOpen] = useState(false);
   const [editingSaving, setEditingSaving] = useState(null);
-  const [savingCalc, setSavingCalc] = useState({ amount: 0, rate: 0, months: 0 });
   const [sharingHouse, setSharingHouse] = useState(null);
   const [assignForm, setAssignForm] = useState({ username: '', role: 'Manager' });
   const [selectedStatsHouses, setSelectedStatsHouses] = useState([]);
@@ -1487,29 +1408,7 @@ const App = () => {
 
         {isAiCreateHouseOpen && (
           <Modal title={editingHouse ? "SỬA THÔNG TIN CƠ SỞ" : "TẠO CƠ SỞ MỚI"} onClose={() => { setIsAiCreateHouseOpen(false); setEditingHouse(null); }}>
-            <form onSubmit={handleAddHouse} className="space-y-4 text-left">
-              <div className="space-y-3">
-                <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Tên Cơ Sở</label><input name="name" defaultValue={editingHouse?.name || ''} required placeholder="VD: Lucky Cầu Giấy" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
-                <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">Địa chỉ</label><input name="address" defaultValue={editingHouse?.address || ''} required placeholder="VD: Số 10, Ngõ 12..." className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
-              </div>
-              <div className="mt-4 pt-4 border-t-2 border-dashed border-slate-200">
-                <h4 className="text-[10px] font-black text-blue-600 uppercase mb-3 flex items-center tracking-widest"><FileText className="w-3.5 h-3.5 mr-1" /> Thông tin hợp đồng thuê</h4>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1 col-span-2"><label className="text-[8px] font-black text-slate-400 uppercase px-1">1. Giá thuê nhà / tháng</label><input name="rentPrice" defaultValue={formatN(editingHouse?.rentPrice || '')} onInput={(e) => e.target.value = formatN(parseN(e.target.value))} placeholder="VD: 15.000.000" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-black text-xs outline-none focus:border-blue-600 text-blue-700" /></div>
-                  <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">2. Ngày bắt đầu</label><input type="date" name="startDate" defaultValue={getSafeDate(editingHouse?.startDate || '')} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
-                  <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">3. Thời hạn thuê (Tháng)</label><input type="number" name="leaseTerm" defaultValue={editingHouse?.leaseTerm || ''} placeholder="VD: 60" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
-                  <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">4. Tiền cọc</label><input name="deposit" defaultValue={formatN(editingHouse?.deposit || '')} onInput={(e) => e.target.value = formatN(parseN(e.target.value))} placeholder="VD: 30.000.000" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
-                  <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">5. Đóng tiền mấy tháng/lần</label><input type="number" name="paymentPeriod" defaultValue={editingHouse?.paymentPeriod || 1} placeholder="VD: 3" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
-                  <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">6. Ngày đóng hàng tháng</label><input type="number" name="paymentDay" min="1" max="31" defaultValue={editingHouse?.paymentDay || 5} placeholder="VD: 5" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
-                  <div className="space-y-1"><label className="text-[8px] font-black text-slate-400 uppercase px-1">7. Phí Internet / tháng</label><input name="internetFee" defaultValue={formatN(editingHouse?.internetFee || '')} onInput={(e) => e.target.value = formatN(parseN(e.target.value))} placeholder="VD: 250.000" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
-                  <div className="space-y-1 col-span-2"><label className="text-[8px] font-black text-slate-400 uppercase px-1">8. Chi phí khác</label><input name="otherFees" defaultValue={formatN(editingHouse?.otherFees || '')} onInput={(e) => e.target.value = formatN(parseN(e.target.value))} placeholder="VD: 100.000" className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
-                  <div className="space-y-1 col-span-2"><label className="text-[8px] font-black text-slate-400 uppercase px-1">9. Ghi chú</label><textarea name="notes" defaultValue={editingHouse?.notes || ''} rows="2" placeholder="Ghi chú thêm..." className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600 resize-none" /></div>
-                </div>
-              </div>
-              <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-[11px] flex items-center justify-center gap-2 border-b-1 border-blue-800 text-center mt-4">
-                <Save className="w-4 h-4" /> {editingHouse ? "Lưu thay đổi" : "Khởi tạo cơ sở"}
-              </button>
-            </form>
+            <AddHouseForm editingHouse={editingHouse} onSubmit={handleAddHouse} />
           </Modal>
         )}
 
@@ -1681,7 +1580,7 @@ const App = () => {
             if (activeTab === 'rooms') { setEditingRoom(null); setIsAddRoomModalOpen(true); }
             if (activeTab === 'finance') setIsAddTransactionModalOpen(true);
             if (activeTab === 'meters_list') setIsAddMeterModalOpen(true);
-            if (activeTab === 'savings') { setEditingSaving(null); setSavingCalc({ amount: 0, rate: 0, months: 0 }); setIsAddSavingModalOpen(true); }
+            if (activeTab === 'savings') { setEditingSaving(null); setIsAddSavingModalOpen(true); }
           }} className="p-1.5 bg-blue-600 text-white rounded-lg active:scale-90 transition-all flex items-center justify-center">
             <Plus className="w-4.5 h-4.5" strokeWidth={4} />
           </button>
@@ -1765,7 +1664,6 @@ const App = () => {
           unselectedSavingsBanks={unselectedSavingsBanks}
           setUnselectedSavingsBanks={setUnselectedSavingsBanks}
           setEditingSaving={setEditingSaving}
-          setSavingCalc={setSavingCalc}
           setIsAddSavingModalOpen={setIsAddSavingModalOpen}
         />
         }
@@ -1934,96 +1832,18 @@ const App = () => {
 
         {isAddTransactionModalOpen && (
           <Modal title="Ghi sổ thu chi" onClose={() => setIsAddTransactionModalOpen(false)}>
-            <form onSubmit={handleAddTx} className="space-y-5 text-left p-1">
-              <div className="bg-slate-100 p-1.5 rounded-xl flex gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setTxType('in')}
-                  className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase transition-all flex items-center justify-center gap-2 ${txType === 'in' ? 'bg-white text-emerald-600' : 'text-slate-400'}`}
-                >
-                  <div className={`w-2 h-2 rounded-full ${txType === 'in' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
-                  Thu vào (+)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTxType('out')}
-                  className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase transition-all flex items-center justify-center gap-2 ${txType === 'out' ? 'bg-white text-rose-600' : 'text-slate-400'}`}
-                >
-                  <div className={`w-2 h-2 rounded-full ${txType === 'out' ? 'bg-rose-500 animate-pulse' : 'bg-slate-300'}`} />
-                  Chi ra (-)
-                </button>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Số tiền (VND)</label>
-                <div className="relative">
-                  <input
-                    type="text" name="amount" required placeholder="0"
-                    defaultValue={editingTransaction ? formatN(editingTransaction.amount) : ''}
-                    className={`w-full p-4 bg-slate-50 rounded-xl font-black text-2xl outline-none border-2 transition-all shadow-inner tabular-nums ... (giữ nguyên style cũ)`}
-                    onInput={(e) => { e.target.value = formatN(parseN(e.target.value)); }}
-                  />
-                  <span className="absolute right-5 top-1/2 -translate-y-1/2 font-black text-slate-300 text-sm">đ</span>
-                </div>
-              </div>
-
-              <div className="space-y-2 relative">
-                <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Danh mục</label>
-
-                <button
-                  type="button"
-                  onClick={() => setIsCatOpen(!isCatOpen)}
-                  className="w-full p-4 bg-slate-50 rounded-xl font-bold text-sm text-left flex justify-between items-center border-2 border-transparent hover:border-slate-200 transition-all shadow-inner active:scale-[0.99]"
-                >
-                  <span className="text-slate-700">
-                    {TRANSACTION_CATEGORIES[selectedCat]?.label || TRANSACTION_CATEGORIES['RENT'].label}
-                  </span>
-                  <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-300 ${isCatOpen ? 'rotate-180' : ''}`} />
-                </button>
-
-                {isCatOpen && (
-                  <>
-                    <div className="fixed inset-0 z-[60]" onClick={() => setIsCatOpen(false)}></div>
-                    <div className="absolute left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-2xl z-[70] overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-top">
-                      <div className="max-h-60 overflow-y-auto p-1">
-                        {Object.keys(TRANSACTION_CATEGORIES).map((key) => (
-                          <button
-                            key={key}
-                            type="button"
-                            onClick={() => { setSelectedCat(key); setIsCatOpen(false); }}
-                            className={`w-full px-4 py-3.5 text-left text-sm font-bold flex justify-between items-center transition-colors rounded-xl mb-0.5 last:mb-0 ${selectedCat === key ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50 hover:text-blue-500'}`}
-                          >
-                            <span>{TRANSACTION_CATEGORIES[key].label}</span>
-                            {selectedCat === key && <Check className="w-4 h-4 text-blue-600" />}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Nội dung chi tiết</label>
-                <textarea
-                  name="note" rows="2" placeholder="Ghi chú thêm..."
-                  defaultValue={editingTransaction?.note || ''}
-                  className="w-full p-4 bg-slate-50 rounded-xl font-bold text-sm outline-none border-2 border-transparent focus:border-blue-600/20 shadow-inner resize-none"
-                />
-              </div>
-
-              <div className="flex gap-2 pt-3">
-                {editingTransaction && canManageTransactions && (
-                  <button type="button" onClick={() => handleDeleteTransaction(editingTransaction.id)} className="flex-1 bg-red-500 text-white py-4 rounded-xl font-black uppercase text-[11px] active:scale-95 border-b-1 border-red-200">Xóa</button>
-                )}
-                <button type="submit" className={`flex-[2] text-white py-4 rounded-xl font-black uppercase text-[11px] transition-all active:scale-95 border-b-1 ${txType === 'in' ? 'bg-emerald-600 border-emerald-800' : 'bg-rose-600 border-rose-800'}`}>
-                  {editingTransaction ? 'Lưu thay đổi' : 'Xác nhận'}
-                </button>
-              </div>
-
-              <input type="hidden" name="type" value={txType} />
-              <input type="hidden" name="category" value={TRANSACTION_CATEGORIES[selectedCat]?.id ?? 0} />
-            </form>
+            <AddTransactionForm
+              onSave={handleAddTx}
+              onDelete={handleDeleteTransaction}
+              editingTransaction={editingTransaction}
+              canManageTransactions={canManageTransactions}
+              txType={txType}
+              setTxType={setTxType}
+              selectedCat={selectedCat}
+              setSelectedCat={setSelectedCat}
+              isCatOpen={isCatOpen}
+              setIsCatOpen={setIsCatOpen}
+            />
           </Modal>
         )}
 
@@ -2093,189 +1913,26 @@ const App = () => {
 
 
       {/* BIÊN LAI CHI TIẾT VÀ ẢNH HÓA ĐƠN ẨN */}
-      {bottomSheet && bottomSheet.type === 'bill' && (
-        <div className="fixed inset-0 z-[600] flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setBottomSheet(null)} />
-          <div className="bg-white w-full max-w-lg h-full sm:p-6 shadow-2xl animate-in slide-in-from-bottom duration-500 relative flex flex-col no-scrollbar overflow-hidden">
-            <div className="flex-1 overflow-y-auto no-scrollbar">
-              <div
-                key={`receipt-export-${bottomSheet.data.id}-${bottomSheet.data.total}-${bottomSheet.data.details.discount}`}
-                id={`receipt-export-${bottomSheet.data.id}`}
-                className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm mx-auto"
-                style={{
-                  width: '100%',
-                  maxWidth: '420px',
-                  fontFamily: 'Arial, Helvetica, sans-serif',
-                  WebkitFontSmoothing: 'antialiased',
-                }}
-              >
-                {/* Header */}
-                <div className="bg-gradient-to-r from-blue-700 to-blue-500 text-white p-4 text-center">
-                  <div className="flex items-center justify-center gap-3 mb-0.5">
-                    <h1 className="text-2xl font-black uppercase tracking-tight">
-                      Lucky Home
-                    </h1>
-                  </div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest opacity-80">
-                    Hóa đơn thanh toán
-                  </p>
-                </div>
-
-                <div className="p-4 space-y-3">
-                  {/* 1. Thông tin phòng & Kỳ thanh toán */}
-                  <div className="bg-blue-50/50 border border-blue-100 p-3 rounded-xl flex justify-between items-center">
-                    <div>
-                      <p className="text-[9px] font-bold text-blue-500 uppercase mb-0.5 tracking-widest">Phòng</p>
-                      <p className="text-xl font-black text-blue-700 leading-none">{bottomSheet.data.roomId}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-[9px] font-bold text-blue-500 uppercase mb-0.5 tracking-widest">Kỳ thanh toán</p>
-                      <p className="text-base font-black text-blue-700 leading-none">{bottomSheet.data.currentMonthFull}</p>
-                    </div>
-                  </div>
-
-                  {/* 2. Chi tiết các khoản phí */}
-                  <div className="border border-slate-200 rounded-xl px-3 py-1 bg-white">
-                    <div className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200">
-                      <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Tiền phòng</span>
-                      <span className="text-[13px] font-black text-slate-800">{formatN(bottomSheet.data.details.rent)}</span>
-                    </div>
-
-                    <div className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200">
-                      <div className="flex flex-col">
-                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight leading-tight">Tiền điện riêng</span>
-                        <p className="text-[9px] text-blue-500 font-semibold leading-tight mt-0.5">
-                          Số: {bottomSheet.data.meter?.old} → {bottomSheet.data.meter?.new} <span className="text-blue-600">({bottomSheet.data.meter?.new - bottomSheet.data.meter?.old} số)</span>
-                        </p>
-                      </div>
-                      <span className="text-[13px] font-black text-slate-800">{formatN(bottomSheet.data.details.elec)}</span>
-                    </div>
-
-                    {bottomSheet.data.heaterMeter && (
-                      <div className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200">
-                        <div className="flex flex-col">
-                          <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight leading-tight">Điện BNL Chung</span>
-                          <p className="text-[9px] text-rose-500 font-semibold leading-tight mt-0.5">
-                            Số: {bottomSheet.data.heaterMeter.old} → {bottomSheet.data.heaterMeter.new} <span className="text-rose-600">({bottomSheet.data.heaterMeter.new - bottomSheet.data.heaterMeter.old} số)</span>
-                          </p>
-                        </div>
-                        <span className="text-[13px] font-black text-slate-800">{formatN(bottomSheet.data.details.heater)}</span>
-                      </div>
-                    )}
-
-                    {[
-                      { label: "Tiền nước", val: bottomSheet.data.details.water },
-                      { label: "Phí dịch vụ", val: bottomSheet.data.details.service || 0 },
-                      { label: "Internet", val: bottomSheet.data.details.internet || 0 },
-                      { label: "Xe điện", val: bottomSheet.data.details.ebikes || 0 }
-                    ].map((item, idx) => (
-                      <div key={idx} className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200 last:border-0">
-                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">{item.label}</span>
-                        <span className="text-[13px] font-black text-slate-800">{formatN(item.val)}</span>
-                      </div>
-                    ))}
-
-                    {bottomSheet.data.details.monthlyFee > 0 && (
-                      <div className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200 last:border-0">
-                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Phí DV Hàng tháng (MBKD)</span>
-                        <span className="text-[13px] font-black text-slate-800">{formatN(bottomSheet.data.details.monthlyFee)}</span>
-                      </div>
-                    )}
-
-                    <div className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200 last:border-0">
-                      <span className="text-[11px] font-bold text-red-500 uppercase tracking-tight">Giảm giá</span>
-                      {bottomSheet.data.status === 'pending' && isManagerOrAbove && !isGeneratingImage ? (
-                        <div className="flex items-center space-x-1 border-b border-dashed border-red-200 pb-0.5">
-                          <span className="text-red-500 font-bold">-</span>
-                          <input
-                            type="text"
-                            value={formatN(bottomSheet.data.details.discount || 0)}
-                            onChange={(e) => handleDiscountChange(bottomSheet.data.id, e.target.value)}
-                            onBlur={(e) => handleDiscountBlur(bottomSheet.data.id, parseN(e.target.value))}
-                            className="w-16 text-right bg-transparent text-red-600 font-black outline-none text-[13px]"
-                          />
-                        </div>
-                      ) : (
-                        <span className="text-[13px] font-black text-red-600">-{formatN(bottomSheet.data.details.discount || 0)}</span>
-                      )}
-                    </div>
-                    <div className="bg-indigo-600 p-3 rounded-lg text-white mb-2 mt-2 shadow-sm flex items-center justify-between">
-                      <p className="text-[11px] font-bold uppercase tracking-widest opacity-80">
-                        Tổng thanh toán
-                      </p>
-                      <p className="text-xl font-black leading-none tabular-nums">
-                        {formatN(bottomSheet.data.total)}
-                        <span className="text-[11px] opacity-80 font-bold ml-1">đ</span>
-                      </p>
-                    </div>
-                  </div>
-                  {/* 3. Tổng tiền & Chuyển khoản (Cân bằng & Sát viền) */}
-                  <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl flex items-stretch gap-3">
-                    <div className="flex-1 flex flex-col justify-between">
-
-                      <div className="px-1">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Thông tin chuyển khoản</p>
-                        <p className="text-[15px] font-black text-purple-700 uppercase leading-tight truncate mt-5">{config.bankName || "MB BANK"}</p>
-                        <p className="text-[20px] font-black text-blue-600 tracking-tighter leading-tight mt-1">{config.bankAcc || "0000"}</p>
-                      </div>
-                    </div>
-                    <div className="w-[100px] h-[100px] bg-white rounded-lg border border-slate-200 p-1 flex items-center justify-center shrink-0 shadow-sm self-end">
-                      <img
-                        key={`qr-${bottomSheet.data.id}`}
-                        src={`${API_URL}/vietqr/generate?bankBin=${config.bankBin || '970422'}&bankAcc=${config.bankAcc || '0'}&amount=${bottomSheet.data.total}&addInfo=${encodeURIComponent(`P${bottomSheet.data.roomId} ${bottomSheet.data.currentMonthFull}`)}&t=${bottomSheet.data.id}-${bottomSheet.data.total}`}
-                        className="w-full h-full object-contain rounded-md"
-                        crossOrigin="anonymous"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pb-3 text-center mt-1">
-                  <p className="text-[10px] text-slate-400 font-semibold italic">Cảm ơn quý khách đã tin tưởng Lucky Home!</p>
-                </div>
-              </div>
-
-            </div>
-
-            {/* Các Nút Thao Tác (Cố định ở dưới cùng) */}
-            <div className="grid grid-cols-1 gap-3 shrink-0 mt-4 p-2 pt-4 border-t border-slate-100 w-full max-w-[420px] mx-auto">
-              <button disabled={isGeneratingImage} onClick={() => handleShareZaloImage(bottomSheet.data)} className="w-full bg-[#0068FF] text-white py-3.5 rounded-xl font-black text-[11px] uppercase active:scale-95 border-b-2 border-[#004BBF] flex items-center justify-center gap-2 transition-all disabled:opacity-70 shadow-sm">
-                {isGeneratingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
-                {isGeneratingImage ? 'ĐANG TẠO ẢNH...' : 'COPY ẢNH CHO ZALO'}
-              </button>
-
-              {isOwnerOrAdmin && (
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleDeleteBill(bottomSheet.data.id)}
-                    className={`bg-red-500 text-white py-3.5 rounded-xl font-black text-[10px] uppercase active:scale-95 border-b-2 border-red-700 flex items-center justify-center gap-1.5 transition-all shadow-sm ${bottomSheet.data.status === 'pending' ? 'w-1/3' : 'w-full'}`}
-                  >
-                    <Trash2 className="w-4 h-4" /> Xóa
-                  </button>
-
-                  {bottomSheet.data.status === 'pending' && (
-                    <button
-                      onClick={() => handlePayBill(bottomSheet.data.id)}
-                      className="flex-1 bg-emerald-600 text-white py-3.5 rounded-xl font-black text-[10px] uppercase active:scale-95 border-b-2 border-emerald-800 flex items-center justify-center gap-1.5 transition-all shadow-sm"
-                    >
-                      <CheckCircle2 className="w-4 h-4" /> Xác Nhận Đã Thu
-                    </button>
-                  )}
-                </div>
-              )}
-              <button onClick={() => setBottomSheet(null)} className="w-full bg-slate-100 text-slate-600 py-3.5 rounded-xl font-black text-[11px] uppercase active:scale-95 flex items-center justify-center gap-2 transition-all border border-slate-200 shadow-sm">
-                <X className="w-4 h-4" /> Đóng
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <BillReceipt
+        bottomSheet={bottomSheet}
+        setBottomSheet={setBottomSheet}
+        config={config}
+        API_URL={API_URL}
+        isManagerOrAbove={isManagerOrAbove}
+        isOwnerOrAdmin={isOwnerOrAdmin}
+        isGeneratingImage={isGeneratingImage}
+        handleDiscountChange={handleDiscountChange}
+        handleDiscountBlur={handleDiscountBlur}
+        handleShareZaloImage={handleShareZaloImage}
+        handleDeleteBill={handleDeleteBill}
+        handlePayBill={handlePayBill}
+      />
 
 
       {/* MODALS PHỤ TRỢ (Mở bằng nút + ở Quick Menu hoặc Search Bar) */}
       {isAddRoomModalOpen && (
         <Modal title={editingRoom ? "Cập nhật phòng" : "Thêm phòng mới"} onClose={() => setIsAddRoomModalOpen(false)}>
-          <AddRoomForm onSave={handleAddRoom} onDelete={handleDeleteRoom} editingRoom={editingRoom} sharedHeaters={meters.filter(m => m.type === 'heater' && m.houseId === selectedHouse?.id)} formatN={formatN} parseN={parseN} />
+          <AddRoomForm onSave={handleAddRoom} onDelete={handleDeleteRoom} editingRoom={editingRoom} sharedHeaters={meters.filter(m => m.type === 'heater' && m.houseId === selectedHouse?.id)} />
         </Modal>
       )}
 
@@ -2304,68 +1961,13 @@ const App = () => {
 
       {isAddMeterModalOpen && (
         <Modal title={editingMeter ? "Cập nhật công tơ" : "Thêm công tơ mới"} onClose={() => { setIsAddMeterModalOpen(false); setEditingMeter(null); }}>
-          <form onSubmit={handleSaveMeter} className="space-y-4 text-left">
-            <div className="space-y-1"><label className="text-[7px] font-black text-slate-400 uppercase px-1">Tên mô tả</label><input name="name" defaultValue={editingMeter?.name || ''} placeholder="VD: BNL Tầng 1" required className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
-            <div className="space-y-1"><label className="text-[7px] font-black text-slate-400 uppercase px-1">Loại thiết bị</label><select name="type" defaultValue={editingMeter?.type || 'electric'} className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none appearance-none focus:border-blue-600"><option value="electric">Điện phòng</option><option value="heater">Bình nóng lạnh chung</option></select></div>
-            <div className="space-y-1"><label className="text-[7px] font-black text-slate-400 uppercase px-1">Chỉ số đầu</label><input name="val" type="number" defaultValue={editingMeter?.oldVal || '0'} required className="w-full p-3 bg-slate-50 border border-slate-100 rounded-xl font-bold text-xs outline-none focus:border-blue-600" /></div>
-            <div className="flex gap-2 mt-4">
-              {editingMeter && (
-                <button type="button" onClick={() => handleDeleteMeter(editingMeter.id)} className="flex-1 bg-red-500 text-white py-3.5 rounded-xl font-black uppercase text-[10px] border-b-1 border-red-200 active:translate-y-1 transition-all text-center">Xóa</button>
-              )}
-              <button type="submit" className="flex-[2] bg-orange-600 text-white py-3.5 rounded-xl font-black uppercase text-[10px] border-b-1 border-orange-800 active:translate-y-1 transition-all text-center">{editingMeter ? 'Lưu thay đổi' : 'Tạo công tơ'}</button>
-            </div>
-          </form>
+          <AddMeterForm onSave={handleSaveMeter} onDelete={handleDeleteMeter} editingMeter={editingMeter} />
         </Modal>
       )}
 
       {isAddSavingModalOpen && (
         <Modal title={editingSaving ? "Cập nhật sổ tiết kiệm" : "Thêm sổ tiết kiệm"} onClose={() => setIsAddSavingModalOpen(false)}>
-          <form onSubmit={handleAddSaving} className="space-y-4 text-left p-1">
-            {savingCalc.amount > 0 && savingCalc.rate > 0 && savingCalc.months > 0 && (
-              <div className="p-3.5 bg-emerald-50 border border-emerald-100 rounded-xl flex justify-between items-center animate-in slide-in-from-top-2">
-                <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Tiền lãi dự tính</span>
-                <span className="text-base font-black text-emerald-600">+{formatN(Math.round((savingCalc.amount * (savingCalc.rate / 100) * (savingCalc.months / 12))))} đ</span>
-              </div>
-            )}
-
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Ngân hàng / Tên sổ</label>
-              <div className="relative group">
-                <Landmark className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-amber-500 transition-colors" />
-                <input type="text" name="bankName" list="bank-names-list" required defaultValue={editingSaving?.bankName} placeholder="VD: Vietcombank, Sổ tiết kiệm 1..." className="w-full pl-10 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-amber-500 shadow-inner" />
-                <datalist id="bank-names-list">
-                  {uniqueBankNames.map((name, idx) => (
-                    <option key={idx} value={name} />
-                  ))}
-                </datalist>
-              </div>
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Số tiền gửi (VNĐ)</label>
-              <input type="text" name="amount" required defaultValue={editingSaving ? formatN(editingSaving.amount) : ''} onInput={(e) => { e.target.value = formatN(parseN(e.target.value)); setSavingCalc(prev => ({ ...prev, amount: parseN(e.target.value) })); }} placeholder="0" className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-black text-xl text-slate-800 outline-none focus:border-amber-500 shadow-inner" />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Lãi suất (%/năm)</label><input type="number" step="0.1" name="interestRate" required defaultValue={editingSaving?.interestRate} onChange={(e) => setSavingCalc(prev => ({ ...prev, rate: Number(e.target.value) }))} placeholder="VD: 5.5" className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-amber-500 shadow-inner" /></div>
-              <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Kỳ hạn (Tháng)</label><input type="number" step="any" name="termMonths" required defaultValue={editingSaving?.termMonths} onChange={(e) => setSavingCalc(prev => ({ ...prev, months: Number(e.target.value) }))} placeholder="VD: 6, hoặc 0.5..." className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-amber-500 shadow-inner" /></div>
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Ngày gửi</label>
-              <input type="date" name="startDate" required defaultValue={getSafeDate(editingSaving?.startDate)} className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-amber-500 shadow-inner" />
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Ghi chú thêm</label>
-              <textarea name="note" rows="2" defaultValue={editingSaving?.note} placeholder="Tùy chọn..." className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-sm outline-none focus:border-amber-500 shadow-inner resize-none"></textarea>
-            </div>
-
-            <div className="flex gap-2 pt-3">
-              {editingSaving && (
-                <button type="button" onClick={() => handleDeleteSaving(editingSaving.id)} className="flex-1 bg-red-500 text-white py-4 rounded-xl font-black uppercase text-[11px] active:scale-95 border-b-1 border-red-200 transition-all">Xóa sổ</button>
-              )}
-              <button type="submit" className={`flex-[2] text-white py-4 rounded-xl font-black uppercase text-[11px] shadow-lg transition-all active:scale-95 border-b-1 bg-slate-900 border-slate-950 hover:bg-slate-800`}>
-                {editingSaving ? 'Lưu thay đổi' : 'Thêm sổ tiết kiệm'}
-              </button>
-            </div>
-          </form>
+          <AddSavingForm onSave={handleAddSaving} onDelete={handleDeleteSaving} editingSaving={editingSaving} uniqueBankNames={uniqueBankNames} />
         </Modal>
       )}
 
