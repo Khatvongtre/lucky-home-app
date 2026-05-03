@@ -4,40 +4,9 @@ export const exportToClipboard = async (elementId) => {
     const el = document.getElementById(elementId);
     if (!el) throw new Error("Giao diện chưa sẵn sàng, vui lòng thử lại sau");
 
-    // 1. Lấy chính xác kích thước thực tế đang hiển thị trên màn hình
-    const width = el.offsetWidth;
-
-    // 2. Clone phần tử
-    const clone = el.cloneNode(true);
-    const wrapper = document.createElement('div');
-
-    // 3. Đặt wrapper ở chế độ absolute, đẩy hoàn toàn ra khỏi khung nhìn để tránh bị đè layout trên mobile
-    Object.assign(wrapper.style, {
-        position: 'absolute',
-        top: '-9999px',
-        left: '-9999px',
-        width: `${width}px`,
-        zIndex: -1000,
-        pointerEvents: 'none',
-        margin: '0'
-    });
-
-    // 4. Ép kích thước clone chính xác bằng phần tử gốc, xóa margin auto để không bị lệch
-    Object.assign(clone.style, {
-        margin: '0',
-        width: `${width}px`,
-        height: 'auto', // Để auto để khung tự giãn nếu font chữ trên điện thoại bẻ dòng khác PC
-        maxWidth: 'none',
-        transform: 'none',
-        boxShadow: 'none'
-    });
-
-    wrapper.appendChild(clone);
-    document.body.appendChild(wrapper);
-
     try {
-        // Đợi tất cả ảnh (QR code) tải xong
-        const images = Array.from(clone.querySelectorAll('img'));
+        // Đợi tất cả ảnh (như QR code) tải xong trực tiếp trên giao diện gốc
+        const images = Array.from(el.querySelectorAll('img'));
         await Promise.all(images.map(img => {
             if (img.complete) return Promise.resolve();
             return new Promise((resolve) => {
@@ -50,19 +19,25 @@ export const exportToClipboard = async (elementId) => {
         await document.fonts.ready;
         await new Promise(r => setTimeout(r, 200));
 
-        // 5. Tính lại height thực tế sau khi clone đã render font đầy đủ
-        const cloneHeight = clone.offsetHeight;
+        // Lấy kích thước thực tế đang hiển thị
+        const width = el.offsetWidth;
+        const height = el.offsetHeight;
 
-        // Dùng domToBlob xuất thẳng ra Blob
-        const blob = await domToBlob(clone, {
-            scale: 3, // Nét hơn trên điện thoại
+        // Thư viện sẽ tự clone ngầm và bảo toàn CSS chuẩn xác
+        const blob = await domToBlob(el, {
+            scale: 3, // Phóng to 3x để ảnh nét căng
             width: width,
-            height: cloneHeight, // Dùng chiều cao chuẩn vừa lấy
+            height: height,
             backgroundColor: '#ffffff',
             style: {
-                // Khắc phục triệt để lỗi đè font/rớt chữ trên iOS Safari & Chrome Mobile
+                margin: '0',
+                transform: 'none',
+                boxShadow: 'none',
+                maxWidth: 'none',
+                // Khắc phục lỗi rớt dòng/đè chữ trên WebKit (iOS Safari / Chrome Mobile)
                 WebkitTextSizeAdjust: '100%',
-                fontKerning: 'normal'
+                fontKerning: 'normal',
+                textRendering: 'optimizeLegibility'
             }
         });
 
@@ -73,9 +48,5 @@ export const exportToClipboard = async (elementId) => {
     } catch (error) {
         console.error("Lỗi xuất ảnh:", error);
         throw new Error("Lỗi khi tạo ảnh. Đảm bảo trình duyệt hỗ trợ Copy Image.");
-    } finally {
-        if (document.body.contains(wrapper)) {
-            document.body.removeChild(wrapper);
-        }
     }
 };
