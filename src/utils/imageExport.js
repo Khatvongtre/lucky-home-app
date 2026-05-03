@@ -1,5 +1,3 @@
-import { domToBlob } from 'modern-screenshot';
-
 export const exportToClipboard = async (elementId) => {
     const el = document.getElementById(elementId);
     if (!el) throw new Error("Giao diện chưa sẵn sàng, vui lòng thử lại sau");
@@ -19,27 +17,20 @@ export const exportToClipboard = async (elementId) => {
         await document.fonts.ready;
         await new Promise(r => setTimeout(r, 200));
 
-        // Lấy kích thước thực tế đang hiển thị
-        const width = el.offsetWidth;
-        const height = el.offsetHeight;
+        if (!window.html2canvas) {
+            throw new Error("Thư viện tạo ảnh chưa sẵn sàng, vui lòng tải lại trang.");
+        }
 
-        // Thư viện sẽ tự clone ngầm và bảo toàn CSS chuẩn xác
-        const blob = await domToBlob(el, {
-            scale: 3, // Phóng to 3x để ảnh nét căng
-            width: width,
-            height: height,
+        // Sử dụng html2canvas để vẽ từng pixel, tránh lỗi WebKit foreignObject làm đè chữ
+        const canvas = await window.html2canvas(el, {
+            scale: 3,
+            useCORS: true,
             backgroundColor: '#ffffff',
-            style: {
-                margin: '0',
-                transform: 'none',
-                boxShadow: 'none',
-                maxWidth: 'none',
-                // Khắc phục lỗi rớt dòng/đè chữ trên WebKit (iOS Safari / Chrome Mobile)
-                WebkitTextSizeAdjust: '100%',
-                fontKerning: 'normal',
-                textRendering: 'optimizeLegibility'
-            }
+            windowWidth: el.scrollWidth,
+            windowHeight: el.scrollHeight
         });
+
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png', 1.0));
 
         if (!blob) throw new Error("Dữ liệu ảnh rỗng.");
 
