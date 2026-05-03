@@ -39,6 +39,13 @@ import AddSavingForm from './components/savings/AddSavingForm';
 import AddTransactionForm from './components/finance/AddTransactionForm';
 import BillReceipt from './components/bills/BillReceipt';
 import AddHouseForm from './components/houses/AddHouseForm';
+import Header from './components/layout/Header';
+import TabBar from './components/layout/TabBar';
+import QuickMenu from './components/layout/QuickMenu';
+import AiPromptModal from './components/houses/AiPromptModal';
+import ShareHouseModal from './components/houses/ShareHouseModal';
+import OverwriteBillModal from './components/bills/OverwriteBillModal';
+import MeterMappingModal from './components/meters/MeterMappingModal';
 
 // ==========================================
 // CẤU HÌNH API BACKEND (.NET 8)
@@ -470,6 +477,28 @@ const App = () => {
       setEditingHouse(null);
     }
     catch (e) { showToast("Lỗi: " + e.message, "error"); }
+  };
+
+  const handleAiGenerateHouse = async () => {
+    if (!aiPrompt.trim()) {
+      showToast("Vui lòng nhập mô tả hoặc chọn mẫu!", "error");
+      return;
+    }
+    showToast("AI đang xử lý... vui lòng đợi!", "success");
+    try {
+      const res = await fetchApi('/house/ai-generate', 'POST', { prompt: aiPrompt });
+      if (res.isSuccess === false) {
+        setAiFeedback(res.message);
+        showToast("AI cần thêm thông tin!", "error");
+      } else {
+        const updatedHouses = await fetchApi('/house', 'GET');
+        setHouses(updatedHouses);
+        showToast("Phép màu đã xảy ra! Nhà đã được tạo.", "success");
+        setIsAiPromptModalOpen(false);
+        setAiPrompt("");
+        setAiFeedback("");
+      }
+    } catch (e) { showToast("Lỗi khi tạo AI: " + e.message, "error"); }
   };
 
   const handleMicClick = () => {
@@ -1371,40 +1400,15 @@ const App = () => {
           </div>
         </div>
 
-        {isShareModalOpen && (
-          <Modal title="PHÂN QUYỀN & CHIA SẺ CƠ SỞ" onClose={() => { setIsShareModalOpen(false); setSharingHouse(null); }}>
-            <form onSubmit={handleAssignRole} className="space-y-4 text-left">
-              <p className="text-[10px] font-bold text-slate-500 mb-2">Thêm tài khoản quản lý cho cơ sở <span className="text-blue-600 font-black">{sharingHouse?.name}</span></p>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Tài khoản (SĐT/Username)</label>
-                <div className="relative">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input
-                    type="text" required value={assignForm.username} onChange={(e) => setAssignForm({ ...assignForm, username: e.target.value })}
-                    placeholder="Nhập SĐT hoặc tên đăng nhập..."
-                    className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-600 transition-all"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Vai trò (Role)</label>
-                <select
-                  value={assignForm.role} onChange={(e) => setAssignForm({ ...assignForm, role: e.target.value })}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-blue-600 transition-all appearance-none"
-                >
-                  <option value="Manager">Quản lý (Manager)</option>
-                  <option value="Staff">Nhân viên (Staff)</option>
-                </select>
-              </div>
-
-              <button type="submit" className="w-full bg-blue-600 text-white py-3.5 rounded-xl font-black uppercase text-[11px] flex items-center justify-center gap-2 border-b-1 border-blue-800 text-center mt-4 active:scale-95 transition-all">
-                <UserCheck className="w-4 h-4" /> Xác nhận cấp quyền
-              </button>
-            </form>
-          </Modal>
-        )}
+        <ShareHouseModal
+          isShareModalOpen={isShareModalOpen}
+          setIsShareModalOpen={setIsShareModalOpen}
+          sharingHouse={sharingHouse}
+          setSharingHouse={setSharingHouse}
+          assignForm={assignForm}
+          setAssignForm={setAssignForm}
+          handleAssignRole={handleAssignRole}
+        />
 
         {isAiCreateHouseOpen && (
           <Modal title={editingHouse ? "SỬA THÔNG TIN CƠ SỞ" : "TẠO CƠ SỞ MỚI"} onClose={() => { setIsAiCreateHouseOpen(false); setEditingHouse(null); }}>
@@ -1412,112 +1416,18 @@ const App = () => {
           </Modal>
         )}
 
-        {isAiPromptModalOpen && (
-          <Modal title="TRỢ LÝ AI TẠO NHÀ" onClose={() => { setIsAiPromptModalOpen(false); setIsListening(false); setAiFeedback(""); }}>
-            <div className="space-y-4 text-left">
-              {aiFeedback && (
-                <div className="bg-indigo-50 border border-indigo-200 p-3 rounded-xl flex items-start space-x-2 animate-in slide-in-from-top-2">
-                  <Sparkles className="w-4 h-4 text-indigo-500 mt-0.5 shrink-0" />
-                  <p className="text-xs font-black text-indigo-700 leading-snug">{aiFeedback}</p>
-                </div>
-              )}
-              <div className="flex flex-wrap gap-2 p-3 bg-slate-900 rounded-xl shadow-inner border border-white/5">
-                <div className="flex flex-col items-center flex-1">
-                  <p className="text-[7px] font-black text-slate-500 uppercase mb-1">Địa chỉ</p>
-                  <div className={`w-full py-1.5 rounded-lg text-center text-[10px] font-black transition-all ${aiPrompt.includes(',') ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-slate-600'}`}>
-                    {aiPrompt.split(',')[0].slice(0, 15) || "---"}
-                  </div>
-                </div>
-                <div className="flex flex-col items-center px-4 border-x border-white/10">
-                  <p className="text-[7px] font-black text-slate-500 uppercase mb-1">Số tầng</p>
-                  <div className={`px-4 py-1.5 rounded-lg text-center text-[10px] font-black transition-all ${/(\d+)\s*(tầng|tang|tnagf|lầu|lau)/i.test(aiPrompt) ? 'bg-blue-500/20 text-blue-400' : 'bg-white/5 text-slate-600'}`}>
-                    {aiPrompt.match(/(\d+)\s*(tầng|tang|tnagf|lầu|lau)/i)?.[1] || "0"}
-                  </div>
-                </div>
-                <div className="flex flex-col items-center flex-1">
-                  <p className="text-[7px] font-black text-slate-500 uppercase mb-1">Số phòng</p>
-                  <div className={`w-full py-1.5 rounded-lg text-center text-[10px] font-black transition-all ${/(\d+)\s*(phòng|phong|p\s|p$)/i.test(aiPrompt) ? 'bg-orange-500/20 text-orange-400' : 'bg-white/5 text-slate-600'}`}>
-                    {aiPrompt.match(/(\d+)\s*(phòng|phong|p\s|p$)/i)?.[1] || "0"}
-                  </div>
-                </div>
-              </div>
-
-              <div className="relative">
-                <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center mb-2">
-                  <Sparkles className="w-3.5 h-3.5 mr-1" /> {aiFeedback ? "Bạn hãy bổ sung thêm ở dưới:" : "Bạn muốn tạo nhà thế nào?"}
-                </label>
-                <div className="relative">
-                  <textarea
-                    value={aiPrompt}
-                    onChange={(e) => setAiPrompt(e.target.value)}
-                    placeholder="VD: 180 Nam Dư, Vĩnh Hưng, Hà Nội Nhà 4 tầng 6 phòng giá 3.5tr..."
-                    className="w-full p-3.5 pr-12 bg-indigo-50/50 border border-indigo-100 rounded-xl font-bold text-[13px] outline-none focus:border-indigo-400 focus:bg-white transition-all resize-none min-h-[100px] text-slate-700 leading-relaxed shadow-inner"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleMicClick}
-                    className={`absolute right-2 bottom-2 p-2.5 rounded-xl transition-all shadow-sm ${isListening
-                      ? 'bg-red-500 text-white animate-pulse shadow-red-200'
-                      : 'bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-200'
-                      }`}
-                  >
-                    {isListening ? <Mic className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                  </button>
-                </div>
-                {isListening && <p className="text-[9px] font-bold text-red-500 italic mt-1 text-right animate-pulse">Đang nghe...</p>}
-              </div>
-
-              <div className="pt-2 border-t border-dashed border-slate-200">
-                <h4 className="text-[9px] font-black text-slate-400 uppercase mb-2.5 tracking-widest">Mẫu thực tế chuyên sâu</h4>
-                <div className="flex flex-col gap-2">
-                  {[
-                    "180 Nam Dư, Vĩnh Hưng Hà Nội Nhà 4 tầng 6 phòng giá 10.5tr",
-                    "Ngõ 10 Cầu Giấy, Nhà 5 lầu 12 phòng, tầng trệt kinh doanh giá 15 củ",
-                    "Số 50 Trần Duy Hưng, Nhà 3 tầng 4 phòng, tầng 1 để xe giá 8 triệu"
-                  ].map((tpl, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => setAiPrompt(tpl)}
-                      className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-[10px] font-bold text-slate-600 active:scale-95 hover:border-indigo-400 hover:bg-indigo-50 hover:text-indigo-600 transition-all text-left leading-tight"
-                    >
-                      {tpl}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <button
-                onClick={async () => {
-                  if (!aiPrompt.trim()) {
-                    showToast("Vui lòng nhập mô tả hoặc chọn mẫu!", "error");
-                    return;
-                  }
-
-                  showToast("AI đang xử lý... vui lòng đợi!", "success");
-
-                  try {
-                    const res = await fetchApi('/house/ai-generate', 'POST', { prompt: aiPrompt });
-                    if (res.isSuccess === false) {
-                      setAiFeedback(res.message);
-                      showToast("AI cần thêm thông tin!", "error");
-                    } else {
-                      const updatedHouses = await fetchApi('/house', 'GET');
-                      setHouses(updatedHouses);
-                      showToast("Phép màu đã xảy ra! Nhà đã được tạo.", "success");
-                      setIsAiPromptModalOpen(false);
-                      setAiPrompt("");
-                      setAiFeedback("");
-                    }
-                  } catch (e) { showToast("Lỗi khi tạo AI: " + e.message, "error"); }
-                }}
-                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 rounded-xl font-black uppercase text-[11px] flex items-center justify-center gap-2 border-b-1 border-indigo-800 text-center mt-4 active:scale-95 transition-all"
-              >
-                <Sparkles className="w-4 h-4 text-indigo-100" /> Bắt đầu tạo tự động
-              </button>
-            </div>
-          </Modal>
-        )}
+        <AiPromptModal
+          isAiPromptModalOpen={isAiPromptModalOpen}
+          setIsAiPromptModalOpen={setIsAiPromptModalOpen}
+          setIsListening={setIsListening}
+          aiFeedback={aiFeedback}
+          setAiFeedback={setAiFeedback}
+          aiPrompt={aiPrompt}
+          setAiPrompt={setAiPrompt}
+          handleMicClick={handleMicClick}
+          isListening={isListening}
+          handleAiGenerateHouse={handleAiGenerateHouse}
+        />
       </div>
     );
   }
@@ -1533,37 +1443,15 @@ const App = () => {
       />
 
       {/* HEADER */}
-      <header className="px-4 h-14 flex items-center justify-between shrink-0 bg-blue-600 text-white z-50 shadow-md relative">
-        <div className="flex items-center space-x-2">
-          <button onClick={() => {
-            if (!selectedHouse || activeTab === 'dashboard') {
-              setIsHubMode(true);
-              setSelectedHouse(null);
-            } else {
-              setActiveTab('dashboard');
-            }
-          }} className="p-1.5 bg-white/10 rounded-lg active:scale-90 transition-all flex items-center justify-center">
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <h2 className="text-[10px] font-black uppercase tracking-widest text-blue-50 mt-0.5">
-            {activeTab === 'dashboard' ? 'Trang chủ' : activeTab === 'rooms' ? 'Phòng' : activeTab === 'meters_list' ? 'Chốt số điện' : activeTab === 'bills' ? 'Hóa đơn' : activeTab === 'finance' ? 'Thu chi' : activeTab === 'savings' ? 'Sổ tiết kiệm' : activeTab === 'ai' ? 'Chat AI' : activeTab === 'profile' ? 'Tài khoản' : 'Cài đặt'}
-          </h2>
-        </div>
-        <div className="absolute left-1/2 -translate-x-1/2 hidden sm:flex items-center space-x-1.5">
-          <Building2 className="w-4 h-4 opacity-80" />
-          <h2 className="text-sm font-black uppercase tracking-tighter mt-0.5">Lucky Home</h2>
-        </div>
-        <div className="flex items-center space-x-2">
-          <div className="flex flex-row items-center space-x-1 cursor-pointer active:opacity-80" onClick={() => { setIsHubMode(false); setSelectedHouse(null); if (isGlobalTab) setActiveTab('dashboard'); }}>
-            <p className="text-[8px] font-bold text-blue-100 uppercase tracking-widest truncate max-w-[160px] mt-0.5">{selectedHouse?.name || 'Tổng hợp'}</p>
-          </div>
-          {isOwnerOrAdmin && (
-            <div onClick={() => setActiveTab('settings')} className="w-8 h-8 rounded-full border border-white/30 overflow-hidden cursor-pointer active:scale-90 shadow-sm bg-white flex items-center justify-center">
-              <User className="w-5 h-5 text-blue-600" />
-            </div>
-          )}
-        </div>
-      </header>
+      <Header
+        selectedHouse={selectedHouse}
+        activeTab={activeTab}
+        isGlobalTab={isGlobalTab}
+        isOwnerOrAdmin={isOwnerOrAdmin}
+        setIsHubMode={setIsHubMode}
+        setSelectedHouse={setSelectedHouse}
+        setActiveTab={setActiveTab}
+      />
 
       {/* SEARCH BAR (TÌM KIẾM + NÚT ADD) */}
       {['rooms', 'meters_list', 'finance', 'bills', 'savings'].includes(activeTab) && (
@@ -1801,34 +1689,11 @@ const App = () => {
 
 
         {/* --- HÓA ĐƠN --- */}
-        {isOverwriteModalOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300"></div>
-
-            <div className="bg-white w-full max-w-sm rounded-[32px] shadow-2xl relative z-10 overflow-hidden animate-in zoom-in-95 duration-300">
-              <div className="p-8 text-center">
-                <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <AlertTriangle className="w-10 h-10 text-orange-500 animate-bounce" />
-                </div>
-                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight mb-3">Phát hiện trùng lặp!</h3>
-                <p className="text-sm text-slate-500 font-medium leading-relaxed px-2">
-                  Hóa đơn <span className="font-bold text-blue-600">Tháng {new Date().getMonth() + 1}</span> đã tồn tại trên hệ thống. Bạn có muốn xóa bản cũ và tạo lại không?
-                </p>
-              </div>
-
-              <div className="flex p-4 gap-3 bg-slate-50">
-                <button
-                  onClick={() => setIsOverwriteModalOpen(false)}
-                  className="flex-1 py-4 bg-white text-slate-400 font-black uppercase text-[10px] rounded-2xl border border-slate-200 active:scale-95 transition-all"
-                >Để sau</button>
-                <button
-                  onClick={executeGenerateBills}
-                  className="flex-1 py-4 bg-blue-600 text-white font-black uppercase text-[10px] rounded-2xl active:scale-95 transition-all border-b-1 border-blue-800"
-                >Đồng ý tạo lại</button>
-              </div>
-            </div>
-          </div>
-        )}
+        <OverwriteBillModal
+          isOverwriteModalOpen={isOverwriteModalOpen}
+          setIsOverwriteModalOpen={setIsOverwriteModalOpen}
+          executeGenerateBills={executeGenerateBills}
+        />
 
         {isAddTransactionModalOpen && (
           <Modal title="Ghi sổ thu chi" onClose={() => setIsAddTransactionModalOpen(false)}>
@@ -1861,53 +1726,28 @@ const App = () => {
       {!['savings', 'profile'].includes(activeTab) && (
         <>
           {/* FOOTER TAB BAR */}
-          <div className="fixed bottom-0 left-0 right-0 z-[70] pointer-events-none">
-            <div className="bg-white border-t border-slate-100 h-14 flex items-center justify-around px-2 pointer-events-auto shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
-              {[
-                { id: 'dashboard', icon: LayoutDashboard, label: 'Trang chủ' },
-                shouldShowMeterBanner
-                  ? { id: 'meters_list', icon: Boxes, label: 'Chốt số' }
-                  : { id: 'rooms', icon: Home, label: 'Phòng' },
-                { id: 'spacer', icon: null, label: '' },
-                { id: 'bills', icon: FileText, label: 'Hóa đơn' },
-                { id: 'finance', icon: Wallet, label: 'Thu Chi', hidden: !canAccessFinance },
-                { id: 'ai', icon: Sparkles, label: 'AI Chat', hidden: canAccessFinance }
-              ].filter(i => !i.hidden).map((item, i) => (
-                item.id === 'spacer' ? <div key={i} className="w-12" /> : (
-                  <button key={item.id} onClick={() => { setActiveTab(item.id); setSearchQuery(""); }} className={`flex flex-col items-center justify-center px-1 transition-all ${activeTab === item.id ? 'text-blue-600 scale-105' : 'text-slate-400 opacity-60'}`}>
-                    <div className={`p-1.5 rounded-lg ${activeTab === item.id ? 'bg-blue-50 shadow-inner' : ''} flex items-center justify-center`}><item.icon className="w-4.5 h-4.5" strokeWidth={activeTab === item.id ? 3 : 2} /></div>
-                    <span className={`text-[6px] font-black uppercase mt-1 transition-all ${activeTab === item.id ? 'opacity-100' : 'opacity-0'}`}>{item.label}</span>
-                  </button>
-                )
-              ))}
-            </div>
-            <button onClick={() => setShowQuickMenu(!showQuickMenu)} className={`absolute -top-5 left-1/2 -translate-x-1/2 w-14 h-14 rounded-[1.4rem] flex items-center justify-center transition-all duration-500 active:scale-90 pointer-events-auto border-[4px] border-white ${showQuickMenu ? 'bg-slate-800 rotate-45' : 'bg-blue-600'}`}><Plus className="w-7 h-7 text-white stroke-[4px]" /></button>
-          </div>
+          <TabBar
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            setSearchQuery={setSearchQuery}
+            shouldShowMeterBanner={shouldShowMeterBanner}
+            canAccessFinance={canAccessFinance}
+            showQuickMenu={showQuickMenu}
+            setShowQuickMenu={setShowQuickMenu}
+          />
 
           {/* QUICK MENU */}
-          <div className={`fixed inset-0 z-[500] transition-opacity duration-300 ${showQuickMenu ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setShowQuickMenu(false)} />
-            <div className={`absolute bottom-0 left-0 right-0 max-w-lg mx-auto bg-white rounded-t-[2.5rem] p-8 pb-36 transition-transform duration-500 transform ${showQuickMenu ? 'translate-y-0' : 'translate-y-full'}`}>
-              <div className="grid grid-cols-3 gap-6">
-                {[
-                  { label: 'Thêm Phòng', icon: UserCheck, color: 'text-emerald-600 bg-emerald-50', action: () => { setEditingRoom(null); setIsAddRoomModalOpen(true); setShowQuickMenu(false); } },
-                  shouldShowMeterBanner
-                    ? { label: 'Phòng', icon: Home, color: 'text-blue-600 bg-blue-50', action: () => { setActiveTab('rooms'); setShowQuickMenu(false); } }
-                    : { label: 'Chốt số điện', icon: Boxes, color: 'text-orange-600 bg-orange-50', action: () => { setActiveTab('meters_list'); setShowQuickMenu(false); } },
-                  { label: 'Hóa Đơn', icon: Receipt, color: 'text-purple-600 bg-purple-50', action: () => { setActiveTab('bills'); setShowQuickMenu(false); } },
-                  { label: 'AI Chat', icon: Sparkles, color: 'text-indigo-600 bg-indigo-50', action: () => { setActiveTab('ai'); setShowQuickMenu(false); } },
-                  { label: 'Thu chi', icon: CircleDollarSign, color: 'text-rose-600 bg-rose-50', action: () => { setIsAddTransactionModalOpen(true); setShowQuickMenu(false); }, hidden: user?.role !== 'Owner' },
-                  { label: 'Cài Đặt', icon: Settings, color: 'text-slate-600 bg-slate-50', action: () => { setActiveTab('settings'); setShowQuickMenu(false); }, hidden: user?.role !== 'Owner' },
-                  { label: 'Đăng Xuất', icon: LogOut, color: 'text-red-600 bg-red-50', action: () => handleLogout() }
-                ].filter(i => !i.hidden).map((item, i) => (
-                  <button key={i} onClick={() => item.action()} className="flex flex-col items-center space-y-2 active:scale-90 transition-all">
-                    <div className={`w-14 h-14 ${item.color} rounded-xl flex items-center justify-center`}><item.icon className="w-6 h-6" strokeWidth={1.5} /></div>
-                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter text-center leading-tight">{item.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
+          <QuickMenu
+            showQuickMenu={showQuickMenu}
+            setShowQuickMenu={setShowQuickMenu}
+            setEditingRoom={setEditingRoom}
+            setIsAddRoomModalOpen={setIsAddRoomModalOpen}
+            shouldShowMeterBanner={shouldShowMeterBanner}
+            setActiveTab={setActiveTab}
+            setIsAddTransactionModalOpen={setIsAddTransactionModalOpen}
+            user={user}
+            handleLogout={handleLogout}
+          />
         </>
       )}
 
@@ -1936,28 +1776,14 @@ const App = () => {
         </Modal>
       )}
 
-      {mappingMeter && (
-        <Modal title={`Chọn phòng: ${mappingMeter.name}`} onClose={() => setMappingMeter(null)}>
-          <div className="space-y-4 text-left">
-            <p className="text-[10px] font-black text-slate-400 uppercase px-1">Chọn các phòng sử dụng chung công tơ này:</p>
-            <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto no-scrollbar py-2">
-              {rooms.filter(r => r.houseId === selectedHouse?.id).map(r => {
-                const isSelected = mappingMeter.roomIds.includes(r.id);
-                return (
-                  <button key={r.id} onClick={() => {
-                    const newIds = isSelected ? mappingMeter.roomIds.filter(id => id !== r.id) : [...mappingMeter.roomIds, r.id];
-                    setMeters(prev => prev.map(m => m.id === mappingMeter.id ? { ...m, roomIds: newIds } : m));
-                    setMappingMeter({ ...mappingMeter, roomIds: newIds });
-                  }} className={`p-3 rounded-xl border-2 font-black text-xs flex justify-between items-center transition-all ${isSelected ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-slate-50 text-slate-400 border-slate-100 hover:border-blue-200'}`}>
-                    <span>Phòng {r.roomCode}</span>{isSelected && <CheckCircle2 className="w-3 h-3" />}
-                  </button>
-                )
-              })}
-            </div>
-            <button onClick={handleSaveMeterMapping} className="w-full bg-blue-600 text-white py-3.5 rounded-xl font-black uppercase text-[10px] shadow-lg active:scale-95 transition-all border-b-1 border-blue-800 text-center">Hoàn tất</button>
-          </div>
-        </Modal>
-      )}
+      <MeterMappingModal
+        mappingMeter={mappingMeter}
+        setMappingMeter={setMappingMeter}
+        rooms={rooms}
+        selectedHouse={selectedHouse}
+        setMeters={setMeters}
+        handleSaveMeterMapping={handleSaveMeterMapping}
+      />
 
       {isAddMeterModalOpen && (
         <Modal title={editingMeter ? "Cập nhật công tơ" : "Thêm công tơ mới"} onClose={() => { setIsAddMeterModalOpen(false); setEditingMeter(null); }}>
