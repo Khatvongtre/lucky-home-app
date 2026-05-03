@@ -6,29 +6,27 @@ export const exportToClipboard = async (elementId) => {
 
     // 1. Lấy chính xác kích thước thực tế đang hiển thị trên màn hình
     const width = el.offsetWidth;
-    const height = el.offsetHeight;
 
-    // 2. Clone phần tử để tránh các lỗi liên quan đến Scroll Offset (cắt xén ảnh)
+    // 2. Clone phần tử
     const clone = el.cloneNode(true);
     const wrapper = document.createElement('div');
 
-    // 3. Đặt wrapper ở chế độ fixed, off-screen với kích thước cố định
+    // 3. Đặt wrapper ở chế độ absolute, đẩy hoàn toàn ra khỏi khung nhìn để tránh bị đè layout trên mobile
     Object.assign(wrapper.style, {
-        position: 'fixed',
+        position: 'absolute',
         top: '-9999px',
-        left: '0px',
+        left: '-9999px',
         width: `${width}px`,
-        height: `${height}px`,
         zIndex: -1000,
         pointerEvents: 'none',
-        overflow: 'visible'
+        margin: '0'
     });
 
     // 4. Ép kích thước clone chính xác bằng phần tử gốc, xóa margin auto để không bị lệch
     Object.assign(clone.style, {
         margin: '0',
         width: `${width}px`,
-        height: `${height}px`,
+        height: 'auto', // Để auto để khung tự giãn nếu font chữ trên điện thoại bẻ dòng khác PC
         maxWidth: 'none',
         transform: 'none',
         boxShadow: 'none'
@@ -52,12 +50,20 @@ export const exportToClipboard = async (elementId) => {
         await document.fonts.ready;
         await new Promise(r => setTimeout(r, 200));
 
-        // Dùng domToBlob xuất thẳng ra Blob (tốt hơn domToCanvas -> toBlob)
+        // 5. Tính lại height thực tế sau khi clone đã render font đầy đủ
+        const cloneHeight = clone.offsetHeight;
+
+        // Dùng domToBlob xuất thẳng ra Blob
         const blob = await domToBlob(clone, {
             scale: 3, // Nét hơn trên điện thoại
             width: width,
-            height: height,
+            height: cloneHeight, // Dùng chiều cao chuẩn vừa lấy
             backgroundColor: '#ffffff',
+            style: {
+                // Khắc phục triệt để lỗi đè font/rớt chữ trên iOS Safari & Chrome Mobile
+                WebkitTextSizeAdjust: '100%',
+                fontKerning: 'normal'
+            }
         });
 
         if (!blob) throw new Error("Dữ liệu ảnh rỗng.");
