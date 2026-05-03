@@ -2,8 +2,8 @@ export const exportToClipboard = async (elementId) => {
     const el = document.getElementById(elementId);
     if (!el) throw new Error("Giao diện chưa sẵn sàng, vui lòng thử lại sau");
 
-    try {
-        // Đợi tất cả ảnh (như QR code) tải xong trực tiếp trên giao diện gốc
+    // Đóng gói logic tạo ảnh vào một hàm bất đồng bộ
+    const generateImageBlob = async () => {
         const images = Array.from(el.querySelectorAll('img'));
         await Promise.all(images.map(img => {
             if (img.complete) return Promise.resolve();
@@ -13,7 +13,6 @@ export const exportToClipboard = async (elementId) => {
             });
         }));
 
-        // Đợi font chữ và CSS áp dụng hoàn toàn
         await document.fonts.ready;
         await new Promise(r => setTimeout(r, 200));
 
@@ -21,9 +20,8 @@ export const exportToClipboard = async (elementId) => {
             throw new Error("Thư viện tạo ảnh chưa sẵn sàng, vui lòng tải lại trang.");
         }
 
-        // Sử dụng html2canvas để vẽ từng pixel, tránh lỗi WebKit foreignObject làm đè chữ
         const canvas = await window.html2canvas(el, {
-            scale: 3,
+            scale: 2, // Giảm xuống 2 để tránh lỗi văng bộ nhớ (Crash Canvas) trên điện thoại
             useCORS: true,
             backgroundColor: '#ffffff',
             windowWidth: el.scrollWidth,
@@ -31,13 +29,27 @@ export const exportToClipboard = async (elementId) => {
         });
 
         const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png', 1.0));
-
         if (!blob) throw new Error("Dữ liệu ảnh rỗng.");
+        return blob;
+    };
 
-        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+    try {
+        // Khắc phục lỗi Safari (iOS): Truyền trực tiếp Promise vào ClipboardItem để giữ ngữ cảnh thao tác
+        await navigator.clipboard.write([
+            new window.ClipboardItem({ 'image/png': generateImageBlob() })
+        ]);
         return true;
     } catch (error) {
-        console.error("Lỗi xuất ảnh:", error);
-        throw new Error("Lỗi khi tạo ảnh. Đảm bảo trình duyệt hỗ trợ Copy Image.");
+        console.error("Lỗi xuất ảnh với Promise:", error);
+
+        // Fallback: Nếu trình duyệt (Chrome cũ, Android) không hỗ trợ truyền Promise vào ClipboardItem
+        try {
+            const blob = await generateImageBlob();
+            await navigator.clipboard.write([new window.ClipboardItem({ 'image/png': blob })]);
+            return true;
+        } catch (fallbackError) {
+            console.error("Lỗi Fallback:", fallbackError);
+            throw new Error("Trình duyệt điện thoại không hỗ trợ Copy tự động. Vui lòng tự chụp màn hình.");
+        }
     }
 };
