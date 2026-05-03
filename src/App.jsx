@@ -3289,7 +3289,7 @@ const App = () => {
                       </div>
                     )}
 
-                    <div className="flex justify-between items-center py-2.5 border-t border-dashed border-slate-200">
+                    <div className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200 last:border-0">
                       <span className="text-[11px] font-bold text-red-500 uppercase tracking-tight">Giảm giá</span>
                       {bottomSheet.data.status === 'pending' && isManagerOrAbove && !isGeneratingImage ? (
                         <div className="flex items-center space-x-1 border-b border-dashed border-red-200 pb-0.5">
@@ -3306,7 +3306,7 @@ const App = () => {
                         <span className="text-[13px] font-black text-red-600">-{formatN(bottomSheet.data.details.discount || 0)}</span>
                       )}
                     </div>
-                    <div className="bg-indigo-600 p-3 rounded-lg text-white mb-2 shadow-sm flex items-center justify-between">
+                    <div className="bg-indigo-600 p-3 rounded-lg text-white mb-2 mt-2 shadow-sm flex items-center justify-between">
                       <p className="text-[11px] font-bold uppercase tracking-widest opacity-80">
                         Tổng thanh toán
                       </p>
