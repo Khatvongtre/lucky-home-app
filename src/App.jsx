@@ -27,6 +27,12 @@ import AuthView from './pages/AuthView';
 import HubView from './pages/HubView';
 import DashboardPage from './pages/DashboardPage';
 import RoomsPage from './pages/RoomsPage';
+import BillsPage from './pages/BillsPage';
+import MetersPage from './pages/MetersPage';
+import FinancePage from './pages/FinancePage';
+import SavingsPage from './pages/SavingsPage';
+import AiChatPage from './pages/AiChatPage';
+import ProfilePage from './pages/ProfilePage';
 
 // ==========================================
 // CẤU HÌNH API BACKEND (.NET 8)
@@ -1685,831 +1691,102 @@ const App = () => {
       {/* KHU VỰC HIỂN THỊ NỘI DUNG CHÍNH */}
       <main className="flex-1 w-full overflow-y-auto px-4 pt-2 pb-32 no-scrollbar scroll-smooth">
 
-        {/* --- TỔNG QUAN --- */}
-        {activeTab === 'dashboard' && (
-          <div className="space-y-4 animate-in fade-in duration-500 pb-10">
-            {shouldShowMeterBanner && (
-              <div className="bg-gradient-to-r from-orange-500 to-red-500 p-4 rounded-xl text-white shadow-lg flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="p-2 bg-white/20 rounded-lg"><Zap className="w-5 h-5" /></div>
-                  <div><p className="font-black text-sm uppercase">Đến hạn chốt điện</p><p className="text-[9px] font-bold opacity-90">Kỳ chốt công tơ điện tháng này</p></div>
-                </div>
-                <button onClick={() => setActiveTab('meters_list')} className="px-4 py-2 bg-white text-orange-600 rounded-lg font-black text-[10px] active:scale-95">Ghi Số</button>
-              </div>
-            )}
+        {activeTab === 'dashboard' && <DashboardPage
+          shouldShowMeterBanner={shouldShowMeterBanner}
+          setActiveTab={setActiveTab}
+          dashboardSummary={dashboardSummary}
+          canViewProfit={canViewProfit}
+          isOwnerOrAdmin={isOwnerOrAdmin}
+          revenueChartData={revenueChartData}
+        />
+        }
 
-            <div className="grid grid-cols-4 gap-2 text-center">
-              <div className="bg-white p-2 rounded-xl border border-slate-100 shadow-sm flex flex-col items-center"><p className="text-[13px] font-black text-blue-600">{dashboardSummary?.totalRooms || 0}</p><p className="text-[7px] font-bold text-slate-400 uppercase mt-1">Phòng</p></div>
-              <div className="bg-white p-2 rounded-xl border border-slate-100 shadow-sm flex flex-col items-center"><p className="text-[13px] font-black text-emerald-600">{dashboardSummary?.emptyRooms || 0}</p><p className="text-[7px] font-bold text-slate-400 uppercase mt-1">Trống</p></div>
-              <div className="bg-white p-2 rounded-xl border border-slate-100 shadow-sm flex flex-col items-center"><p className="text-[13px] font-black text-indigo-600">{dashboardSummary?.totalPeople || 0}</p><p className="text-[7px] font-bold text-slate-400 uppercase mt-1">Người</p></div>
-              <div className="bg-white p-2 rounded-xl border border-slate-100 shadow-sm flex flex-col items-center"><p className="text-[13px] font-black text-orange-600">{dashboardSummary?.totalEbikes || 0}</p><p className="text-[7px] font-bold text-slate-400 uppercase mt-1">Xe điện</p></div>
-            </div>
+        {activeTab === 'rooms' && <RoomsPage
+          currentRooms={currentRooms}
+          setEditingRoom={setEditingRoom}
+          setIsAddRoomModalOpen={setIsAddRoomModalOpen}
+          isManagerOrAbove={isManagerOrAbove}
+        />
+        }
 
-            {canViewProfit && (
-              <div className="bg-slate-900 p-5 rounded-xl text-white shadow-xl relative overflow-hidden border-b-1 border-emerald-500">
-                <div className="absolute -right-4 -top-4 w-32 h-32 bg-emerald-500 rounded-full blur-3xl opacity-20 pointer-events-none"></div>
-                <div className="flex justify-between items-start mb-2 relative z-10">
-                  <div>
-                    <p className="text-[9px] font-black uppercase tracking-widest mb-1 text-slate-400">Tổng doanh thu dự kiến</p>
-                    <h3 className="text-3xl font-black text-emerald-400 tabular-nums leading-none">+{formatN(dashboardSummary?.revenue || 0)}</h3>
-                  </div>
-                  <div className="p-2 bg-emerald-500/20 rounded-lg">
-                    <TrendingUp className="w-5 h-5 text-emerald-400" />
-                  </div>
-                </div>
+        {activeTab === 'bills' && <BillsPage
+          handlePrevMonth={handlePrevMonth}
+          handleNextMonth={handleNextMonth}
+          monthDisplay={monthDisplay}
+          billStats={billStats}
+          currentBills={currentBills}
+          setBottomSheet={setBottomSheet}
+        />
+        }
 
-                <div className="grid grid-cols-2 gap-4 border-t border-slate-700/80 pt-3 mt-4 relative z-10">
-                  <div>
-                    <p className="text-[8px] font-black uppercase tracking-widest mb-1 text-slate-400">Tổng chi phí</p>
-                    <p className="text-sm font-black text-rose-400">-{formatN(dashboardSummary?.expense || 0)}</p>
-                  </div>
-                  <div className="text-right border-l border-slate-700/80 pl-4">
-                    <p className="text-[8px] font-black uppercase tracking-widest mb-1 text-slate-400">Lợi nhuận ròng</p>
-                    <p className="text-sm font-black text-blue-400">{formatN(dashboardSummary?.profit || 0)}</p>
-                  </div>
-                </div>
-              </div>
-            )}
+        {activeTab === 'meters_list' && <MetersPage
+          handlePrevMonth={handlePrevMonth}
+          handleNextMonth={handleNextMonth}
+          monthDisplay={monthDisplay}
+          summary={summary}
+          config={config}
+          currentMeters={currentMeters}
+          handleUpdateOldMeterUI={handleUpdateOldMeterUI}
+          handleUpdateMeterUI={handleUpdateMeterUI}
+          setEditingMeter={setEditingMeter}
+          setIsAddMeterModalOpen={setIsAddMeterModalOpen}
+          setMappingMeter={setMappingMeter}
+          handleSaveMetersAndGenerateBills={handleSaveMetersAndGenerateBills}
+        />
+        }
 
-            <div className="grid grid-cols-2 gap-2">
-              <div className="bg-orange-400 p-4 rounded-xl text-white shadow-md relative overflow-hidden"><Zap className="w-8 h-8 absolute -right-1 -top-1 opacity-20" /><p className="text-[8px] font-black uppercase mb-1 opacity-80">Điện dự tính</p><p className="text-sm font-black">{formatN(dashboardSummary?.expectedElecCost || 0)}</p></div>
-              <div className="bg-sky-500 p-4 rounded-xl text-white shadow-md relative overflow-hidden"><Droplets className="w-8 h-8 absolute -right-1 -top-1 opacity-20" /><p className="text-[8px] font-black uppercase mb-1 opacity-80">Nước dự tính</p><p className="text-sm font-black">{formatN(dashboardSummary?.expectedWaterCost || 0)}</p></div>
-              <div className="bg-purple-400 p-4 rounded-xl text-white shadow-md relative overflow-hidden"><Activity className="w-8 h-8 absolute -right-1 -top-1 opacity-20" /><p className="text-[8px] font-black uppercase mb-1 opacity-80">Dịch vụ</p><p className="text-sm font-black">{formatN(dashboardSummary?.expectedServiceCost || 0)}</p></div>
-              <div className="bg-emerald-500 p-4 rounded-xl text-white shadow-md relative overflow-hidden"><Wifi className="w-8 h-8 absolute -right-1 -top-1 opacity-20" /><p className="text-[8px] font-black uppercase mb-1 opacity-80">Internet</p><p className="text-sm font-black">{formatN(dashboardSummary?.expectedInternetCost || 0)}</p></div>
-            </div>
+        {activeTab === 'finance' && canAccessFinance && <FinancePage
+          canViewProfit={canViewProfit}
+          isFinanceStatsOpen={isFinanceStatsOpen}
+          setIsFinanceStatsOpen={setIsFinanceStatsOpen}
+          isMonthOpen={isMonthOpen}
+          setIsMonthOpen={setIsMonthOpen}
+          selectedMonth={selectedMonth}
+          setSelectedMonth={setSelectedMonth}
+          monthLabels={monthLabels}
+          financeStats={financeStats}
+          currentTransactions={currentTransactions}
+          canManageTransactions={canManageTransactions}
+          setEditingTransaction={setEditingTransaction}
+          setTxType={setTxType}
+          setSelectedCat={setSelectedCat}
+          setIsAddTransactionModalOpen={setIsAddTransactionModalOpen}
+        />
+        }
 
-            {isOwnerOrAdmin && (
-              <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm">
-                <h4 className="font-black text-slate-400 uppercase text-[8px] mb-4 tracking-widest flex items-center"><TrendingUp className="w-3.5 h-3.5 mr-2 text-blue-600" /> BIỂU ĐỒ DOANH THU</h4>
-                <div className="h-28 flex items-end justify-between px-1 gap-2.5 relative">
-                  <div className="absolute w-full h-[1px] bg-slate-50 bottom-[33%]"></div>
-                  <div className="absolute w-full h-[1px] bg-slate-50 bottom-[66%]"></div>
-                  <div className="absolute w-full h-[1px] bg-slate-50 top-0"></div>
-                  {revenueChartData.map((d, i) => (
-                    <div key={i} className="flex-1 h-full flex flex-col items-center justify-end relative z-10 group cursor-pointer">
-                      <div className="absolute -top-7 bg-slate-800 text-white text-[9px] font-black px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-20 shadow-md">
-                        {formatN(d.value)} đ
-                      </div>
-                      <div className="w-full flex-1 flex items-end">
-                        <div className={`w-full rounded-t-md transition-all duration-1000 ${d.isCurrent ? 'bg-gradient-to-t from-blue-600 to-sky-400 shadow-md' : 'bg-gradient-to-t from-slate-200 to-slate-100 group-hover:from-blue-300 group-hover:to-blue-200'}`} style={{ height: `${d.height}%`, minHeight: d.height > 0 ? '4px' : '0' }}></div>
-                      </div>
-                      <span className={`text-[6px] font-black mt-2 uppercase ${d.isCurrent ? 'text-blue-600' : 'text-slate-400'}`}>{d.label}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+        {activeTab === 'savings' && <SavingsPage
+          isSavingsStatsOpen={isSavingsStatsOpen}
+          setIsSavingsStatsOpen={setIsSavingsStatsOpen}
+          uniqueBankNames={uniqueBankNames}
+          collapsedSavingsBanks={collapsedSavingsBanks}
+          setCollapsedSavingsBanks={setCollapsedSavingsBanks}
+          summarySavings={summarySavings}
+          currentSavings={currentSavings}
+          unselectedSavingsBanks={unselectedSavingsBanks}
+          setUnselectedSavingsBanks={setUnselectedSavingsBanks}
+          setEditingSaving={setEditingSaving}
+          setSavingCalc={setSavingCalc}
+          setIsAddSavingModalOpen={setIsAddSavingModalOpen}
+        />
+        }
 
-        {/* --- SỔ TIẾT KIỆM --- */}
-        {activeTab === 'savings' && (
-          <div className="animate-in fade-in pb-20">
-            <div className="sticky top-0 z-30 bg-slate-50/80 backdrop-blur-md px-1">
-              <div className="bg-slate-900 p-6 rounded-xl text-white shadow-xl relative border-b-8 border-slate-950">
-                <div className="flex justify-between items-center">
-                  <button onClick={() => setIsSavingsStatsOpen(!isSavingsStatsOpen)} className="flex items-center gap-1 active:scale-95 transition-all text-left">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tổng tiền gửi tiết kiệm</p>
-                    <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-300 ${!isSavingsStatsOpen ? 'rotate-180' : ''}`} />
-                  </button>
-                  {uniqueBankNames.length > 0 && (
-                    <button
-                      onClick={() => {
-                        if (collapsedSavingsBanks.length === uniqueBankNames.length) {
-                          setCollapsedSavingsBanks([]);
-                        } else {
-                          setCollapsedSavingsBanks(uniqueBankNames);
-                        }
-                      }}
-                      className="flex items-center gap-1 text-slate-400 hover:text-amber-400 transition-colors bg-white/5 px-2 py-1 rounded shadow-sm active:scale-95"
-                    >
-                      <span className="text-[8px] font-black uppercase tracking-widest">
-                        {collapsedSavingsBanks.length === uniqueBankNames.length ? 'Mở rộng tất cả' : 'Thu gọn tất cả'}
-                      </span>
-                      <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-300 ${collapsedSavingsBanks.length !== uniqueBankNames.length ? 'rotate-180' : ''}`} />
-                    </button>
-                  )}
-                </div>
-                {isSavingsStatsOpen && (
-                  <div className="animate-in slide-in-from-top-2 duration-200 mt-3">
-                    <h3 className="text-4xl font-black tracking-tight tabular-nums text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-yellow-400">
-                      {formatN(summarySavings.reduce((a, b) => a + (b.amount || 0), 0))}
-                    </h3>
-                    <div className="mt-5 grid grid-cols-2 gap-3">
-                      <div className="bg-white/5 p-3.5 rounded-xl border border-white/10 relative overflow-hidden">
-                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Lãi / tháng</p>
-                        <p className="text-base font-black text-amber-400 tabular-nums">+{formatN(summarySavings.reduce((a, b) => a + Math.round((b.amount || 0) * ((b.interestRate || 0) / 100) / 12), 0))}</p>
-                      </div>
-                      <div className="bg-white/5 p-3.5 rounded-xl border border-white/10 relative overflow-hidden">
-                        <PiggyBank className="w-10 h-10 absolute -right-2 -bottom-2 opacity-10 text-white" />
-                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Tổng lãi dự kiến</p>
-                        <p className="text-base font-black text-amber-400 tabular-nums">+{formatN(summarySavings.reduce((a, b) => a + Math.round((b.amount || 0) * ((b.interestRate || 0) / 100) * ((b.termMonths || 0) / 12)), 0))}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+        {activeTab === 'ai' && <AiChatPage
+          aiMessages={aiMessages}
+          isAiLoading={isAiLoading}
+          handleAiChat={handleAiChat}
+        />
+        }
 
-            <div className="px-1 mt-4 pb-4">
-              {currentSavings.length === 0 && (
-                <p className="text-xs text-slate-400 italic text-center mt-10">Chưa có sổ tiết kiệm nào.</p>
-              )}
-              {Object.entries(
-                currentSavings.reduce((acc, s) => {
-                  const bank = s.bankName || 'Khác';
-                  if (!acc[bank]) acc[bank] = [];
-                  acc[bank].push(s);
-                  return acc;
-                }, {})
-              ).map(([bank, items]) => {
-                const groupAmount = items.reduce((a, b) => a + (b.amount || 0), 0);
-                const groupInterest = items.reduce((a, b) => a + Math.round((b.amount || 0) * ((b.interestRate || 0) / 100) * ((b.termMonths || 0) / 12)), 0);
-                const isSelected = !unselectedSavingsBanks.includes(bank);
-                const isCollapsed = collapsedSavingsBanks.includes(bank);
+        {activeTab === 'profile' && <ProfilePage
+          user={user}
+          getRoleLabel={getRoleLabel}
+          handleLogout={handleLogout}
+          changePasswordForm={changePasswordForm}
+          setChangePasswordForm={setChangePasswordForm}
+          handleChangePassword={handleChangePassword}
+        />
+        }
 
-                return (
-                  <div key={bank} className="mb-6 last:mb-0 animate-in fade-in">
-                    <div className="flex flex-col mb-3 bg-gradient-to-r from-slate-100 to-white p-3 rounded-xl border border-slate-200 shadow-sm gap-3">
-                      <div className="flex items-center gap-2.5">
-                        <div className="flex items-center shrink-0 ml-0.5">
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={(e) => {
-                              if (e.target.checked) setUnselectedSavingsBanks(unselectedSavingsBanks.filter(b => b !== bank));
-                              else setUnselectedSavingsBanks([...unselectedSavingsBanks, bank]);
-                            }}
-                            className="w-4 h-4 rounded border-slate-300 text-amber-500 focus:ring-amber-500 cursor-pointer"
-                          />
-                        </div>
-                        <div className="w-8 h-8 rounded-lg bg-amber-100 border border-amber-200 flex items-center justify-center shadow-inner shrink-0">
-                          <Landmark className="w-4 h-4 text-amber-600" />
-                        </div>
-                        <div className="flex-1 flex justify-between items-center gap-1 min-w-0">
-                          <h4 className="text-[13px] font-black text-blue-900 uppercase tracking-wider leading-tight truncate pr-2">{bank}</h4>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span className="text-[9px] font-black bg-amber-500 text-white px-2 py-0.5 rounded shadow-sm">{items.length} SỔ</span>
-                            <button
-                              onClick={() => {
-                                if (isCollapsed) {
-                                  setCollapsedSavingsBanks(collapsedSavingsBanks.filter(b => b !== bank));
-                                } else {
-                                  setCollapsedSavingsBanks([...collapsedSavingsBanks, bank]);
-                                }
-                              }}
-                              className="p-1 -mr-1 text-slate-400 hover:bg-slate-200 rounded-md transition-colors shadow-none"
-                            >
-                              <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${!isCollapsed ? 'rotate-180' : ''}`} />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="border-t border-slate-200/80 pt-3 flex items-center justify-between px-1">
-                        <div className="flex-1">
-                          <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Tổng gốc</p>
-                          <p className="text-[13px] font-black text-indigo-700 tabular-nums">{formatN(groupAmount)}<span className="text-[9px] text-indigo-400 ml-0.5">đ</span></p>
-                        </div>
-                        <div className="w-[1px] h-8 bg-slate-200 mx-4"></div>
-                        <div className="flex-1 text-right">
-                          <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Tổng lãi</p>
-                          <p className="text-[13px] font-black text-emerald-600 tabular-nums">+{formatN(groupInterest)}<span className="text-[9px] text-emerald-600/50 ml-0.5">đ</span></p>
-                        </div>
-                      </div>
-                    </div>
-                    {!isCollapsed && (
-                      <div className={`space-y-3 transition-all ${!isSelected ? 'opacity-50 grayscale pointer-events-none' : ''}`}>
-                        {items.map(s => {
-                          const endDate = new Date(s.startDate);
-                          const tMonths = s.termMonths || 0;
-                          endDate.setMonth(endDate.getMonth() + Math.floor(tMonths));
-                          endDate.setDate(endDate.getDate() + Math.round((tMonths - Math.floor(tMonths)) * 30));
-                          const daysLeft = Math.ceil((endDate - new Date()) / (1000 * 60 * 60 * 24));
-                          const isMatured = daysLeft <= 0;
-                          const interest = Math.round((s.amount || 0) * ((s.interestRate || 0) / 100) * ((s.termMonths || 0) / 12));
-                          const startDate = new Date(s.startDate);
-                          const totalDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
-                          const passedDays = Math.max(0, totalDays - daysLeft);
-                          const progress = totalDays > 0 ? Math.min(100, (passedDays / totalDays) * 100) : 100;
-
-                          return (
-                            <div key={s.id} onClick={() => { setEditingSaving(s); setSavingCalc({ amount: s.amount || 0, rate: s.interestRate || 0, months: s.termMonths || 0 }); setIsAddSavingModalOpen(true); }} className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm active:scale-[0.98] transition-all cursor-pointer relative overflow-hidden ml-2 border-l-4 border-l-amber-500">
-                              {isMatured && <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[8px] font-black px-2 py-1 rounded-bl-lg uppercase z-10 shadow-sm">Đã đến hạn</div>}
-                              <div className="flex justify-between items-center mb-3">
-                                <div className="flex items-center space-x-3 w-[60%]">
-                                  <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-100 text-amber-600 flex items-center justify-center shadow-inner shrink-0"><PiggyBank className="w-5 h-5" /></div>
-                                  <div className="overflow-hidden w-full">
-                                    <h4 className="font-black text-[13px] text-blue-900 uppercase leading-tight mb-0.5">{s.note || `Sổ tiết kiệm`}</h4>
-                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate">Gửi: {startDate.toLocaleDateString('vi-VN')}</p>
-                                  </div>
-                                </div>
-                                <div className="text-right w-[40%] pl-2 shrink-0">
-                                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Số tiền gốc</p>
-                                  <p className="text-[15px] font-black text-indigo-700 tabular-nums">{formatN(s.amount)}<span className="text-[10px] text-indigo-400 ml-0.5">đ</span></p>
-                                </div>
-                              </div>
-                              <div className="flex items-center justify-between bg-slate-50 rounded-lg p-2.5 border border-slate-100">
-                                <div className="flex items-center gap-3">
-                                  <div>
-                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Lãi suất</p>
-                                    <p className="text-[11px] font-black text-purple-600">{s.interestRate}%<span className="text-[9px] text-purple-400 font-bold">/năm</span></p>
-                                  </div>
-                                  <div className="w-[1px] h-6 bg-slate-200"></div>
-                                  <div>
-                                    <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Kỳ hạn</p>
-                                    <p className="text-[11px] font-black text-emerald-600">{s.termMonths} <span className="text-[9px] text-emerald-500 font-bold">tháng</span></p>
-                                  </div>
-                                </div>
-                                <div className="text-right">
-                                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Lãi dự kiến</p>
-                                  <p className="text-[13px] font-black text-emerald-600 tabular-nums">+{formatN(interest)} đ</p>
-                                </div>
-                              </div>
-                              <div className="mt-3 flex items-center justify-between px-1 gap-2">
-                                <div className="flex-1 bg-slate-100 rounded-full h-1.5 overflow-hidden relative">
-                                  <div className={`absolute top-0 left-0 h-full transition-all duration-1000 ${isMatured ? 'bg-emerald-500' : 'bg-amber-400'}`} style={{ width: `${progress}%` }}></div>
-                                </div>
-                                <p className={`text-[9px] font-black uppercase tracking-widest whitespace-nowrap ${isMatured ? 'text-emerald-600' : 'text-amber-600'}`}>
-                                  {isMatured ? 'Đáo hạn' : `Còn ${daysLeft} ngày`}
-                                </p>
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* --- PHÒNG TRỌ --- */}
-        {activeTab === 'rooms' && (
-          <div className="space-y-4 pb-20 animate-in slide-in-from-right">
-            <div className="grid grid-cols-2 gap-2">
-              {currentRooms.length === 0 && <p className="text-xs text-slate-400 italic mt-5 col-span-2 text-center">Chưa có phòng nào. Bấm Thêm phòng mới bên dưới.</p>}
-              {currentRooms.map(r => {
-                const payDays = getDueInfo(r.paymentDate)?.daysLeft || 0;
-                const contractEndDate = endContract(r.contractStart, r.months);
-                const endDays = diffDays(contractEndDate);
-                const isPayUrgent = r.status === 'full' && payDays <= 3;
-                const isPaySoon = r.status === 'full' && payDays > 3 && payDays <= 7;
-                const showContractWarning = r.status === 'full' && contractEndDate && endDays <= 30;
-                const cardStyle = r.status !== 'full'
-                  ? 'bg-white/70 border-dashed border-slate-200 opacity-75'
-                  : isPayUrgent
-                    ? 'bg-red-50 border-red-200 shadow-red-100'
-                    : isPaySoon
-                      ? 'bg-amber-50 border-amber-200 shadow-amber-100'
-                      : 'bg-white border-slate-200 shadow-slate-100';
-                const roomBadgeStyle = r.status !== 'full'
-                  ? 'bg-slate-200 text-slate-600'
-                  : isPayUrgent
-                    ? 'bg-red-600 text-white'
-                    : isPaySoon
-                      ? 'bg-amber-500 text-white'
-                      : 'bg-blue-600 text-white';
-                const payColor = isPayUrgent ? 'bg-red-100 text-red-700 border-red-200' : isPaySoon ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-100';
-                const endColor = endDays <= 7 ? 'bg-red-100 text-red-700 border-red-200' : 'bg-amber-100 text-amber-700 border-amber-200';
-
-                return (
-                  <div key={r.id} className={`p-3 rounded-xl border-2 shadow-sm relative transition-all flex flex-col active:scale-[0.99] ${cardStyle}`}>
-                    <div className="flex justify-between items-center mb-1.5">
-                      <span className={`px-2 py-0.5 rounded-md font-black text-[10px] shadow-sm ${roomBadgeStyle}`}>
-                        {r.roomType === 'mbkd' ? 'MBKD ' : 'P.'}{r.roomCode || r.id} {r.status === 'empty' ? '- TRỐNG' : ''}
-                      </span>
-                      <button onClick={() => { setEditingRoom(r); setIsAddRoomModalOpen(true); }} className="w-6 h-6 bg-white border border-slate-200 rounded-full flex items-center justify-center text-slate-500 hover:bg-blue-600 hover:border-blue-600 hover:text-white active:scale-95 transition-all shadow-sm"><LucideEdit className="w-3 h-3" /></button>
-                    </div>
-                    <p className={`text-[14px] font-black leading-none mb-2 ${isPayUrgent ? 'text-red-700' : isPaySoon ? 'text-amber-700' : 'text-blue-800'}`}>{formatN(r.price)}</p>
-
-                    {r.status === 'full' && (
-                      <div className="space-y-1.5 border-t border-slate-200/70 pt-2 flex-1">
-                        <div className="flex justify-between items-center text-[8px] font-bold uppercase gap-2"><span className="text-slate-500 flex items-center"><CreditCard className="w-3 h-3 mr-1 text-blue-600" /> Đóng tiền</span><span className={`px-1.5 py-0.5 rounded-md border text-center font-black ${payColor}`}>Còn {payDays > 0 ? payDays : 0} ngày</span></div>
-                        {showContractWarning && (
-                          <div className="flex justify-between items-center text-[8px] font-bold uppercase gap-2"><span className="text-slate-500 flex items-center"><Calendar className="w-3 h-3 mr-1 text-amber-600" /> Hợp đồng</span><span className={`px-1.5 py-0.5 rounded-md border text-center font-black ${endColor}`}>Còn {endDays > 0 ? endDays : 0} ngày</span></div>
-                        )}
-                      </div>
-                    )}
-                    <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-slate-200/70 pt-2">
-                      <div className="flex items-center text-slate-600 font-bold text-[9px] bg-white/70 border border-slate-200 px-1.5 py-0.5 rounded-md"><Users2 className="w-3 h-3 mr-1 text-blue-600" />{r.peopleCount ?? r.people ?? 0} người</div>
-                      {r.eBikeCount > 0 && <div className="flex items-center text-slate-600 font-bold text-[9px] bg-white/70 border border-slate-200 px-1.5 py-0.5 rounded-md"><Bike className="w-3 h-3 mr-1 text-amber-600" />{r.eBikeCount ?? r.ebikes ?? 0} xe điện</div>}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-
-            {isManagerOrAbove && (
-              <button onClick={() => { setEditingRoom(null); setIsAddRoomModalOpen(true); }} className="w-full mt-6 bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 active:scale-95 transition-all">
-                <PlusCircle className="w-4 h-4 text-white" /> Thêm Phòng Mới
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* --- HÓA ĐƠN --- */}
-        {isOverwriteModalOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300"></div>
-
-            <div className="bg-white w-full max-w-sm rounded-[32px] shadow-2xl relative z-10 overflow-hidden animate-in zoom-in-95 duration-300">
-              <div className="p-8 text-center">
-                <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                  <AlertTriangle className="w-10 h-10 text-orange-500 animate-bounce" />
-                </div>
-                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight mb-3">Phát hiện trùng lặp!</h3>
-                <p className="text-sm text-slate-500 font-medium leading-relaxed px-2">
-                  Hóa đơn <span className="font-bold text-blue-600">Tháng {new Date().getMonth() + 1}</span> đã tồn tại trên hệ thống. Bạn có muốn xóa bản cũ và tạo lại không?
-                </p>
-              </div>
-
-              <div className="flex p-4 gap-3 bg-slate-50">
-                <button
-                  onClick={() => setIsOverwriteModalOpen(false)}
-                  className="flex-1 py-4 bg-white text-slate-400 font-black uppercase text-[10px] rounded-2xl border border-slate-200 active:scale-95 transition-all"
-                >Để sau</button>
-                <button
-                  onClick={executeGenerateBills}
-                  className="flex-1 py-4 bg-blue-600 text-white font-black uppercase text-[10px] rounded-2xl active:scale-95 transition-all border-b-1 border-blue-800"
-                >Đồng ý tạo lại</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeTab === 'bills' && (
-          <div className="space-y-4 pb-20 animate-in fade-in">
-            <div className="sticky top-0 z-30 bg-indigo-600 rounded-xl p-4 space-y-4 shadow-lg">
-              <div className="bg-white p-1 rounded-xl flex items-center">
-                <button onClick={handlePrevMonth} className="p-3 text-indigo-600"><ChevronLeft /></button>
-                <div className="flex-1 text-center font-black uppercase text-xs">Hóa đơn {monthDisplay}</div>
-                <button onClick={handleNextMonth} className="p-3 text-indigo-600"><ChevronRight /></button>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                <div className="bg-white p-3 rounded-xl text-center">
-                  <p className="text-[7px] font-black text-slate-400 uppercase">Đã thu</p>
-                  <p className="text-sm font-black text-emerald-600">{billStats.totalBillPaids}/{billStats.totalRooms}</p>
-                </div>
-                <div className="bg-white p-3 rounded-xl text-center">
-                  <p className="text-[7px] font-black text-slate-400 uppercase">Chưa thu</p>
-                  <p className="text-sm font-black text-rose-600">{billStats.totalBillNotPaids}</p>
-                </div>
-                <div className="bg-white p-3 rounded-xl text-center">
-                  <p className="text-[7px] font-black text-slate-400 uppercase">Tiền đã thu</p>
-                  <p className="text-sm font-black text-indigo-600">{formatN(billStats.totalAmountPaids)}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              {currentBills.length === 0 ? (
-                <div className="py-20 text-center text-slate-400 italic text-xs">
-                  Chưa có hóa đơn nào trong tháng này.
-                </div>
-              ) : (
-                currentBills.map(bill => (
-                  <div
-                    key={bill.id}
-                    onClick={() => setBottomSheet({ type: 'bill', data: bill })}
-                    className={`bg-white p-3.5 rounded-xl border-2 shadow-sm flex items-center justify-between active:scale-[0.98] transition-all cursor-pointer ${bill.status === 'paid' ? 'border-emerald-100/60' : 'border-rose-100'
-                      }`}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-inner shrink-0 ${bill.status === 'paid' ? 'bg-emerald-50 text-emerald-500' : 'bg-rose-50 text-rose-500'
-                        }`}>
-                        <Receipt className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <p className={`text-[12px] font-black uppercase leading-none mb-1.5 ${bill.status === 'paid' ? 'text-emerald-700' : 'text-rose-700'
-                          }`}>
-                          Phòng {bill.roomId}
-                        </p>
-                        <div className={`text-[8px] font-black px-2 py-0.5 rounded uppercase tracking-wider inline-flex items-center ${bill.status === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
-                          }`}>
-                          {bill.status === 'paid' ? 'Đã thu tiền' : 'Chưa thu'}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="text-right">
-                      <p className={`font-black text-[15px] tracking-tight tabular-nums ${bill.status === 'paid' ? 'text-emerald-600' : 'text-rose-600'
-                        }`}>
-                        {formatN(bill.total)}
-                      </p>
-                      <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                        Tổng cộng
-                      </p>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* --- CHỐT SỐ --- */}
-        {activeTab === 'meters_list' && (
-          <div className="space-y-4 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="sticky top-0 z-30 bg-blue-600 rounded-xl border border-blue-600 backdrop-blur-md p-4 space-y-4">
-              <div className="bg-white p-1 rounded-xl border border-slate-100 shadow-sm flex items-center">
-                <button type="button" onClick={handlePrevMonth} className="p-3 hover:bg-slate-50 rounded-xl text-blue-600 active:scale-90 transition-all"><ChevronLeft className="w-5 h-5" /></button>
-                <div className="flex-1 text-center">
-                  <p className="text-[8px] font-black uppercase text-blue-600">Kỳ chốt số điện</p>
-                  <div className="flex items-center justify-center gap-2 bg-blue-600 px-4 py-1.5 rounded-full w-fit mx-auto">
-                    <Calendar className="w-3.5 h-3.5 text-white" />
-                    <span className="text-xs font-black text-white uppercase">{monthDisplay}</span>
-                  </div>
-                </div>
-                <button type="button" onClick={handleNextMonth} className="p-3 hover:bg-slate-50 rounded-xl text-blue-600 active:scale-90 transition-all"><ChevronRight className="w-5 h-5" /></button>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                <div className="bg-white p-3 rounded-xl text-center">
-                  <p className="text-[7px] font-black text-rose-400 uppercase mb-1">Tổng điện</p>
-                  <div className="flex items-baseline gap-1 text-rose-600 justify-center">
-                    <span className="text-sm font-black">{formatN(summary.kwh)}</span><span className="text-[7px] font-bold">kWh</span>
-                  </div>
-                </div>
-                <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm text-center">
-                  <p className="text-[7px] font-black text-orange-400 uppercase mb-1">Nóng lạnh</p>
-                  <div className="flex items-baseline gap-1 text-orange-600 justify-center">
-                    <span className="text-sm font-black">{formatN(summary.heater)}</span><span className="text-[7px] font-bold">kWh</span>
-                  </div>
-                </div>
-                <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm text-center">
-                  <p className="text-[7px] font-black text-emerald-500 uppercase mb-1">Tổng tiền</p>
-                  <div className="flex items-baseline gap-0.5 text-emerald-600 justify-center">
-                    <span className="text-sm font-black">{formatN(summary.money)}</span><span className="text-[7px] font-bold">đ</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-3 px-0.5">
-              {(!currentMeters || currentMeters.length === 0) && (
-                <div className="py-20 text-center">
-                  <ZapOff className="w-8 h-8 text-slate-200 mx-auto mb-2" />
-                  <p className="text-xs text-slate-400 italic">Chưa có dữ liệu kỳ này.</p>
-                </div>
-              )}
-              {currentMeters?.map(m => {
-                const isOldEmpty = m.oldVal === null || m.oldVal === "";
-                const isNewEmpty = m.newVal === null || m.newVal === "";
-                let consumption = 0;
-                let totalPrice = 0;
-
-                if (!isOldEmpty && !isNewEmpty) {
-                  const vOld = parseN(m.oldVal);
-                  const vNew = parseN(m.newVal);
-                  consumption = vNew >= vOld ? (vNew - vOld) : 0;
-                  totalPrice = consumption * (config.priceElec || 0);
-                }
-
-                return (
-                  <div key={m.id} className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm">
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="flex items-center space-x-3">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${m.type === 'heater' ? 'bg-orange-50 text-orange-500' : 'bg-blue-50 text-blue-600'}`}>
-                          {m.type === 'heater' ? <Flame className="w-5 h-5" /> : <Zap className="w-5 h-5" />}
-                        </div>
-                        <div>
-                          <p className="text-[11px] font-black uppercase text-rose-800 leading-none">{m.name}</p>
-                          <p className="text-[8px] font-bold text-blue-400 mt-1">
-                            Tổng: {formatN(consumption)} số - Tiền: {formatN(totalPrice)} đ
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button onClick={() => { setEditingMeter(m); setIsAddMeterModalOpen(true); }} className="p-2 bg-slate-50 text-slate-400 rounded-xl hover:text-blue-600 transition-all"><Edit className="w-4 h-4" /></button>
-                        <button onClick={() => setMappingMeter(m)} className="p-2 bg-slate-50 text-slate-400 rounded-xl active:bg-orange-50 active:text-orange-500 transition-all"><Boxes className="w-4 h-4" /></button>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-[8px] font-black text-slate-400 uppercase mb-1 block px-1">Số cũ</label>
-                        <input type="number" value={m.oldVal || ''} onChange={(e) => handleUpdateOldMeterUI(m.id, e.target.value)} className="w-full bg-slate-50 border-2 border-transparent p-3 rounded-xl font-black text-slate-500 text-center text-sm outline-none focus:border-purple-200 transition-all shadow-inner" />
-                      </div>
-                      <div>
-                        <label className="text-[8px] font-black text-rose-600 uppercase mb-1 block px-1">Số mới</label>
-                        <input type="number" value={m.newVal || ''} onChange={(e) => handleUpdateMeterUI(m.id, e.target.value)} className="w-full bg-blue-50/50 border-2 border-transparent p-3 rounded-xl font-black text-red-600 text-center text-sm outline-none focus:border-red-200 transition-all shadow-inner" />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {currentMeters?.length > 0 && (
-              <div className="fixed bottom-[4.5rem] left-1/2 -translate-x-1/2 w-full max-w-lg px-4 z-40">
-                <button
-                  onClick={handleSaveMetersAndGenerateBills}
-                  className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-[11px] border-b-1 border-blue-800 active:translate-y-1 transition-all flex items-center justify-center gap-2"
-                >
-                  <Receipt className="w-4 h-4" /> Xác nhận lưu & Lập hóa đơn {monthDisplay}
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* --- THU CHI --- */}
-        {activeTab === 'finance' && canAccessFinance && (
-          <div className="animate-in fade-in pb-20">
-            <div className="sticky top-0 z-30 bg-slate-50 pb-4 -mt-4 -mx-4 px-5">
-              <div className="bg-slate-900 p-5 rounded-2xl text-white shadow-2xl relative border-b-1 border-blue-600 overflow-hidden">
-                <div className="absolute top-0 right-0 w-40 h-40 bg-blue-600 rounded-full blur-3xl opacity-20 pointer-events-none"></div>
-
-                <div className="flex justify-between items-center relative z-50">
-                  <button onClick={() => setIsFinanceStatsOpen(!isFinanceStatsOpen)} className="flex items-center gap-2 active:scale-95 transition-all text-left">
-                    <div className="p-1.5 bg-blue-500/20 rounded-lg">
-                      <Wallet className="w-4 h-4 text-blue-400" />
-                    </div>
-                    <p className="text-[10px] font-black text-blue-300 uppercase tracking-widest flex items-center gap-1">
-                      Báo cáo tài chính
-                      <ChevronDown className={`w-3.5 h-3.5 text-blue-400 transition-transform duration-300 ${!isFinanceStatsOpen ? 'rotate-180' : ''}`} />
-                    </p>
-                  </button>
-
-                  <div className="relative z-50">
-                    <button
-                      onClick={() => setIsMonthOpen(!isMonthOpen)}
-                      className="flex items-center gap-2 bg-blue-600 border border-blue-400 py-1.5 px-3 rounded-full text-[10px] font-black uppercase tracking-wider text-white shadow-lg shadow-blue-950/30 hover:bg-blue-500 transition-all active:scale-95"
-                    >
-                      {monthLabels[selectedMonth]}
-                      <ChevronDown className={`w-3 h-3 transition-transform ${isMonthOpen ? 'rotate-180' : ''}`} />
-                    </button>
-
-                    {isMonthOpen && (
-                      <div className="absolute right-0 mt-2 w-44 bg-slate-900 border border-blue-500/40 rounded-2xl shadow-2xl z-[80] overflow-hidden animate-in zoom-in-95 duration-200 origin-top-right">
-                        <div className="p-1">
-                          {Object.keys(monthLabels).map((key) => (
-                            <button
-                              key={key}
-                              type="button"
-                              onClick={() => { setSelectedMonth(key); setIsMonthOpen(false); }}
-                              className={`w-full flex items-center justify-between px-4 py-3 text-[10px] font-black uppercase tracking-widest transition-all rounded-xl mb-0.5 last:mb-0 ${selectedMonth === key ? 'bg-blue-600 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}
-                            >
-                              <span>{monthLabels[key]}</span>
-                              {selectedMonth === key && <Check className="w-3.5 h-3.5" />}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {isFinanceStatsOpen && (
-                  <div className="animate-in slide-in-from-top-2 duration-200 mt-5 relative z-0">
-                    {canViewProfit && (
-                      <div className="text-center mb-5 relative z-0">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Lợi nhuận ròng</p>
-                        <h3 className="text-4xl font-black tracking-tight tabular-nums text-transparent bg-clip-text bg-gradient-to-r from-blue-200 to-blue-400">
-                          {formatN(financeStats.rev - financeStats.exp)}
-                        </h3>
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-2 gap-3 relative z-0">
-                      <div className="bg-white/5 border border-white/10 rounded-xl p-3.5">
-                        <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Tổng Doanh Thu</p>
-                        <p className="text-lg font-black text-emerald-400">+{formatN(financeStats.rev)}</p>
-                      </div>
-                      <div className="bg-white/5 border border-white/10 rounded-xl p-3.5">
-                        <p className="text-[9px] font-black text-slate-400 uppercase mb-1">Tổng Chi Phí</p>
-                        <p className="text-lg font-black text-rose-400 mb-2">-{formatN(financeStats.exp)}</p>
-                        <div className="space-y-1 border-t border-white/10 pt-2">
-                          <div className="flex justify-between items-center text-[8px] font-bold">
-                            <span className="text-slate-400">Phí cố định</span>
-                            <span className="text-slate-300">{formatN(financeStats.fixedCosts)}</span>
-                          </div>
-                          <div className="flex justify-between items-center text-[8px] font-bold">
-                            <span className="text-slate-400">Phát sinh</span>
-                            <span className="text-slate-300">{formatN(financeStats.txExp)}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="mt-4 space-y-2 px-1">
-              {currentTransactions.length === 0 && (
-                <p className="text-xs text-slate-400 italic text-center mt-10">Chưa có giao dịch thu chi nào.</p>
-              )}
-              {currentTransactions.map(t => (
-                <div key={t.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex items-center justify-between active:scale-[0.98] transition-all">
-                  <div className="flex items-center space-x-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-inner ${t.type === 'in' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                      <ArrowRight className={`w-5 h-5 ${t.type === 'in' ? 'rotate-[-45deg]' : 'rotate-[135deg]'}`} />
-                    </div>
-                    <div>
-                      <p className={`text-[11px] font-black uppercase leading-none mb-1.5 ${t.type === 'in' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                        {t.note}
-                      </p>
-                      <p className="text-[9px] font-bold text-slate-500 uppercase">
-                        {new Date(t.date).toLocaleDateString('vi-VN')}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <p className={`font-black text-sm text-right tabular-nums ${t.type === 'in' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                      {t.type === 'in' ? '+' : '-'}{formatN(t.amount)}
-                    </p>
-                    {canManageTransactions && (
-                      <button onClick={() => {
-                        setEditingTransaction(t);
-                        setTxType(t.type);
-                        const catKey = Object.keys(TRANSACTION_CATEGORIES).find(k => TRANSACTION_CATEGORIES[k].id === t.category) || 'OTHER';
-                        setSelectedCat(catKey);
-                        setIsAddTransactionModalOpen(true);
-                      }} className="p-1.5 bg-slate-50 text-slate-400 rounded-md hover:text-blue-600 transition-colors">
-                        <Edit className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {isAddTransactionModalOpen && (
-          <Modal title="Ghi sổ thu chi" onClose={() => setIsAddTransactionModalOpen(false)}>
-            <form onSubmit={handleAddTx} className="space-y-5 text-left p-1">
-              <div className="bg-slate-100 p-1.5 rounded-xl flex gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setTxType('in')}
-                  className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase transition-all flex items-center justify-center gap-2 ${txType === 'in' ? 'bg-white text-emerald-600' : 'text-slate-400'}`}
-                >
-                  <div className={`w-2 h-2 rounded-full ${txType === 'in' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
-                  Thu vào (+)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTxType('out')}
-                  className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase transition-all flex items-center justify-center gap-2 ${txType === 'out' ? 'bg-white text-rose-600' : 'text-slate-400'}`}
-                >
-                  <div className={`w-2 h-2 rounded-full ${txType === 'out' ? 'bg-rose-500 animate-pulse' : 'bg-slate-300'}`} />
-                  Chi ra (-)
-                </button>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Số tiền (VND)</label>
-                <div className="relative">
-                  <input
-                    type="text" name="amount" required placeholder="0"
-                    defaultValue={editingTransaction ? formatN(editingTransaction.amount) : ''}
-                    className={`w-full p-4 bg-slate-50 rounded-xl font-black text-2xl outline-none border-2 transition-all shadow-inner tabular-nums ... (giữ nguyên style cũ)`}
-                    onInput={(e) => { e.target.value = formatN(parseN(e.target.value)); }}
-                  />
-                  <span className="absolute right-5 top-1/2 -translate-y-1/2 font-black text-slate-300 text-sm">đ</span>
-                </div>
-              </div>
-
-              <div className="space-y-2 relative">
-                <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Danh mục</label>
-
-                <button
-                  type="button"
-                  onClick={() => setIsCatOpen(!isCatOpen)}
-                  className="w-full p-4 bg-slate-50 rounded-xl font-bold text-sm text-left flex justify-between items-center border-2 border-transparent hover:border-slate-200 transition-all shadow-inner active:scale-[0.99]"
-                >
-                  <span className="text-slate-700">
-                    {TRANSACTION_CATEGORIES[selectedCat]?.label || TRANSACTION_CATEGORIES['RENT'].label}
-                  </span>
-                  <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-300 ${isCatOpen ? 'rotate-180' : ''}`} />
-                </button>
-
-                {isCatOpen && (
-                  <>
-                    <div className="fixed inset-0 z-[60]" onClick={() => setIsCatOpen(false)}></div>
-                    <div className="absolute left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-2xl z-[70] overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-top">
-                      <div className="max-h-60 overflow-y-auto p-1">
-                        {Object.keys(TRANSACTION_CATEGORIES).map((key) => (
-                          <button
-                            key={key}
-                            type="button"
-                            onClick={() => { setSelectedCat(key); setIsCatOpen(false); }}
-                            className={`w-full px-4 py-3.5 text-left text-sm font-bold flex justify-between items-center transition-colors rounded-xl mb-0.5 last:mb-0 ${selectedCat === key ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50 hover:text-blue-500'}`}
-                          >
-                            <span>{TRANSACTION_CATEGORIES[key].label}</span>
-                            {selectedCat === key && <Check className="w-4 h-4 text-blue-600" />}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Nội dung chi tiết</label>
-                <textarea
-                  name="note" rows="2" placeholder="Ghi chú thêm..."
-                  defaultValue={editingTransaction?.note || ''}
-                  className="w-full p-4 bg-slate-50 rounded-xl font-bold text-sm outline-none border-2 border-transparent focus:border-blue-600/20 shadow-inner resize-none"
-                />
-              </div>
-
-              <div className="flex gap-2 pt-3">
-                {editingTransaction && canManageTransactions && (
-                  <button type="button" onClick={() => handleDeleteTransaction(editingTransaction.id)} className="flex-1 bg-red-500 text-white py-4 rounded-xl font-black uppercase text-[11px] active:scale-95 border-b-1 border-red-200">Xóa</button>
-                )}
-                <button type="submit" className={`flex-[2] text-white py-4 rounded-xl font-black uppercase text-[11px] transition-all active:scale-95 border-b-1 ${txType === 'in' ? 'bg-emerald-600 border-emerald-800' : 'bg-rose-600 border-rose-800'}`}>
-                  {editingTransaction ? 'Lưu thay đổi' : 'Xác nhận'}
-                </button>
-              </div>
-
-              <input type="hidden" name="type" value={txType} />
-              <input type="hidden" name="category" value={TRANSACTION_CATEGORIES[selectedCat]?.id ?? 0} />
-            </form>
-          </Modal>
-        )}
-
-        {/* --- CHAT AI --- */}
-        {activeTab === 'ai' && (
-          <div className="flex flex-col h-[calc(100vh-140px)] bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden animate-in slide-in-from-bottom">
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50 no-scrollbar pb-10">
-              {aiMessages.map((msg, i) => (
-                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[85%] p-3 rounded-xl text-sm ${msg.role === 'user' ? 'bg-blue-600 text-white rounded-br-none shadow-md shadow-blue-200' : 'bg-white text-slate-800 rounded-bl-none border border-slate-200 shadow-sm whitespace-pre-wrap'}`}>
-                    {msg.text}
-                  </div>
-                </div>
-              ))}
-              {isAiLoading && <div className="flex justify-start"><div className="p-3 bg-white border border-slate-200 shadow-sm rounded-xl rounded-bl-none"><Loader2 className="w-4 h-4 animate-spin text-blue-600" /></div></div>}
-            </div>
-            <form onSubmit={handleAiChat} className="p-3 bg-white border-t border-slate-100 flex space-x-2">
-              <input name="q" placeholder="Hỏi AI Lucky Home..." disabled={isAiLoading} className="flex-1 bg-slate-100 border-none rounded-lg px-3 text-xs font-bold outline-none focus:bg-blue-50 transition-colors" />
-              <button type="submit" disabled={isAiLoading} className="p-2.5 bg-blue-600 text-white rounded-lg active:scale-90 flex items-center justify-center disabled:opacity-50"><Send className="w-4 h-4" /></button>
-            </form>
-          </div>
-        )}
-
-        {/* --- TÀI KHOẢN --- */}
-        {activeTab === 'profile' && (
-          <div className="min-h-[calc(100vh-170px)] flex flex-col animate-in fade-in pb-6">
-            <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5 mb-4">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-sm">
-                  <User className="w-7 h-7" />
-                </div>
-                <div className="min-w-0">
-                  <h3 className="font-black text-base text-slate-900 uppercase tracking-tight truncate">
-                    {user?.fullName || user?.username || 'Tài khoản'}
-                  </h3>
-                  <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mt-1">
-                    {getRoleLabel(user?.role)}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-              <div className="bg-blue-600 px-5 py-4">
-                <h4 className="text-[10px] font-black text-white uppercase tracking-widest">Đổi mật khẩu</h4>
-              </div>
-              <form onSubmit={handleChangePassword} className="p-5">
-                <div className="grid grid-cols-1 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[8px] font-black text-slate-400 uppercase px-1">Mật khẩu cũ</label>
-                    <input type="password" value={changePasswordForm.oldPassword || ''} onChange={e => setChangePasswordForm({ ...changePasswordForm, oldPassword: e.target.value })} className="w-full bg-slate-50 p-3 rounded-xl font-bold text-xs outline-none focus:border-rose-600 border border-transparent transition-all" required />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[8px] font-black text-slate-400 uppercase px-1">Mật khẩu mới</label>
-                    <input type="password" value={changePasswordForm.newPassword || ''} onChange={e => setChangePasswordForm({ ...changePasswordForm, newPassword: e.target.value })} className="w-full bg-slate-50 p-3 rounded-xl font-bold text-xs outline-none focus:border-rose-600 border border-transparent transition-all" required />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[8px] font-black text-slate-400 uppercase px-1">Xác nhận mật khẩu mới</label>
-                    <input type="password" value={changePasswordForm.confirmNewPassword || ''} onChange={e => setChangePasswordForm({ ...changePasswordForm, confirmNewPassword: e.target.value })} className="w-full bg-slate-50 p-3 rounded-xl font-bold text-xs outline-none focus:border-rose-600 border border-transparent transition-all" required />
-                  </div>
-                  <button type="submit" className="w-full bg-rose-600 text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 border-b-1 border-rose-800 active:translate-y-1 transition-all">
-                    <Lock className="w-4 h-4" /> Xác nhận đổi mật khẩu
-                  </button>
-                </div>
-              </form>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleLogout}
-              className="mt-4 w-full bg-white border border-red-100 text-red-600 py-4 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 shadow-sm active:scale-[0.98] transition-all"
-            >
-              <LogOut className="w-4 h-4" /> Đăng xuất
-            </button>
-          </div>
-        )}
-
-        {/* --- CÀI ĐẶT --- */}
         {activeTab === 'settings' && isOwnerOrAdmin && (
           <div className="space-y-4 animate-in fade-in pb-20">
             <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm flex items-center justify-between mb-2">
@@ -2622,6 +1899,132 @@ const App = () => {
               )}
             </div>
           </div>
+        )}
+
+
+        {/* --- HÓA ĐƠN --- */}
+        {isOverwriteModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300"></div>
+
+            <div className="bg-white w-full max-w-sm rounded-[32px] shadow-2xl relative z-10 overflow-hidden animate-in zoom-in-95 duration-300">
+              <div className="p-8 text-center">
+                <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <AlertTriangle className="w-10 h-10 text-orange-500 animate-bounce" />
+                </div>
+                <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight mb-3">Phát hiện trùng lặp!</h3>
+                <p className="text-sm text-slate-500 font-medium leading-relaxed px-2">
+                  Hóa đơn <span className="font-bold text-blue-600">Tháng {new Date().getMonth() + 1}</span> đã tồn tại trên hệ thống. Bạn có muốn xóa bản cũ và tạo lại không?
+                </p>
+              </div>
+
+              <div className="flex p-4 gap-3 bg-slate-50">
+                <button
+                  onClick={() => setIsOverwriteModalOpen(false)}
+                  className="flex-1 py-4 bg-white text-slate-400 font-black uppercase text-[10px] rounded-2xl border border-slate-200 active:scale-95 transition-all"
+                >Để sau</button>
+                <button
+                  onClick={executeGenerateBills}
+                  className="flex-1 py-4 bg-blue-600 text-white font-black uppercase text-[10px] rounded-2xl active:scale-95 transition-all border-b-1 border-blue-800"
+                >Đồng ý tạo lại</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {isAddTransactionModalOpen && (
+          <Modal title="Ghi sổ thu chi" onClose={() => setIsAddTransactionModalOpen(false)}>
+            <form onSubmit={handleAddTx} className="space-y-5 text-left p-1">
+              <div className="bg-slate-100 p-1.5 rounded-xl flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setTxType('in')}
+                  className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase transition-all flex items-center justify-center gap-2 ${txType === 'in' ? 'bg-white text-emerald-600' : 'text-slate-400'}`}
+                >
+                  <div className={`w-2 h-2 rounded-full ${txType === 'in' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
+                  Thu vào (+)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTxType('out')}
+                  className={`flex-1 py-3 rounded-xl font-black text-[10px] uppercase transition-all flex items-center justify-center gap-2 ${txType === 'out' ? 'bg-white text-rose-600' : 'text-slate-400'}`}
+                >
+                  <div className={`w-2 h-2 rounded-full ${txType === 'out' ? 'bg-rose-500 animate-pulse' : 'bg-slate-300'}`} />
+                  Chi ra (-)
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Số tiền (VND)</label>
+                <div className="relative">
+                  <input
+                    type="text" name="amount" required placeholder="0"
+                    defaultValue={editingTransaction ? formatN(editingTransaction.amount) : ''}
+                    className={`w-full p-4 bg-slate-50 rounded-xl font-black text-2xl outline-none border-2 transition-all shadow-inner tabular-nums ... (giữ nguyên style cũ)`}
+                    onInput={(e) => { e.target.value = formatN(parseN(e.target.value)); }}
+                  />
+                  <span className="absolute right-5 top-1/2 -translate-y-1/2 font-black text-slate-300 text-sm">đ</span>
+                </div>
+              </div>
+
+              <div className="space-y-2 relative">
+                <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Danh mục</label>
+
+                <button
+                  type="button"
+                  onClick={() => setIsCatOpen(!isCatOpen)}
+                  className="w-full p-4 bg-slate-50 rounded-xl font-bold text-sm text-left flex justify-between items-center border-2 border-transparent hover:border-slate-200 transition-all shadow-inner active:scale-[0.99]"
+                >
+                  <span className="text-slate-700">
+                    {TRANSACTION_CATEGORIES[selectedCat]?.label || TRANSACTION_CATEGORIES['RENT'].label}
+                  </span>
+                  <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform duration-300 ${isCatOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {isCatOpen && (
+                  <>
+                    <div className="fixed inset-0 z-[60]" onClick={() => setIsCatOpen(false)}></div>
+                    <div className="absolute left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-2xl z-[70] overflow-hidden animate-in fade-in zoom-in-95 duration-200 origin-top">
+                      <div className="max-h-60 overflow-y-auto p-1">
+                        {Object.keys(TRANSACTION_CATEGORIES).map((key) => (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => { setSelectedCat(key); setIsCatOpen(false); }}
+                            className={`w-full px-4 py-3.5 text-left text-sm font-bold flex justify-between items-center transition-colors rounded-xl mb-0.5 last:mb-0 ${selectedCat === key ? 'bg-blue-50 text-blue-600' : 'text-slate-600 hover:bg-slate-50 hover:text-blue-500'}`}
+                          >
+                            <span>{TRANSACTION_CATEGORIES[key].label}</span>
+                            {selectedCat === key && <Check className="w-4 h-4 text-blue-600" />}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase px-1 tracking-widest">Nội dung chi tiết</label>
+                <textarea
+                  name="note" rows="2" placeholder="Ghi chú thêm..."
+                  defaultValue={editingTransaction?.note || ''}
+                  className="w-full p-4 bg-slate-50 rounded-xl font-bold text-sm outline-none border-2 border-transparent focus:border-blue-600/20 shadow-inner resize-none"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-3">
+                {editingTransaction && canManageTransactions && (
+                  <button type="button" onClick={() => handleDeleteTransaction(editingTransaction.id)} className="flex-1 bg-red-500 text-white py-4 rounded-xl font-black uppercase text-[11px] active:scale-95 border-b-1 border-red-200">Xóa</button>
+                )}
+                <button type="submit" className={`flex-[2] text-white py-4 rounded-xl font-black uppercase text-[11px] transition-all active:scale-95 border-b-1 ${txType === 'in' ? 'bg-emerald-600 border-emerald-800' : 'bg-rose-600 border-rose-800'}`}>
+                  {editingTransaction ? 'Lưu thay đổi' : 'Xác nhận'}
+                </button>
+              </div>
+
+              <input type="hidden" name="type" value={txType} />
+              <input type="hidden" name="category" value={TRANSACTION_CATEGORIES[selectedCat]?.id ?? 0} />
+            </form>
+          </Modal>
         )}
 
         {/* LỖI PHÂN QUYỀN */}
