@@ -3203,8 +3203,8 @@ const App = () => {
       {bottomSheet && bottomSheet.type === 'bill' && (
         <div className="fixed inset-0 z-[600] flex items-center justify-center">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setBottomSheet(null)} />
-          <div className="bg-white w-full max-w-lg h-full p-4 sm:p-6 shadow-2xl animate-in slide-in-from-bottom duration-500 relative flex flex-col no-scrollbar overflow-hidden">
-            <div className="flex-1 overflow-y-auto no-scrollbar pb-4 pt-2">
+          <div className="bg-white w-full max-w-lg h-full sm:p-6 shadow-2xl animate-in slide-in-from-bottom duration-500 relative flex flex-col no-scrollbar overflow-hidden">
+            <div className="flex-1 overflow-y-auto no-scrollbar">
               <div
                 key={`receipt-export-${bottomSheet.data.id}-${bottomSheet.data.total}-${bottomSheet.data.details.discount}`}
                 id={`receipt-export-${bottomSheet.data.id}`}
@@ -3252,7 +3252,7 @@ const App = () => {
                       <div className="flex flex-col">
                         <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight leading-tight">Tiền điện riêng</span>
                         <p className="text-[9px] text-blue-500 font-semibold leading-tight mt-0.5">
-                          Số: {bottomSheet.data.meter?.old} → {bottomSheet.data.meter?.new} <span className="text-slate-400">({bottomSheet.data.meter?.new - bottomSheet.data.meter?.old} số)</span>
+                          Số: {bottomSheet.data.meter?.old} → {bottomSheet.data.meter?.new} <span className="text-blue-600">({bottomSheet.data.meter?.new - bottomSheet.data.meter?.old} số)</span>
                         </p>
                       </div>
                       <span className="text-[13px] font-black text-slate-800">{formatN(bottomSheet.data.details.elec)}</span>
@@ -3263,7 +3263,7 @@ const App = () => {
                         <div className="flex flex-col">
                           <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight leading-tight">Điện BNL Chung</span>
                           <p className="text-[9px] text-rose-500 font-semibold leading-tight mt-0.5">
-                            Số: {bottomSheet.data.heaterMeter.old} → {bottomSheet.data.heaterMeter.new} <span className="text-slate-400">({bottomSheet.data.heaterMeter.new - bottomSheet.data.heaterMeter.old} số)</span>
+                            Số: {bottomSheet.data.heaterMeter.old} → {bottomSheet.data.heaterMeter.new} <span className="text-rose-600">({bottomSheet.data.heaterMeter.new - bottomSheet.data.heaterMeter.old} số)</span>
                           </p>
                         </div>
                         <span className="text-[13px] font-black text-slate-800">{formatN(bottomSheet.data.details.heater)}</span>
@@ -3306,18 +3306,24 @@ const App = () => {
                         <span className="text-[13px] font-black text-red-600">-{formatN(bottomSheet.data.details.discount || 0)}</span>
                       )}
                     </div>
+                    <div className="bg-indigo-600 p-3 rounded-lg text-white mb-2 shadow-sm flex items-center justify-between">
+                      <p className="text-[11px] font-bold uppercase tracking-widest opacity-80">
+                        Tổng thanh toán
+                      </p>
+                      <p className="text-xl font-black leading-none tabular-nums">
+                        {formatN(bottomSheet.data.total)}
+                        <span className="text-[11px] opacity-80 font-bold ml-1">đ</span>
+                      </p>
+                    </div>
                   </div>
                   {/* 3. Tổng tiền & Chuyển khoản (Cân bằng & Sát viền) */}
                   <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl flex items-stretch gap-3">
                     <div className="flex-1 flex flex-col justify-between">
-                      <div className="bg-indigo-600 p-3 rounded-lg text-white mb-2 shadow-sm">
-                        <p className="text-[9px] font-bold uppercase tracking-widest opacity-80 mb-0.5">Tổng Thanh Toán</p>
-                        <p className="text-xl font-black leading-none">{formatN(bottomSheet.data.total)} <span className="text-[10px] uppercase opacity-80 font-bold">VNĐ</span></p>
-                      </div>
+
                       <div className="px-1">
-                        <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Chuyển khoản</p>
-                        <p className="text-[10px] font-black text-slate-700 uppercase leading-tight truncate">{config.bankName || "MB BANK"}</p>
-                        <p className="text-[13px] font-black text-blue-600 tracking-tighter leading-tight mt-0.5">{config.bankAcc || "0000"}</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Thông tin chuyển khoản</p>
+                        <p className="text-[15px] font-black text-purple-700 uppercase leading-tight truncate mt-5">{config.bankName || "MB BANK"}</p>
+                        <p className="text-[20px] font-black text-blue-600 tracking-tighter leading-tight mt-1">{config.bankAcc || "0000"}</p>
                       </div>
                     </div>
                     <div className="w-[100px] h-[100px] bg-white rounded-lg border border-slate-200 p-1 flex items-center justify-center shrink-0 shadow-sm self-end">
@@ -3339,7 +3345,7 @@ const App = () => {
             </div>
 
             {/* Các Nút Thao Tác (Cố định ở dưới cùng) */}
-            <div className="grid grid-cols-1 gap-3 shrink-0 mt-4 pt-4 border-t border-slate-100 w-full max-w-[420px] mx-auto">
+            <div className="grid grid-cols-1 gap-3 shrink-0 mt-4 p-2 pt-4 border-t border-slate-100 w-full max-w-[420px] mx-auto">
               <button disabled={isGeneratingImage} onClick={() => handleShareZaloImage(bottomSheet.data)} className="w-full bg-[#0068FF] text-white py-3.5 rounded-xl font-black text-[11px] uppercase active:scale-95 border-b-2 border-[#004BBF] flex items-center justify-center gap-2 transition-all disabled:opacity-70 shadow-sm">
                 {isGeneratingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
                 {isGeneratingImage ? 'ĐANG TẠO ẢNH...' : 'COPY ẢNH CHO ZALO'}
