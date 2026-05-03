@@ -11,15 +11,13 @@ import {
   Edit, Trash2, ZapOff, PiggyBank, Landmark, Bell, Target, PieChart
 } from 'lucide-react';
 
-import { toPng } from 'html-to-image';
-import { domToCanvas } from 'modern-screenshot';
-import jsQR from 'jsqr';
-
 // --- Tách Component & Utils (Giai đoạn 1 & 2) ---
 import { TRANSACTION_CATEGORIES } from './utils/constants';
 import { formatN, parseN } from './utils/formatters';
 import { diffDays, getDueInfo, endContract, getSafeDate } from './utils/date';
 import { parseVietQR, getBankNameFromBin } from './utils/qr';
+import { exportToClipboard } from './utils/imageExport';
+import { readQRFromFile } from './utils/qrReader';
 
 import Modal from './components/common/Modal';
 import ToastNotification from './components/common/Toast';
@@ -949,142 +947,36 @@ const App = () => {
     // Đợi 600ms để đảm bảo animation (duration-500) chạy xong hoàn toàn, tránh chụp phải ảnh mờ/trắng
     await new Promise(r => setTimeout(r, 600));
 
-    const el = document.getElementById(`receipt-export-${billData.id}`);
-
-    if (!el) {
-      showToast("Giao diện chưa sẵn sàng, vui lòng thử lại sau", "error");
-      setIsGeneratingImage(false);
-      return;
-    }
-
-    // KHẮC PHỤC TRIỆT ĐỂ: Kỹ thuật Deep Clone - Tạo bản sao tách biệt khỏi giao diện cũ
-    // Tránh việc trình duyệt lấy nhầm cache ảnh của lần tạo trước đó
-    const clone = el.cloneNode(true);
-    const wrapper = document.createElement('div');
-    Object.assign(wrapper.style, { position: 'absolute', top: '-9999px', left: '-9999px', width: '420px', pointerEvents: 'none' });
-    wrapper.appendChild(clone);
-    document.body.appendChild(wrapper);
-
     try {
-      // Đảm bảo ảnh QR tải xong
-      const qrImg = clone.querySelector('img');
-      if (qrImg && !qrImg.complete) {
-        await new Promise((resolve) => {
-          qrImg.onload = resolve;
-          qrImg.onerror = resolve;
-        });
-      }
-
-      let canvas = null;
-
-      // Ưu tiên modern-screenshot để xử lý triệt để lỗi lệch CSS & cache ảnh cũ
-      try {
-        // Hỗ trợ đợi font chữ load xong để không bị lệch chữ
-        await document.fonts.ready;
-        await new Promise(r => setTimeout(r, 200)); // Đợi thêm một chút để DOM clone ổn định
-
-        canvas = await domToCanvas(clone, {
-          scale: 2.5,
-          backgroundColor: '#ffffff'
-        });
-      } catch (err) {
-        console.warn("modern-screenshot lỗi → fallback html2canvas", err);
-      }
-
-      if (!canvas && window.html2canvas) {
-        canvas = await window.html2canvas(clone, {
-          scale: 2.5,
-          useCORS: true,
-          backgroundColor: '#ffffff'
-        });
-      }
-
-      const cropCanvas = (canvas) => {
-        const ctx = canvas.getContext('2d');
-        const { width, height } = canvas;
-        const data = ctx.getImageData(0, 0, width, height).data;
-
-        let top = null, left = null, right = null, bottom = null;
-
-        for (let y = 0; y < height; y++) {
-          for (let x = 0; x < width; x++) {
-            const i = (y * width + x) * 4;
-            if (data[i + 3] > 0) { // Check alpha
-              if (top === null) top = y;
-              if (left === null || x < left) left = x;
-              if (right === null || x > right) right = x;
-              bottom = y;
-            }
-          }
-        }
-
-        // Chống crash ngầm nếu ảnh hoàn toàn trong suốt (thường do thư viện lỗi chụp trắng)
-        if (top === null) return canvas;
-
-        const w = right - left + 1;
-        const h = bottom - top + 1;
-
-        const cropped = document.createElement('canvas');
-        cropped.width = w;
-        cropped.height = h;
-
-        cropped.getContext('2d').drawImage(canvas, left, top, w, h, 0, 0, w, h);
-        return cropped;
-      };
-
-      const finalCanvas = cropCanvas(canvas);
-      const blob = await new Promise(resolve => finalCanvas.toBlob(resolve, 'image/png'));
-
-      if (!blob) throw new Error("Không thể tạo dữ liệu ảnh (Kích thước = 0).");
-
-      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      await exportToClipboard(`receipt-export-${billData.id}`);
       showToast("Đã copy ảnh vào clipboard!", "success");
-
     } catch (e) {
       console.error(e);
-      showToast("Lỗi khi tạo ảnh: " + e.message, "error");
+      showToast(e.message || "Lỗi khi xuất ảnh", "error");
     } finally {
-      if (document.body.contains(wrapper)) {
-        document.body.removeChild(wrapper);
-      }
       setIsGeneratingImage(false);
     }
   };
 
-  const handleUploadQR = (e) => {
+  const handleUploadQR = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setIsScanningQR(true);
-    const reader = new FileReader();
-
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx.drawImage(img, 0, 0, img.width, img.height);
-        const imageData = ctx.getImageData(0, 0, img.width, img.height);
-
-        const code = jsQR(imageData.data, imageData.width, imageData.height);
-        if (code) {
-          const { bin, acc } = parseVietQR(code.data);
-          if (bin && acc) {
-            setConfig(prev => ({ ...prev, bankBin: bin, bankAcc: acc, bankName: getBankNameFromBin(bin) }));
-            showToast("Tuyệt vời! Đã nhận diện thành công mã VietQR.", "success");
-          } else {
-            showToast("QR không đúng chuẩn VietQR hoặc không có số tài khoản.", "error");
-          }
-        } else {
-          showToast("Không thể đọc mã QR. Vui lòng chọn ảnh rõ nét hơn.", "error");
-        }
-        setIsScanningQR(false);
-      };
-      img.src = event.target.result;
-    };
-    reader.readAsDataURL(file);
+    try {
+      const qrData = await readQRFromFile(file);
+      const { bin, acc } = parseVietQR(qrData);
+      if (bin && acc) {
+        setConfig(prev => ({ ...prev, bankBin: bin, bankAcc: acc, bankName: getBankNameFromBin(bin) }));
+        showToast("Tuyệt vời! Đã nhận diện thành công mã VietQR.", "success");
+      } else {
+        showToast("QR không đúng chuẩn VietQR hoặc không có số tài khoản.", "error");
+      }
+    } catch (err) {
+      showToast(err.message, "error");
+    } finally {
+      setIsScanningQR(false);
+    }
     e.target.value = null;
   };
 

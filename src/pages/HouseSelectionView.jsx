@@ -37,6 +37,19 @@ const getAdvancedDueInfo = (startDate, paymentDay, paymentPeriod) => {
     return { daysLeft: diffDays, dueDate };
 };
 
+const ROLE_DISPLAY_MAP = {
+    SuperAdmin: { text: 'Quản trị viên', class: 'bg-purple-100 text-purple-600' },
+    Owner: { text: 'Chủ nhà', class: 'bg-blue-100 text-blue-600' },
+    Manager: { text: 'Quản lý', class: 'bg-indigo-100 text-indigo-600' },
+    Staff: { text: 'Nhân viên', class: 'bg-slate-100 text-slate-500' }
+};
+
+const getRoomStatusColor = (isFull, emptyRooms, totalRooms) => {
+    if (isFull) return 'bg-emerald-500';
+    const emptyRatio = emptyRooms / totalRooms;
+    return emptyRatio <= 0.3 ? 'bg-amber-500' : 'bg-red-500';
+};
+
 const HouseSelectionView = ({
     user,
     houses,
@@ -198,21 +211,7 @@ const HouseSelectionView = ({
 
                         const cardStyle = isUrgentPay ? 'bg-red-50/50 border-red-100' : isFull ? 'bg-emerald-50/30 border-emerald-100' : 'bg-white border-slate-100';
 
-                        const getRoleDisplay = (role) => {
-                            switch (role) {
-                                case 'SuperAdmin': return { text: 'Quản trị viên', class: 'bg-purple-100 text-purple-600' };
-                                case 'Owner': return { text: 'Chủ nhà', class: 'bg-blue-100 text-blue-600' };
-                                case 'Manager': return { text: 'Quản lý', class: 'bg-indigo-100 text-indigo-600' };
-                                default: return { text: 'Nhân viên', class: 'bg-slate-100 text-slate-500' };
-                            }
-                        };
-                        const roleInfo = getRoleDisplay(h.userRole);
-
-                        const getRoomStatusColor = () => {
-                            if (isFull) return 'bg-emerald-500';
-                            const emptyRatio = h.emptyRooms / h.totalRooms;
-                            return emptyRatio <= 0.3 ? 'bg-amber-500' : 'bg-red-500';
-                        };
+                        const roleInfo = ROLE_DISPLAY_MAP[h.userRole] || ROLE_DISPLAY_MAP.Staff;
 
                         return (
                             <div key={h.id} className={`w-full p-2.5 rounded-xl border shadow-sm active:scale-[0.99] transition-all text-left relative mb-2 ${cardStyle}`}>
@@ -272,7 +271,7 @@ const HouseSelectionView = ({
                                 <div className="pt-2 border-t border-black/5 flex items-center justify-between gap-2">
                                     <div className="flex items-center">
                                         <div className={`flex items-center text-[10px] font-bold px-2 py-1 rounded-md ${isFull ? 'text-emerald-700 bg-emerald-100/50' : 'text-blue-700 bg-blue-50'}`}>
-                                            <div className={`w-1.5 h-1.5 rounded-full mr-2 ${isFull ? '' : 'animate-pulse'} ${getRoomStatusColor()}`} />
+                                            <div className={`w-1.5 h-1.5 rounded-full mr-2 ${isFull ? '' : 'animate-pulse'} ${getRoomStatusColor(isFull, h.emptyRooms, h.totalRooms)}`} />
                                             {isFull ? `Đã lấp đầy (${h.totalRooms} phòng)` : `Trống ${h.emptyRooms} / ${h.totalRooms} phòng`}
                                         </div>
                                     </div>
