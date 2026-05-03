@@ -2,7 +2,7 @@ import React from 'react';
 import { ChevronLeft, ChevronRight, Receipt, AlertTriangle } from 'lucide-react';
 import { formatN } from '../utils/formatters';
 
-const BillsPage = ({
+const BillsView = ({
     handlePrevMonth,
     handleNextMonth,
     monthDisplay,
@@ -83,4 +83,4 @@ const BillsPage = ({
     );
 };
 
-export default BillsPage;
+export default BillsView;

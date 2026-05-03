@@ -2,7 +2,7 @@ import React from 'react';
 import { ChevronDown, PiggyBank, Landmark } from 'lucide-react';
 import { formatN } from '../utils/formatters';
 
-const SavingsPage = ({
+const SavingsView = ({
     isSavingsStatsOpen,
     setIsSavingsStatsOpen,
     uniqueBankNames,
@@ -199,4 +199,4 @@ const SavingsPage = ({
     );
 };
 
-export default SavingsPage;
+export default SavingsView;

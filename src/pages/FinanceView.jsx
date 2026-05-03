@@ -3,7 +3,7 @@ import { Wallet, ChevronDown, Check, ArrowRight, Edit } from 'lucide-react';
 import { formatN } from '../utils/formatters';
 import { TRANSACTION_CATEGORIES } from '../utils/constants';
 
-const FinancePage = ({
+const FinanceView = ({
     canViewProfit,
     isFinanceStatsOpen,
     setIsFinanceStatsOpen,
@@ -144,4 +144,4 @@ const FinancePage = ({
     );
 };
 
-export default FinancePage;
+export default FinanceView;

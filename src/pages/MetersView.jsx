@@ -2,7 +2,7 @@ import React from 'react';
 import { ChevronLeft, ChevronRight, Calendar, Flame, Zap, Edit, Boxes, Receipt, ZapOff } from 'lucide-react';
 import { formatN, parseN } from '../utils/formatters';
 
-const MetersPage = ({
+const MetersView = ({
     handlePrevMonth,
     handleNextMonth,
     monthDisplay,
@@ -121,4 +121,4 @@ const MetersPage = ({
     );
 };
 
-export default MetersPage;
+export default MetersView;

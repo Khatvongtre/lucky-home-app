@@ -1,7 +1,7 @@
 import React from 'react';
 import { User, Lock, LogOut } from 'lucide-react';
 
-const ProfilePage = ({
+const ProfileView = ({
     user,
     getRoleLabel,
     handleLogout,
@@ -63,4 +63,4 @@ const ProfilePage = ({
     );
 };
 
-export default ProfilePage;
+export default ProfileView;

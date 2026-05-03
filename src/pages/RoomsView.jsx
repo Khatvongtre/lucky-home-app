@@ -3,7 +3,7 @@ import { LucideEdit, CreditCard, Calendar, Users2, Bike, PlusCircle } from 'luci
 import { formatN } from '../utils/formatters';
 import { diffDays, getDueInfo, endContract } from '../utils/date';
 
-const RoomsPage = ({
+const RoomsView = ({
     currentRooms,
     setEditingRoom,
     setIsAddRoomModalOpen,
@@ -73,4 +73,4 @@ const RoomsPage = ({
     );
 };
 
-export default RoomsPage;
+export default RoomsView;

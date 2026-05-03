@@ -2,7 +2,7 @@ import React from 'react';
 import { Zap, TrendingUp, Droplets, Activity, Wifi } from 'lucide-react';
 import { formatN } from '../utils/formatters';
 
-const DashboardPage = ({
+const DashboardView = ({
     shouldShowMeterBanner,
     setActiveTab,
     dashboardSummary,
@@ -87,4 +87,4 @@ const DashboardPage = ({
     );
 };
 
-export default DashboardPage;
+export default DashboardView;

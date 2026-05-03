@@ -1,7 +1,7 @@
 import React from 'react';
 import { Loader2, Send } from 'lucide-react';
 
-const AiChatPage = ({ aiMessages, isAiLoading, handleAiChat }) => {
+const AiChatView = ({ aiMessages, isAiLoading, handleAiChat }) => {
     return (
         <div className="flex flex-col h-[calc(100vh-140px)] bg-white rounded-xl shadow-xl border border-slate-100 overflow-hidden animate-in slide-in-from-bottom">
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50 no-scrollbar pb-10">
@@ -22,4 +22,4 @@ const AiChatPage = ({ aiMessages, isAiLoading, handleAiChat }) => {
     );
 };
 
-export default AiChatPage;
+export default AiChatView;
