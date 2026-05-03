@@ -1,3 +1,5 @@
+import { domToBlob } from 'modern-screenshot';
+
 export const exportToClipboard = async (elementId) => {
     const el = document.getElementById(elementId);
     if (!el) throw new Error("Giao diện chưa sẵn sàng, vui lòng thử lại sau");
@@ -7,18 +9,20 @@ export const exportToClipboard = async (elementId) => {
         // Lấy chiều rộng thật của hóa đơn trên màn hình
         const width = el.offsetWidth;
 
-        // Clone phần tử để render độc lập, tránh lỗi tọa độ Scroll và CSS Transform (nguyên nhân gây đẩy chữ)
+        // Clone phần tử
         const clone = el.cloneNode(true);
         const wrapper = document.createElement('div');
 
-        // Đặt wrapper ẩn, cố định ở góc (0,0) tuyệt đối để html2canvas vẽ tọa độ chuẩn xác 100%
+        // Đặt wrapper ở chế độ absolute, đẩy hoàn toàn ra khỏi khung nhìn để tránh bị đè layout trên mobile
         Object.assign(wrapper.style, {
-            position: 'fixed',
+            position: 'absolute',
             top: '0px',
             left: '-9999px',
             width: `${width}px`,
-            zIndex: -1000,
-            pointerEvents: 'none'
+            zIndex: -1,
+            pointerEvents: 'none',
+            margin: '0',
+            padding: '0',
         });
 
         // Ép width cho clone, tắt shadow và margin để tránh html2canvas bị sai lệch padding
@@ -27,13 +31,25 @@ export const exportToClipboard = async (elementId) => {
             transform: 'none',
             boxShadow: 'none',
             width: `${width}px`,
-            maxWidth: `${width}px`
+            maxWidth: 'none',
+        });
+
+        // FIX CỰC MẠNH: Thay thế ô <input> nhập giảm giá thành văn bản <span>
+        // Khắc phục triệt để lỗi html2canvas render padding ô input làm đẩy/xô lệch layout các chữ khác
+        const inputs = clone.querySelectorAll('input');
+        inputs.forEach(input => {
+            const span = document.createElement('span');
+            span.textContent = input.value;
+            span.className = input.className; // Kế thừa nguyên vẹn class của Tailwind
+            span.style.display = 'inline-block';
+            input.parentNode.replaceChild(span, input);
         });
 
         wrapper.appendChild(clone);
         document.body.appendChild(wrapper);
 
         try {
+            // Đợi ảnh bên trong clone tải xong
             const images = Array.from(wrapper.querySelectorAll('img'));
             await Promise.all(images.map(img => {
                 if (img.complete) return Promise.resolve();
@@ -44,24 +60,26 @@ export const exportToClipboard = async (elementId) => {
             }));
 
             await document.fonts.ready;
-            await new Promise(r => setTimeout(r, 200));
+            await new Promise(r => setTimeout(r, 250)); // Tăng thời gian chờ
 
-            if (!window.html2canvas) {
-                throw new Error("Thư viện tạo ảnh chưa sẵn sàng, vui lòng tải lại trang.");
-            }
+            const height = clone.offsetHeight;
 
-            // Gọi html2canvas trên phần tử clone, triệt tiêu mọi hiệu ứng cuộn trang (scrollY, scrollX)
-            const canvas = await window.html2canvas(clone, {
-                scale: 2,
-                useCORS: true,
-                backgroundColor: '#ffffff',
+            const blob = await domToBlob(clone, {
+                scale: 3, // Phóng to để ảnh nét căng
                 width: width,
-                height: clone.offsetHeight, // Lấy đúng chiều cao thật sau khi clone đã render
-                scrollY: 0,
-                scrollX: 0
+                height: height,
+                backgroundColor: '#ffffff',
+                style: {
+                    margin: '0',
+                    transform: 'none',
+                    boxShadow: 'none',
+                    maxWidth: 'none',
+                    WebkitTextSizeAdjust: '100%',
+                    fontKerning: 'normal',
+                    textRendering: 'optimizeLegibility'
+                }
             });
 
-            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png', 1.0));
             if (!blob) throw new Error("Dữ liệu ảnh rỗng.");
             return blob;
         } finally {
