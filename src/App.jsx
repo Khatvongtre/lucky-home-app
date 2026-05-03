@@ -826,10 +826,12 @@ const App = () => {
     } catch (e) { showToast("Lỗi: " + e.message, "error"); }
   };
 
-  const handleDiscountChange = (billId, val) => {
-    const dVal = parseN(String(val)) || 0;
+  const handleDiscountUpdate = async (billId, dVal) => {
     const targetBill = bills.find(b => b.id === billId);
     if (!targetBill) return;
+
+    // Nếu giá trị không đổi thì bỏ qua, không tính toán hay gọi API
+    if ((targetBill.details.discount || 0) === dVal) return;
 
     const baseTotal = targetBill.details.rent + targetBill.details.elec + (targetBill.details.heater || 0) + targetBill.details.water + (targetBill.details.internet || 0) + (targetBill.details.service || 0) + (targetBill.details.ebikes || 0);
     const newTotal = Math.max(0, baseTotal - dVal);
@@ -840,24 +842,19 @@ const App = () => {
       details: { ...targetBill.details, discount: dVal }
     };
 
+    // Cập nhật giao diện lập tức cho mượt
     setBills(prev => prev.map(b => b.id === billId ? updatedBillData : b));
-
     if (bottomSheet && bottomSheet.data.id === billId) {
       setBottomSheet({ ...bottomSheet, data: updatedBillData });
     }
-  };
 
-  const handleDiscountBlur = async (billId, dVal) => {
     try {
-      const billToUpdate = bills.find(b => b.id === billId);
-      if (billToUpdate) {
-        await api.put(`/bill/${billId}/discount`, {
-          discount: dVal,
-          total: billToUpdate.total,
-          details: billToUpdate.details
-        });
-        await loadHouseData(selectedHouse?.id);
-      }
+      await api.put(`/bill/${billId}/discount`, {
+        discount: dVal,
+        total: newTotal,
+        details: updatedBillData.details
+      });
+      await loadHouseData(selectedHouse?.id);
     } catch (e) { showToast("Đã có lỗi xảy ra ! (" + e.message + ")", "error"); }
   };
 
@@ -1396,8 +1393,7 @@ const App = () => {
         isManagerOrAbove={isManagerOrAbove}
         isOwnerOrAdmin={isOwnerOrAdmin}
         isGeneratingImage={isGeneratingImage}
-        handleDiscountChange={handleDiscountChange}
-        handleDiscountBlur={handleDiscountBlur}
+        handleDiscountUpdate={handleDiscountUpdate}
         handleShareZaloImage={handleShareZaloImage}
         handleDeleteBill={handleDeleteBill}
         handlePayBill={handlePayBill}

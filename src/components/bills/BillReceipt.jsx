@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Loader2, Image as ImageIcon, Trash2, CheckCircle2, X } from 'lucide-react';
 import { formatN, parseN } from '../../utils/formatters';
 
@@ -10,12 +10,20 @@ const BillReceipt = ({
     isManagerOrAbove,
     isOwnerOrAdmin,
     isGeneratingImage,
-    handleDiscountChange,
-    handleDiscountBlur,
+    handleDiscountUpdate,
     handleShareZaloImage,
     handleDeleteBill,
     handlePayBill
 }) => {
+    // Local state quản lý riêng input giảm giá khi người dùng đang gõ
+    const [localDiscount, setLocalDiscount] = useState("");
+
+    useEffect(() => {
+        if (bottomSheet?.data?.details) {
+            setLocalDiscount(formatN(bottomSheet.data.details.discount || 0));
+        }
+    }, [bottomSheet?.data?.id]); // Chỉ đồng bộ khi đổi bill, cho phép gõ tự do
+
     if (!bottomSheet || bottomSheet.type !== 'bill') return null;
 
     return (
@@ -114,9 +122,9 @@ const BillReceipt = ({
                                             <span className="text-red-500 font-bold">-</span>
                                             <input
                                                 type="text"
-                                                value={formatN(bottomSheet.data.details.discount || 0)}
-                                                onChange={(e) => handleDiscountChange(bottomSheet.data.id, e.target.value)}
-                                                onBlur={(e) => handleDiscountBlur(bottomSheet.data.id, parseN(e.target.value))}
+                                                value={localDiscount}
+                                                onChange={(e) => setLocalDiscount(formatN(parseN(e.target.value)))}
+                                                onBlur={() => handleDiscountUpdate(bottomSheet.data.id, parseN(localDiscount))}
                                                 className="w-16 text-right bg-transparent text-red-600 font-black outline-none text-[13px]"
                                             />
                                         </div>
