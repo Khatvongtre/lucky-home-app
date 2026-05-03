@@ -25,6 +25,8 @@ import ToastNotification from './components/common/Toast';
 import ConfirmDialog from './components/common/ConfirmDialog';
 import AuthView from './pages/AuthView';
 import HubView from './pages/HubView';
+import DashboardPage from './pages/DashboardPage';
+import RoomsPage from './pages/RoomsPage';
 
 // ==========================================
 // CẤU HÌNH API BACKEND (.NET 8)
