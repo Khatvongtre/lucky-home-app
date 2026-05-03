@@ -1767,19 +1767,37 @@ const App = () => {
 
         <div className="w-full max-w-sm flex flex-col h-screen relative overflow-hidden">
           <div className="sticky top-0 z-20 bg-slate-50 pt-4 px-3 pb-2 space-y-3 shadow-sm border-b border-slate-200">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center space-x-2">
-                <button onClick={() => setIsHubMode(true)} className="p-1.5 text-slate-600 hover:bg-slate-200 rounded-lg transition-all active:scale-95">
+            <div className="relative flex items-center justify-between">
+
+              {/* LEFT */}
+              <div className="flex items-center space-x-2 z-10">
+                <button
+                  onClick={() => setIsHubMode(true)}
+                  className="text-slate-600 hover:bg-slate-200 rounded-lg transition-all active:scale-95"
+                >
                   <ChevronLeft className="w-5 h-5" />
                 </button>
-                <h2 className="text-[18px] font-black text-slate-900 uppercase tracking-tighter border-l-4 border-blue-600 pl-3">Chọn Cơ Sở</h2>
               </div>
-              <div className="flex items-center space-x-2">
-                <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-1 rounded-md uppercase">{user?.role}</span>
-                <button onClick={handleLogout} className="p-1.5 bg-red-50 text-red-500 rounded-lg active:scale-90 transition-all hover:bg-red-100 hover:text-red-600">
+
+              {/* CENTER (ABSOLUTE) */}
+              <h2 className="absolute left-1/2 -translate-x-1/2 text-[18px] font-black text-blue-900 uppercase tracking-tighter">
+                Lucky Home
+              </h2>
+
+              {/* RIGHT */}
+              <div className="flex items-center space-x-2 z-10">
+                <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-1 rounded-md uppercase">
+                  {user?.role}
+                </span>
+
+                <button
+                  onClick={handleLogout}
+                  className="p-1.5 bg-red-50 text-red-500 rounded-lg active:scale-90 transition-all hover:bg-red-100 hover:text-red-600"
+                >
                   <LogOut className="w-4 h-4" />
                 </button>
               </div>
+
             </div>
 
             <div className="bg-slate-900 rounded-xl p-3.5 text-white shadow-xl border-b-1 border-blue-600">
