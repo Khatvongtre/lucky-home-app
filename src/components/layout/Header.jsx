@@ -1,6 +1,18 @@
 import React from 'react';
 import { ChevronLeft, Building2, User } from 'lucide-react';
 
+const TAB_TITLES = {
+    dashboard: 'Trang chủ',
+    rooms: 'Phòng',
+    meters_list: 'Chốt số điện',
+    bills: 'Hóa đơn',
+    finance: 'Thu chi',
+    savings: 'Sổ tiết kiệm',
+    ai: 'Chat AI',
+    profile: 'Tài khoản',
+    settings: 'Cài đặt'
+};
+
 const Header = ({
     selectedHouse,
     activeTab,
@@ -24,7 +36,7 @@ const Header = ({
                     <ChevronLeft className="w-4 h-4" />
                 </button>
                 <h2 className="text-[10px] font-black uppercase tracking-widest text-blue-50 mt-0.5">
-                    {activeTab === 'dashboard' ? 'Trang chủ' : activeTab === 'rooms' ? 'Phòng' : activeTab === 'meters_list' ? 'Chốt số điện' : activeTab === 'bills' ? 'Hóa đơn' : activeTab === 'finance' ? 'Thu chi' : activeTab === 'savings' ? 'Sổ tiết kiệm' : activeTab === 'ai' ? 'Chat AI' : activeTab === 'profile' ? 'Tài khoản' : 'Cài đặt'}
+                    {TAB_TITLES[activeTab] || 'Trang chủ'}
                 </h2>
             </div>
             <div className="absolute left-1/2 -translate-x-1/2 hidden sm:flex items-center space-x-1.5">

@@ -51,6 +51,7 @@ import AiPromptModal from './components/houses/AiPromptModal';
 import ShareHouseModal from './components/houses/ShareHouseModal';
 import OverwriteBillModal from './components/bills/OverwriteBillModal';
 import MeterMappingModal from './components/meters/MeterMappingModal';
+import { api } from './services/api';
 
 // ==========================================
 // CẤU HÌNH API BACKEND (.NET 8)
@@ -187,6 +188,12 @@ const App = () => {
     setDashboardSummary(null);
   }, []);
 
+  useEffect(() => {
+    const handleUnauthorized = () => handleLogout();
+    window.addEventListener('auth:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
+  }, [handleLogout]);
+
   const handleChangePassword = async (e) => {
     e.preventDefault();
     if (changePasswordForm.newPassword !== changePasswordForm.confirmNewPassword) {
@@ -200,7 +207,7 @@ const App = () => {
         return;
       }
 
-      await fetchApi('/auth/change-password', 'POST', {
+      await api.post('/auth/change-password', {
         username: currentUsername,
         oldPassword: changePasswordForm.oldPassword,
         newPassword: changePasswordForm.newPassword
@@ -212,44 +219,14 @@ const App = () => {
     }
   };
 
-  // ==========================================
-  // 3. DATA FETCHING LOGIC
-  // ==========================================
-
-  const fetchApi = useCallback(async (endpoint, method = 'GET', body = null) => {
-    const token = localStorage.getItem('smartstay_token');
-    const headers = { 'Content-Type': 'application/json' };
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-
-    try {
-      const res = await fetch(`${API_URL}${endpoint}`, { method, headers, body: body ? JSON.stringify(body) : null });
-
-      if (res.status === 401 || res.status === 403) {
-        handleLogout();
-        const result = await res.json().catch(() => ({}));
-        throw new Error(result.message || "Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.");
-      }
-
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.message || `Lỗi máy chủ (${res.status})`);
-
-      return result;
-    } catch (error) {
-      if (error.message.includes('Failed to fetch')) {
-        throw new Error("Không thể kết nối Backend. Vui lòng kiểm tra Server .NET.");
-      }
-      throw error;
-    }
-  }, [handleLogout]);
-
   const loadSavings = useCallback(async () => {
     try {
-      const savingsData = await fetchApi(`/saving`);
+      const savingsData = await api.get(`/saving`);
       setSavings(savingsData);
     } catch (e) {
       setSavings([]);
     }
-  }, [fetchApi]);
+  }, []);
 
   const parseMeters = useCallback((metersData) =>
     metersData.map(m => ({ ...m, roomIds: JSON.parse(m.roomIdsJson || '[]') })), []);
@@ -264,43 +241,43 @@ const App = () => {
     })), []);
 
   const loadHouses = useCallback(async () => {
-    const data = await fetchApi('/house');
+    const data = await api.get('/house');
     setHouses(data);
     return data;
-  }, [fetchApi]);
+  }, []);
 
   const loadDashboardData = useCallback(async (houseId) => {
     const month = viewDate.getMonth() + 1;
     const year = viewDate.getFullYear();
     const [summaryData] = await Promise.all([
-      fetchApi(`/management/dashboard/summary/${houseId}?year=${year}&month=${month}`),
+      api.get(`/management/dashboard/summary/${houseId}?year=${year}&month=${month}`),
     ]);
     setDashboardSummary(summaryData);
-  }, [fetchApi, viewDate]);
+  }, [viewDate]);
 
   const loadRoomsData = useCallback(async (houseId) => {
     const month = viewDate.getMonth() + 1;
     const year = viewDate.getFullYear();
     const [roomsData] = await Promise.all([
-      fetchApi(`/room/${houseId}`),
+      api.get(`/room/${houseId}`),
     ]);
     setRooms(roomsData);
-  }, [fetchApi, parseMeters, viewDate]);
+  }, [viewDate]);
 
   const loadMetersData = useCallback(async (houseId) => {
     const month = viewDate.getMonth() + 1;
     const year = viewDate.getFullYear();
     const [metersData] = await Promise.all([
-      fetchApi(`/meter/${houseId}?year=${year}&month=${month}`)
+      api.get(`/meter/${houseId}?year=${year}&month=${month}`)
     ]);
     setMeters(parseMeters(metersData));
-  }, [fetchApi, parseMeters, viewDate]);
+  }, [parseMeters, viewDate]);
 
   const loadBillsData = useCallback(async (houseId) => {
     const month = viewDate.getMonth() + 1;
     const year = viewDate.getFullYear();
     const [billsResult] = await Promise.all([
-      fetchApi(`/bill/${houseId}?year=${year}&month=${month}`)
+      api.get(`/bill/${houseId}?year=${year}&month=${month}`)
     ]);
     const billsData = Array.isArray(billsResult) ? billsResult : (billsResult?.bills || []);
     setBillStats({
@@ -310,12 +287,12 @@ const App = () => {
       totalAmountPaids: billsResult?.totalAmountPaids ?? billsData.filter(b => b.status === 'paid').reduce((sum, b) => sum + (b.total || 0), 0)
     });
     setBills(parseBills(billsData));
-  }, [fetchApi, parseBills, viewDate]);
+  }, [parseBills, viewDate]);
 
   const loadTransactions = useCallback(async (houseId) => {
-    const txData = await fetchApi(`/transaction/${houseId}?type=${selectedMonth}`);
+    const txData = await api.get(`/transaction/${houseId}?type=${selectedMonth}`);
     setTransactions(txData);
-  }, [fetchApi, selectedMonth]);
+  }, [selectedMonth]);
 
   const loadTabData = useCallback(async (tab = activeTab, houseId = selectedHouse?.id) => {
     try {
@@ -401,7 +378,7 @@ const App = () => {
     const loadTransactions = async () => {
       if (activeTab !== 'finance' || !selectedHouse?.id) return;
       try {
-        const txData = await fetchApi(`/transaction/${selectedHouse.id}?type=${selectedMonth}`);
+        const txData = await api.get(`/transaction/${selectedHouse.id}?type=${selectedMonth}`);
         setTransactions(txData);
       } catch (e) { console.error("Lỗi khi tải giao dịch:", e.message); }
     };
@@ -514,11 +491,11 @@ const App = () => {
     };
     try {
       if (editingSaving) {
-        await fetchApi(`/saving/${editingSaving.id}`, 'PUT', payload);
+        await api.put(`/saving/${editingSaving.id}`, payload);
         showToast("Đã cập nhật sổ tiết kiệm!", "success");
       } else {
         payload.id = crypto.randomUUID();
-        await fetchApi('/saving', 'POST', payload);
+        await api.post('/saving', payload);
         showToast("Đã thêm sổ tiết kiệm!", "success");
       }
       await loadSavings();
@@ -534,7 +511,7 @@ const App = () => {
     });
     if (!confirmed) return;
     try {
-      await fetchApi(`/saving/${id}`, 'DELETE');
+      await api.delete(`/saving/${id}`);
       await loadSavings();
       setIsAddSavingModalOpen(false);
       setEditingSaving(null);
@@ -545,7 +522,7 @@ const App = () => {
   const handleAssignRole = async (e) => {
     e.preventDefault();
     try {
-      await fetchApi(`/house/${sharingHouse.id}/assign`, 'POST', assignForm);
+      await api.post(`/house/${sharingHouse.id}/assign`, assignForm);
       showToast(`Đã cấp quyền ${assignForm.role} cho ${assignForm.username} thành công!`, "success");
       setIsShareModalOpen(false);
     } catch (err) {
@@ -572,15 +549,15 @@ const App = () => {
 
     try {
       if (editingHouse) {
-        await fetchApi(`/house/${editingHouse.id}`, 'PUT', houseData);
+        await api.put(`/house/${editingHouse.id}`, houseData);
         setHouses(houses.map(h => h.id === editingHouse.id ? { ...h, ...houseData } : h));
         showToast("Cập nhật cơ sở thành công!", "success");
       } else {
-        const res = await fetchApi('/house', 'POST', houseData);
+        const res = await api.post('/house', houseData);
         setHouses([...houses, res]);
         showToast("Tạo cơ sở thành công!", "success");
       }
-      const data = await fetchApi('/house', 'GET');
+      const data = await api.get('/house');
       setHouses(data);
       setIsAiCreateHouseOpen(false);
       setEditingHouse(null);
@@ -595,12 +572,12 @@ const App = () => {
     }
     showToast("AI đang xử lý... vui lòng đợi!", "success");
     try {
-      const res = await fetchApi('/house/ai-generate', 'POST', { prompt: aiPrompt });
+      const res = await api.post('/house/ai-generate', { prompt: aiPrompt });
       if (res.isSuccess === false) {
         setAiFeedback(res.message);
         showToast("AI cần thêm thông tin!", "error");
       } else {
-        const updatedHouses = await fetchApi('/house', 'GET');
+        const updatedHouses = await api.get('/house');
         setHouses(updatedHouses);
         showToast("Phép màu đã xảy ra! Nhà đã được tạo.", "success");
         setIsAiPromptModalOpen(false);
@@ -681,7 +658,7 @@ const App = () => {
     };
 
     try {
-      await fetchApi('/room', 'POST', payload);
+      await api.post('/room', payload);
       await loadHouseData(selectedHouse?.id);
       showToast("Lưu phòng thành thành công!", "success");
       setIsAddRoomModalOpen(false);
@@ -696,7 +673,7 @@ const App = () => {
     });
     if (!confirmed) return;
     try {
-      await fetchApi(`/house/${houseId}`, 'DELETE');
+      await api.delete(`/house/${houseId}`);
       setHouses(houses.filter(h => h.id !== houseId));
       if (selectedHouse?.id === houseId) setSelectedHouse(null);
       showToast("Đã xóa cơ sở thành công!", "success");
@@ -710,7 +687,7 @@ const App = () => {
     });
     if (!confirmed) return;
     try {
-      await fetchApi(`/room/${roomId}`, 'DELETE');
+      await api.delete(`/room/${roomId}`);
       await loadHouseData(selectedHouse?.id);
       setIsAddRoomModalOpen(false);
       setEditingRoom(null);
@@ -729,7 +706,7 @@ const App = () => {
     });
     if (!confirmed) return;
     try {
-      await fetchApi(`/transaction/${txId}`, 'DELETE');
+      await api.delete(`/transaction/${txId}`);
       await loadHouseData(selectedHouse?.id);
       setIsAddTransactionModalOpen(false);
       setEditingTransaction(null);
@@ -749,10 +726,10 @@ const App = () => {
     };
     try {
       if (editingMeter) {
-        await fetchApi(`/meter/save`, 'POST', payload);
+        await api.post(`/meter/save`, payload);
         showToast("Đã cập nhật công tơ!", "success");
       } else {
-        await fetchApi('/meter/save', 'POST', payload);
+        await api.post('/meter/save', payload);
         showToast("Đã tạo công tơ!", "success");
       }
       await loadHouseData(selectedHouse?.id);
@@ -768,7 +745,7 @@ const App = () => {
     });
     if (!confirmed) return;
     try {
-      await fetchApi(`/meter/${meterId}`, 'DELETE');
+      await api.delete(`/meter/${meterId}`);
       await loadHouseData(selectedHouse?.id);
       setIsAddMeterModalOpen(false);
       setEditingMeter(null);
@@ -779,7 +756,7 @@ const App = () => {
   const handleSaveMeterMapping = async () => {
     if (!mappingMeter) return;
     try {
-      await fetchApi(`/meter/${mappingMeter.id}/map`, 'PUT', { roomIds: mappingMeter.roomIds });
+      await api.put(`/meter/${mappingMeter.id}/map`, { roomIds: mappingMeter.roomIds });
       showToast("Đã cập nhật sơ đồ công tơ!", "success");
       setMappingMeter(null);
     } catch (e) { showToast("Lỗi lưu sơ đồ: " + e.message, "error"); }
@@ -805,9 +782,9 @@ const App = () => {
         }));
 
       if (updates.length === 0) return showToast("Chưa nhập số mới nào!", "error");
-      await fetchApi('/meter/update', 'POST', updates);
+      await api.post('/meter/update', updates);
 
-      const res = await fetchApi('/bill/generate', 'POST', {
+      const res = await api.post('/bill/generate', {
         houseId: selectedHouse?.id,
         month: monthSelected,
         year: yearSelected,
@@ -840,7 +817,7 @@ const App = () => {
     const year = now.getFullYear();
 
     try {
-      await fetchApi('/bill/generate', 'POST', {
+      await api.post('/bill/generate', {
         houseId: selectedHouse?.id,
         month: month,
         year: year,
@@ -876,7 +853,7 @@ const App = () => {
     try {
       const billToUpdate = bills.find(b => b.id === billId);
       if (billToUpdate) {
-        await fetchApi(`/bill/${billId}/discount`, 'PUT', {
+        await api.put(`/bill/${billId}/discount`, {
           discount: dVal,
           total: billToUpdate.total,
           details: billToUpdate.details
@@ -903,11 +880,11 @@ const App = () => {
 
     try {
       if (editingTransaction) {
-        await fetchApi(`/transaction/${editingTransaction.id}`, 'PUT', payload);
+        await api.put(`/transaction/${editingTransaction.id}`, payload);
         showToast("Đã cập nhật phiếu thu chi!", "success");
       } else {
         payload.id = crypto.randomUUID();
-        await fetchApi('/transaction', 'POST', payload);
+        await api.post('/transaction', payload);
         showToast("Đã ghi sổ thu chi!", "success");
       }
       await loadHouseData(selectedHouse?.id);
@@ -918,7 +895,7 @@ const App = () => {
 
   const handlePayBill = async (billId) => {
     try {
-      await fetchApi(`/bill/pay/${billId}`, 'POST');
+      await api.post(`/bill/pay/${billId}`);
       await loadHouseData(selectedHouse?.id);
       showToast("Gạch nợ & Ghi sổ thành công!", "success");
       setBottomSheet(null);
@@ -935,7 +912,7 @@ const App = () => {
     });
     if (!confirmed) return;
     try {
-      await fetchApi(`/bill/${billId}`, 'DELETE');
+      await api.delete(`/bill/${billId}`);
       await loadHouseData(selectedHouse?.id);
       showToast("Đã xóa hóa đơn thành công!", "success");
       setBottomSheet(null);
@@ -944,7 +921,7 @@ const App = () => {
 
   const handleSaveConfig = async () => {
     try {
-      await fetchApi(`/house/${selectedHouse?.id}/config`, 'PUT', config);
+      await api.put(`/house/${selectedHouse?.id}/config`, config);
       showToast("Đã lưu cấu hình lên máy chủ!", "success");
     } catch (e) { showToast("Đã có lỗi xảy ra ! (" + e.message + ")", "error"); }
   };
@@ -953,7 +930,7 @@ const App = () => {
     e.preventDefault(); const val = e.target.q.value; if (!val) return; e.target.reset();
     setAiMessages(prev => [...prev, { role: 'user', text: val }]); setIsAiLoading(true);
     try {
-      const res = await fetchApi('/ai/chat', 'POST', { houseId: selectedHouse?.id, prompt: val });
+      const res = await api.post('/ai/chat', { houseId: selectedHouse?.id, prompt: val });
       setAiMessages(prev => [...prev, { role: 'assistant', text: res.text }]);
     } catch (e) {
       showToast("Lỗi kết nối AI Server", "error");
@@ -1123,7 +1100,7 @@ const App = () => {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-left animate-in fade-in duration-700">
         <ToastNotification toast={toast} />
-        <AuthView fetchApi={fetchApi} setIsLoggedIn={setIsLoggedIn} setUser={setUser} showToast={showToast} />
+        <AuthView setIsLoggedIn={setIsLoggedIn} setUser={setUser} showToast={showToast} />
       </div>
     );
   }

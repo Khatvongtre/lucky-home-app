@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Building2, Mail, User, Lock, Loader2 } from 'lucide-react';
+import { api } from '../services/api';
 
-const AuthView = ({ fetchApi, setIsLoggedIn, setUser, showToast }) => {
+const AuthView = ({ setIsLoggedIn, setUser, showToast }) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
@@ -13,15 +14,15 @@ const AuthView = ({ fetchApi, setIsLoggedIn, setUser, showToast }) => {
     setIsAuthLoading(true);
     try {
       if (type === 'register') {
-        await fetchApi('/auth/register', 'POST', authForm);
+        await api.post('/auth/register', authForm);
         showToast("Đăng ký thành công! Vui lòng đăng nhập.", "success");
         setIsRegistering(false);
       } else if (type === 'forgot') {
-        await fetchApi('/auth/forgot-password', 'POST', { username: authForm.username });
+        await api.post('/auth/forgot-password', { username: authForm.username });
         showToast("Đã gửi yêu cầu khôi phục mật khẩu. Vui lòng kiểm tra email/SĐT.", "success");
         setIsForgotPassword(false);
       } else {
-        const res = await fetchApi('/auth/login', 'POST', authForm);
+        const res = await api.post('/auth/login', authForm);
         localStorage.setItem('smartstay_token', res.token);
         localStorage.setItem('smartstay_user', JSON.stringify(res.user));
         setUser(res.user);
