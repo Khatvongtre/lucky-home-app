@@ -1,4 +1,4 @@
-import { domToBlob } from 'modern-screenshot';
+import { domToPng } from 'modern-screenshot';
 
 export const exportToClipboard = async (elementId) => {
     const el = document.getElementById(elementId);
@@ -64,8 +64,8 @@ export const exportToClipboard = async (elementId) => {
 
             const height = clone.offsetHeight;
 
-            const blob = await domToBlob(clone, {
-                scale: 3, // Phóng to để ảnh nét căng
+            const dataUrl = await domToPng(clone, {
+                scale: 3,
                 width: width,
                 height: height,
                 backgroundColor: '#ffffff',
@@ -80,7 +80,10 @@ export const exportToClipboard = async (elementId) => {
                 }
             });
 
-            if (!blob) throw new Error("Dữ liệu ảnh rỗng.");
+            if (!dataUrl) throw new Error("Dữ liệu ảnh rỗng.");
+
+            // Chuyển đổi chuỗi base64 (Data URL) thành định dạng Blob để lưu vào Clipboard
+            const blob = await (await fetch(dataUrl)).blob();
             return blob;
         } finally {
             if (document.body.contains(wrapper)) {
