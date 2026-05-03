@@ -4,33 +4,71 @@ export const exportToClipboard = async (elementId) => {
 
     // Đóng gói logic tạo ảnh vào một hàm bất đồng bộ
     const generateImageBlob = async () => {
-        const images = Array.from(el.querySelectorAll('img'));
-        await Promise.all(images.map(img => {
-            if (img.complete) return Promise.resolve();
-            return new Promise((resolve) => {
-                img.onload = resolve;
-                img.onerror = resolve;
-            });
-        }));
+        // Lấy chiều rộng thật của hóa đơn trên màn hình
+        const width = el.offsetWidth;
 
-        await document.fonts.ready;
-        await new Promise(r => setTimeout(r, 200));
+        // Clone phần tử để render độc lập, tránh lỗi tọa độ Scroll và CSS Transform (nguyên nhân gây đẩy chữ)
+        const clone = el.cloneNode(true);
+        const wrapper = document.createElement('div');
 
-        if (!window.html2canvas) {
-            throw new Error("Thư viện tạo ảnh chưa sẵn sàng, vui lòng tải lại trang.");
-        }
-
-        const canvas = await window.html2canvas(el, {
-            scale: 2, // Giảm xuống 2 để tránh lỗi văng bộ nhớ (Crash Canvas) trên điện thoại
-            useCORS: true,
-            backgroundColor: '#ffffff',
-            windowWidth: el.scrollWidth,
-            windowHeight: el.scrollHeight
+        // Đặt wrapper ẩn, cố định ở góc (0,0) tuyệt đối để html2canvas vẽ tọa độ chuẩn xác 100%
+        Object.assign(wrapper.style, {
+            position: 'fixed',
+            top: '0px',
+            left: '-9999px',
+            width: `${width}px`,
+            zIndex: -1000,
+            pointerEvents: 'none'
         });
 
-        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png', 1.0));
-        if (!blob) throw new Error("Dữ liệu ảnh rỗng.");
-        return blob;
+        // Ép width cho clone, tắt shadow và margin để tránh html2canvas bị sai lệch padding
+        Object.assign(clone.style, {
+            margin: '0',
+            transform: 'none',
+            boxShadow: 'none',
+            width: `${width}px`,
+            maxWidth: `${width}px`
+        });
+
+        wrapper.appendChild(clone);
+        document.body.appendChild(wrapper);
+
+        try {
+            const images = Array.from(wrapper.querySelectorAll('img'));
+            await Promise.all(images.map(img => {
+                if (img.complete) return Promise.resolve();
+                return new Promise((resolve) => {
+                    img.onload = resolve;
+                    img.onerror = resolve;
+                });
+            }));
+
+            await document.fonts.ready;
+            await new Promise(r => setTimeout(r, 200));
+
+            if (!window.html2canvas) {
+                throw new Error("Thư viện tạo ảnh chưa sẵn sàng, vui lòng tải lại trang.");
+            }
+
+            // Gọi html2canvas trên phần tử clone, triệt tiêu mọi hiệu ứng cuộn trang (scrollY, scrollX)
+            const canvas = await window.html2canvas(clone, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: '#ffffff',
+                width: width,
+                height: clone.offsetHeight, // Lấy đúng chiều cao thật sau khi clone đã render
+                scrollY: 0,
+                scrollX: 0
+            });
+
+            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png', 1.0));
+            if (!blob) throw new Error("Dữ liệu ảnh rỗng.");
+            return blob;
+        } finally {
+            if (document.body.contains(wrapper)) {
+                document.body.removeChild(wrapper);
+            }
+        }
     };
 
     try {
