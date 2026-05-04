@@ -1,4 +1,4 @@
-import { domToPng } from 'modern-screenshot';
+import { toPng } from 'html-to-image';
 
 export const exportToClipboard = async (elementId) => {
     const el = document.getElementById(elementId);
@@ -73,8 +73,8 @@ export const exportToClipboard = async (elementId) => {
 
             const height = clone.offsetHeight;
 
-            const dataUrl = await domToPng(clone, {
-                scale: isMobile ? 2 : 3, // 🔥 fix mobile
+            const dataUrl = await toPng(clone, {
+                pixelRatio: isMobile ? 2 : 3, // 🔥 fix mobile
                 width,
                 height,
                 backgroundColor: '#ffffff',
