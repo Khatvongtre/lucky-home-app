@@ -154,8 +154,8 @@ const BillReceipt = ({
                                 </div>
                                 <div className="w-[100px] h-[100px] bg-white rounded-lg border border-slate-200 p-1 flex items-center justify-center shrink-0 shadow-sm self-end">
                                     <img
-                                        key={`qr-${bottomSheet.data.id}`}
-                                        src={`${API_URL}/vietqr/generate?bankBin=${config.bankBin || '970422'}&bankAcc=${config.bankAcc || '0'}&amount=${bottomSheet.data.total}&addInfo=${encodeURIComponent(`P${bottomSheet.data.roomId} ${bottomSheet.data.currentMonthFull}`)}&t=${bottomSheet.data.id}-${bottomSheet.data.total}`}
+                                        key={`qr-${bottomSheet.data.id}-${bottomSheet.data.total}-${bottomSheet.data.details.discount}`}
+                                        src={`${API_URL}/vietqr/generate?bankBin=${config.bankBin || '970422'}&bankAcc=${config.bankAcc || '0'}&amount=${bottomSheet.data.total}&addInfo=${encodeURIComponent(`P${bottomSheet.data.roomId} ${bottomSheet.data.currentMonthFull}`)}&t=${bottomSheet.data.id}-${bottomSheet.data.total}-${bottomSheet.data.details.discount}`}
                                         className="w-full h-full object-contain rounded-md"
                                         crossOrigin="anonymous"
                                     />

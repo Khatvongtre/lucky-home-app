@@ -40,6 +40,17 @@ export const exportToClipboard = async (elementId) => {
             input.replaceWith(span);
         });
 
+        // ✅ FIX ẢNH BỊ CACHE (VẤN ĐỀ LẤY NHẦM QR CŨ)
+        clone.querySelectorAll('img').forEach(img => {
+            if (img.src) {
+                try {
+                    const url = new URL(img.src, window.location.href);
+                    url.searchParams.set('_export', Date.now()); // Ép tải ảnh mới tinh, bỏ qua cache
+                    img.src = url.toString();
+                } catch (e) { }
+            }
+        });
+
         // ✅ FIX CHỮ DÍNH (QUAN TRỌNG NHẤT)
         clone.querySelectorAll('*').forEach(el => {
             const style = window.getComputedStyle(el);
@@ -78,6 +89,7 @@ export const exportToClipboard = async (elementId) => {
                 width,
                 height,
                 backgroundColor: '#ffffff',
+                cacheBust: true, // ✅ FIX: Vô hiệu hóa cache, luôn tạo ảnh mới nhất
                 style: {
                     margin: '0',
                     transform: 'none',
