@@ -26,13 +26,29 @@ const BillReceipt = ({
 
     if (!bottomSheet || bottomSheet.type !== 'bill') return null;
 
+    const bill = bottomSheet.data;
+    const bankBin = config.bankBin || '970422';
+    const bankAcc = config.bankAcc || '0';
+    const qrAddInfo = `P${bill.roomId} ${bill.currentMonthFull}`;
+    const qrFingerprint = [
+        API_URL,
+        bankBin,
+        bankAcc,
+        bill.id,
+        bill.roomId,
+        bill.currentMonthFull,
+        bill.total,
+        bill.details.discount || 0
+    ].join('|');
+    const qrSrc = `${API_URL}/vietqr/generate?bankBin=${bankBin}&bankAcc=${bankAcc}&amount=${bill.total}&addInfo=${encodeURIComponent(qrAddInfo)}&t=${encodeURIComponent(qrFingerprint)}`;
+
     return (
         <div className="fixed inset-0 z-[600] flex items-center justify-center">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setBottomSheet(null)} />
             <div className="bg-white w-full max-w-lg h-full sm:p-6 shadow-2xl animate-in slide-in-from-bottom duration-500 relative flex flex-col no-scrollbar overflow-hidden">
                 <div className="flex-1 overflow-y-auto no-scrollbar">
                     <div
-                        key={`receipt-export-${bottomSheet.data.id}-${bottomSheet.data.total}-${bottomSheet.data.details.discount}`}
+                        key={`receipt-export-${qrFingerprint}`}
                         id={`receipt-export-${bottomSheet.data.id}`}
                         className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm mx-auto"
                         style={{
@@ -154,8 +170,9 @@ const BillReceipt = ({
                                 </div>
                                 <div className="w-[100px] h-[100px] bg-white rounded-lg border border-slate-200 p-1 flex items-center justify-center shrink-0 shadow-sm self-end">
                                     <img
-                                        key={`qr-${bottomSheet.data.id}-${bottomSheet.data.total}-${bottomSheet.data.details.discount}`}
-                                        src={`${API_URL}/vietqr/generate?bankBin=${config.bankBin || '970422'}&bankAcc=${config.bankAcc || '0'}&amount=${bottomSheet.data.total}&addInfo=${encodeURIComponent(`P${bottomSheet.data.roomId} ${bottomSheet.data.currentMonthFull}`)}&t=${bottomSheet.data.id}-${bottomSheet.data.total}-${bottomSheet.data.details.discount}`}
+                                        key={`qr-${qrFingerprint}`}
+                                        src={qrSrc}
+                                        alt="QR chuyển khoản"
                                         className="w-full h-full object-contain rounded-md"
                                         crossOrigin="anonymous"
                                     />

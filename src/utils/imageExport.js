@@ -1,5 +1,86 @@
 import { toPng } from 'html-to-image';
 
+const withCacheBust = (src, exportToken) => {
+    try {
+        const url = new URL(src, window.location.href);
+        url.searchParams.set('_export', exportToken);
+        return url.toString();
+    } catch (e) {
+        return src;
+    }
+};
+
+const waitForImage = async (img) => {
+    if (img.decode) {
+        try {
+            await img.decode();
+            return;
+        } catch (e) {
+            // Fall back to load/error listeners below.
+        }
+    }
+
+    if (img.complete && img.naturalWidth > 0) return;
+
+    await new Promise(resolve => {
+        img.onload = resolve;
+        img.onerror = resolve;
+    });
+};
+
+const imageElementToDataUrl = async (img) => {
+    await waitForImage(img);
+
+    const width = img.naturalWidth || img.width;
+    const height = img.naturalHeight || img.height;
+    if (!width || !height) throw new Error('Image is not ready');
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, width, height);
+
+    return canvas.toDataURL('image/png');
+};
+
+const fetchImageAsDataUrl = async (src, exportToken) => {
+    const res = await fetch(withCacheBust(src, exportToken), {
+        cache: 'no-store',
+        credentials: 'include'
+    });
+    if (!res.ok) throw new Error('Cannot load image');
+
+    const blob = await res.blob();
+    return await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+};
+
+const inlineRenderedImages = async (sourceRoot, cloneRoot, exportToken) => {
+    const sourceImages = Array.from(sourceRoot.querySelectorAll('img'));
+    const cloneImages = Array.from(cloneRoot.querySelectorAll('img'));
+
+    await Promise.all(cloneImages.map(async (cloneImg, index) => {
+        const sourceImg = sourceImages[index];
+        const src = sourceImg?.currentSrc || sourceImg?.src || cloneImg.getAttribute('src') || cloneImg.src;
+        if (!src) return;
+
+        cloneImg.removeAttribute('srcset');
+        cloneImg.crossOrigin = 'anonymous';
+
+        try {
+            cloneImg.src = await imageElementToDataUrl(sourceImg);
+        } catch (e) {
+            cloneImg.src = await fetchImageAsDataUrl(src, exportToken);
+        }
+    }));
+};
+
 export const exportToClipboard = async (elementId) => {
     const el = document.getElementById(elementId);
     if (!el) throw new Error("Giao diện chưa sẵn sàng, vui lòng thử lại sau");
@@ -11,6 +92,7 @@ export const exportToClipboard = async (elementId) => {
 
         const clone = el.cloneNode(true);
         const wrapper = document.createElement('div');
+        const exportToken = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
         Object.assign(wrapper.style, {
             position: 'fixed',
@@ -31,7 +113,6 @@ export const exportToClipboard = async (elementId) => {
             maxWidth: 'none',
         });
 
-        // ✅ FIX INPUT -> SPAN
         clone.querySelectorAll('input').forEach(input => {
             const span = document.createElement('span');
             span.textContent = input.value || '';
@@ -40,18 +121,8 @@ export const exportToClipboard = async (elementId) => {
             input.replaceWith(span);
         });
 
-        // ✅ FIX ẢNH BỊ CACHE (VẤN ĐỀ LẤY NHẦM QR CŨ)
-        clone.querySelectorAll('img').forEach(img => {
-            if (img.src) {
-                try {
-                    const url = new URL(img.src, window.location.href);
-                    url.searchParams.set('_export', Date.now()); // Ép tải ảnh mới tinh, bỏ qua cache
-                    img.src = url.toString();
-                } catch (e) { }
-            }
-        });
+        await inlineRenderedImages(el, clone, exportToken);
 
-        // ✅ FIX CHỮ DÍNH (QUAN TRỌNG NHẤT)
         clone.querySelectorAll('*').forEach(el => {
             const style = window.getComputedStyle(el);
 
@@ -67,17 +138,9 @@ export const exportToClipboard = async (elementId) => {
         document.body.appendChild(wrapper);
 
         try {
-            // ✅ Đợi ảnh load
             const images = Array.from(wrapper.querySelectorAll('img'));
-            await Promise.all(images.map(img => {
-                if (img.complete) return Promise.resolve();
-                return new Promise(resolve => {
-                    img.onload = resolve;
-                    img.onerror = resolve;
-                });
-            }));
+            await Promise.all(images.map(waitForImage));
 
-            // ✅ FIX FONT (Safari cực kỳ cần)
             await document.fonts.ready;
             await new Promise(r => requestAnimationFrame(r));
             await new Promise(r => setTimeout(r, 300));
@@ -85,11 +148,11 @@ export const exportToClipboard = async (elementId) => {
             const height = clone.offsetHeight;
 
             const dataUrl = await toPng(clone, {
-                pixelRatio: isMobile ? 2 : 3, // 🔥 fix mobile
+                pixelRatio: isMobile ? 2 : 3,
                 width,
                 height,
                 backgroundColor: '#ffffff',
-                cacheBust: true, // ✅ FIX: Vô hiệu hóa cache, luôn tạo ảnh mới nhất
+                cacheBust: true,
                 style: {
                     margin: '0',
                     transform: 'none',
@@ -105,9 +168,7 @@ export const exportToClipboard = async (elementId) => {
 
             if (!dataUrl) throw new Error("Dữ liệu ảnh rỗng");
 
-            const blob = await (await fetch(dataUrl)).blob();
-            return blob;
-
+            return await (await fetch(dataUrl)).blob();
         } finally {
             if (document.body.contains(wrapper)) {
                 document.body.removeChild(wrapper);
@@ -116,7 +177,6 @@ export const exportToClipboard = async (elementId) => {
     };
 
     try {
-        // ✅ Safari fix (giữ gesture)
         await navigator.clipboard.write([
             new window.ClipboardItem({
                 'image/png': generateImageBlob()
