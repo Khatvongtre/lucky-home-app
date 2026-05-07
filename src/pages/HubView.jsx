@@ -119,7 +119,7 @@ const HubView = ({
         <section className="grid grid-cols-2 gap-3">
           {[
             { label: 'Quản lý cơ sở', desc: `${hubStats.totalHouses} cơ sở`, icon: Building2, tone: 'bg-blue-600 text-white', action: () => { setIsHubMode(false); setActiveTab('dashboard'); } },
-            { label: 'Sổ chi tiêu', desc: 'Đang phát triển', icon: CircleDollarSign, tone: 'bg-white text-orange-600', action: () => showToast('Chức năng sổ chi tiêu đang phát triển', 'success') },
+            { label: 'Sổ chi tiêu', desc: 'Quản lý 6 hũ tài chính', icon: CircleDollarSign, tone: 'bg-white text-orange-600', action: () => { setIsHubMode(false); setActiveTab('expense_tracker'); setSelectedHouse(null); } },
             { label: 'Sổ tiết kiệm', desc: 'Theo dõi tiền gửi', icon: PiggyBank, tone: 'bg-white text-emerald-600', action: () => { setIsHubMode(false); setActiveTab('savings'); setSelectedHouse(null); } },
             { label: 'AI Chat', desc: 'Hỗ trợ thao tác', icon: Sparkles, tone: 'bg-white text-indigo-600', action: () => { setIsHubMode(false); setActiveTab('ai'); setSelectedHouse(null); } }
           ].map(item => (

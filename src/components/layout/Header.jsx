@@ -7,6 +7,7 @@ const TAB_TITLES = {
     meters_list: 'Chốt số điện',
     bills: 'Hóa đơn',
     finance: 'Thu chi',
+    expense_tracker: 'Sổ chi tiêu',
     savings: 'Sổ tiết kiệm',
     ai: 'Chat AI',
     profile: 'Tài khoản',
@@ -45,7 +46,7 @@ const Header = ({
             </div>
             <div className="flex items-center space-x-2">
                 <div className="flex flex-row items-center space-x-1 cursor-pointer active:opacity-80" onClick={() => { setIsHubMode(false); setSelectedHouse(null); if (isGlobalTab) setActiveTab('dashboard'); }}>
-                    <p className="text-[8px] font-bold text-blue-100 uppercase tracking-widest truncate max-w-[160px] mt-0.5">{selectedHouse?.name || 'Tổng hợp'}</p>
+                    <p className="text-[8px] font-bold text-blue-100 uppercase tracking-widest truncate max-w-[160px] mt-0.5">{selectedHouse?.name || 'Trang chủ'}</p>
                 </div>
                 {isOwnerOrAdmin && (
                     <div onClick={() => setActiveTab('settings')} className="w-8 h-8 rounded-full border border-white/30 overflow-hidden cursor-pointer active:scale-90 shadow-sm bg-white flex items-center justify-center">
