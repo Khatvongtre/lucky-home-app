@@ -44,7 +44,7 @@ import AddSavingForm from './components/savings/AddSavingForm';
 import AddTransactionForm from './components/finance/AddTransactionForm';
 import BillReceipt from './components/bills/BillReceipt';
 import AddHouseForm from './components/houses/AddHouseForm';
-import ExpenseTrackerView from './pages/ExpenseTrackerView';
+import FundView from './pages/FundView';
 
 import AiPromptModal from './components/houses/AiPromptModal';
 import ShareHouseModal from './components/houses/ShareHouseModal';
@@ -111,6 +111,7 @@ const App = () => {
   const [houses, setHouses] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [meters, setMeters] = useState([]);
+  const [dashboardWarnings, setDashboardWarnings] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [dashboardSummary, setDashboardSummary] = useState(null);
   const [bills, setBills] = useState([]);
@@ -245,6 +246,15 @@ const App = () => {
     return data;
   }, []);
 
+  const loadWarnings = useCallback(async () => {
+    try {
+      const data = await api.get('/management/dashboard/warnings');
+      setDashboardWarnings(data);
+    } catch (e) {
+      console.error("Lỗi tải cảnh báo:", e.message);
+    }
+  }, []);
+
   const loadDashboardData = useCallback(async (houseId) => {
     const month = viewDate.getMonth() + 1;
     const year = viewDate.getFullYear();
@@ -338,6 +348,12 @@ const App = () => {
   // ==========================================
   // 4. MAIN EFFECTS
   // ==========================================
+
+  useEffect(() => {
+    if (isLoggedIn && isHubMode) {
+      loadWarnings();
+    }
+  }, [isLoggedIn, isHubMode, loadWarnings]);
 
   useEffect(() => {
     const token = localStorage.getItem('smartstay_token');
@@ -976,7 +992,7 @@ const App = () => {
   // ==========================================
 
   // Các tab hiển thị độc lập, không cần thiết phải ở trong một House cụ thể
-  const isGlobalTab = ['savings', 'ai', 'settings', 'profile', 'expense_tracker'].includes(activeTab);
+  const isGlobalTab = ['savings', 'ai', 'settings', 'profile', 'fund'].includes(activeTab);
 
   // 1. CHƯA ĐĂNG NHẬP -> HIỂN THỊ FORM LOGIN/REGISTER
   if (!isLoggedIn) {
@@ -1007,6 +1023,7 @@ const App = () => {
         showToast={showToast}
         handleLogout={handleLogout}
         toast={toast}
+        dashboardWarnings={dashboardWarnings}
       />
     );
   }
@@ -1080,13 +1097,13 @@ const App = () => {
       />
 
       {/* SEARCH BAR (TÌM KIẾM + NÚT ADD) */}
-      {['rooms', 'meters_list', 'finance', 'bills', 'savings', 'expense_tracker'].includes(activeTab) && (
+      {['rooms', 'meters_list', 'finance', 'bills', 'savings', 'fund'].includes(activeTab) && (
         <div className="px-4 py-2.5 shrink-0 bg-white border-b border-slate-100 flex items-center space-x-2 shadow-sm text-left">
           <div className="relative flex-1 group">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-300" />
             <input
               type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder={activeTab === 'savings' ? "Tìm ngân hàng, tên sổ..." : activeTab === 'expense_tracker' ? "Tìm giao dịch, hũ..." : "Tìm phòng, hạng mục..."}
+              placeholder={activeTab === 'savings' ? "Tìm ngân hàng, tên sổ..." : activeTab === 'fund' ? "Tìm giao dịch, hũ..." : "Tìm phòng, hạng mục..."}
               className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-100 rounded-lg text-[11px] font-bold outline-none focus:border-blue-500 transition-all"
             />
           </div>
@@ -1095,7 +1112,7 @@ const App = () => {
             if (activeTab === 'finance') setIsAddTransactionModalOpen(true);
             if (activeTab === 'meters_list') setIsAddMeterModalOpen(true);
             if (activeTab === 'savings') { setEditingSaving(null); setIsAddSavingModalOpen(true); }
-            if (activeTab === 'expense_tracker') { window.dispatchEvent(new CustomEvent('openExpenseModal')); }
+            if (activeTab === 'fund') { window.dispatchEvent(new CustomEvent('openFundModal')); }
           }} className="p-1.5 bg-blue-600 text-white rounded-lg active:scale-90 transition-all flex items-center justify-center">
             <Plus className="w-4.5 h-4.5" strokeWidth={4} />
           </button>
@@ -1183,7 +1200,7 @@ const App = () => {
         />
         }
 
-        {activeTab === 'expense_tracker' && <ExpenseTrackerView
+        {activeTab === 'fund' && <FundView
           showToast={showToast}
           requestConfirm={requestConfirm}
         />}
@@ -1355,7 +1372,7 @@ const App = () => {
         )}
       </main>
 
-      {!['savings', 'profile', 'expense_tracker'].includes(activeTab) && (
+      {!['savings', 'profile', 'fund'].includes(activeTab) && (
         <>
           {/* FOOTER TAB BAR */}
           <TabBar

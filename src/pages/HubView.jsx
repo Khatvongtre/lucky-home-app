@@ -1,7 +1,8 @@
 import React from 'react';
 import {
   Building2, Bell, User, TrendingUp, Sparkles, ChevronRight,
-  CircleDollarSign, PiggyBank, PlusCircle, LogOut
+  CircleDollarSign, PiggyBank, PlusCircle, LogOut,
+  AlertTriangle, Zap, Receipt, FileText
 } from 'lucide-react';
 import { formatN } from '../utils/formatters';
 import ToastNotification from '../components/common/Toast';
@@ -10,7 +11,7 @@ const HubView = ({
   user, houses, setIsHubMode, setActiveTab, setSelectedHouse,
   setConfig, setSearchQuery, setEditingHouse, setIsAiCreateHouseOpen,
   setIsAiPromptModalOpen, setAiPrompt, setIsListening, showToast,
-  handleLogout, toast
+  handleLogout, toast, dashboardWarnings = []
 }) => {
   const hubStats = houses.reduce((acc, h) => {
     acc.totalHouses += 1;
@@ -25,6 +26,39 @@ const HubView = ({
     ? Math.round(((hubStats.totalRooms - hubStats.emptyRooms) / hubStats.totalRooms) * 100)
     : 0;
   const recentHouses = houses.slice(0, 3);
+
+  const handleWarningClick = (warning) => {
+    if (warning.type === 'SAVING') {
+      setIsHubMode(false);
+      setActiveTab('savings');
+      setSelectedHouse(null);
+    } else if (warning.houseId) {
+      const house = houses.find(h => h.id === warning.houseId);
+      if (house) {
+        setSelectedHouse(house);
+        setConfig({ ...house });
+        setIsHubMode(false);
+        switch (warning.type) {
+          case 'METER': setActiveTab('meters_list'); break;
+          case 'BILL': setActiveTab('bills'); break;
+          case 'CONTRACT': setActiveTab('rooms'); break;
+          default: setActiveTab('dashboard');
+        }
+      } else {
+        showToast("Không tìm thấy thông tin cơ sở tương ứng", "error");
+      }
+    }
+  };
+
+  const getWarningConfig = (type) => {
+    switch (type) {
+      case 'SAVING': return { icon: PiggyBank, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100', borderL: 'border-l-emerald-500', lightBg: 'bg-emerald-50/50' };
+      case 'METER': return { icon: Zap, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100', borderL: 'border-l-amber-500', lightBg: 'bg-amber-50/50' };
+      case 'BILL': return { icon: Receipt, color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-100', borderL: 'border-l-rose-500', lightBg: 'bg-rose-50/50' };
+      case 'CONTRACT': return { icon: FileText, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100', borderL: 'border-l-blue-500', lightBg: 'bg-blue-50/50' };
+      default: return { icon: AlertTriangle, color: 'text-slate-600', bg: 'bg-slate-50', border: 'border-slate-100', borderL: 'border-l-slate-400', lightBg: 'bg-slate-50/50' };
+    }
+  };
 
   return (
     <div className="h-screen bg-slate-100 text-slate-900 font-sans flex flex-col max-w-lg mx-auto w-full relative border-x border-slate-200 shadow-2xl overflow-hidden">
@@ -119,7 +153,7 @@ const HubView = ({
         <section className="grid grid-cols-2 gap-3">
           {[
             { label: 'Quản lý cơ sở', desc: `${hubStats.totalHouses} cơ sở`, icon: Building2, tone: 'bg-blue-600 text-white', action: () => { setIsHubMode(false); setActiveTab('dashboard'); } },
-            { label: 'Sổ chi tiêu', desc: 'Quản lý 6 hũ tài chính', icon: CircleDollarSign, tone: 'bg-white text-orange-600', action: () => { setIsHubMode(false); setActiveTab('expense_tracker'); setSelectedHouse(null); } },
+            { label: 'Sổ chi tiêu', desc: 'Quản lý 6 hũ tài chính', icon: CircleDollarSign, tone: 'bg-white text-orange-600', action: () => { setIsHubMode(false); setActiveTab('fund'); setSelectedHouse(null); } },
             { label: 'Sổ tiết kiệm', desc: 'Theo dõi tiền gửi', icon: PiggyBank, tone: 'bg-white text-emerald-600', action: () => { setIsHubMode(false); setActiveTab('savings'); setSelectedHouse(null); } },
             { label: 'AI Chat', desc: 'Hỗ trợ thao tác', icon: Sparkles, tone: 'bg-white text-indigo-600', action: () => { setIsHubMode(false); setActiveTab('ai'); setSelectedHouse(null); } }
           ].map(item => (
@@ -129,6 +163,36 @@ const HubView = ({
             </button>
           ))}
         </section>
+
+        {dashboardWarnings.length > 0 && (
+          <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="p-3.5 flex items-center justify-between border-b border-slate-100 bg-slate-50">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-orange-500" />
+                <h3 className="text-[13px] font-black text-slate-800 uppercase tracking-tight">Cần chú ý</h3>
+              </div>
+              <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-md shadow-sm">{dashboardWarnings.length} Cảnh báo</span>
+            </div>
+            <div className="divide-y divide-white max-h-[300px] overflow-y-auto no-scrollbar">
+              {dashboardWarnings.map((w, idx) => {
+                const config = getWarningConfig(w.type);
+                const Icon = config.icon;
+                return (
+                  <button key={idx} onClick={() => handleWarningClick(w)} className={`w-full text-left p-3 flex items-start gap-3 transition-colors active:scale-[0.99] border-l-4 ${config.borderL} ${config.lightBg} hover:opacity-80`}>
+                    <div className={`w-9 h-9 rounded-full shrink-0 flex items-center justify-center ${config.bg} ${config.color} border ${config.border} shadow-sm`}>
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[12px] font-bold text-slate-800 leading-snug">{w.message}</p>
+                      {w.houseName && <p className={`text-[9px] font-black uppercase tracking-widest mt-1 flex items-center gap-1 ${config.color}`}><Building2 className="w-3 h-3" /> {w.houseName}</p>}
+                    </div>
+                    <ChevronRight className={`w-4 h-4 shrink-0 self-center ${config.color}`} />
+                  </button>
+                )
+              })}
+            </div>
+          </section>
+        )}
 
         <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="p-4 flex items-center justify-between border-b border-slate-100">

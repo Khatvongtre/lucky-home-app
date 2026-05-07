@@ -7,7 +7,7 @@ const TAB_TITLES = {
     meters_list: 'Chốt số điện',
     bills: 'Hóa đơn',
     finance: 'Thu chi',
-    expense_tracker: 'Sổ chi tiêu',
+    fund: 'Sổ chi tiêu',
     savings: 'Sổ tiết kiệm',
     ai: 'Chat AI',
     profile: 'Tài khoản',
