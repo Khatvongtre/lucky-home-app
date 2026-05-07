@@ -148,7 +148,7 @@ export const exportToClipboard = async (elementId) => {
             const height = clone.offsetHeight;
 
             const dataUrl = await toPng(clone, {
-                pixelRatio: isMobile ? 2 : 3,
+                pixelRatio: 3,
                 width,
                 height,
                 backgroundColor: '#ffffff',
