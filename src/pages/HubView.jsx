@@ -15,15 +15,16 @@ const HubView = ({
 }) => {
   const hubStats = houses.reduce((acc, h) => {
     acc.totalHouses += 1;
-    acc.totalRooms += h.totalRooms || 0;
-    acc.emptyRooms += h.emptyRooms || 0;
-    acc.revenue += h.revenue || 0;
-    acc.profit += h.profit || ((h.revenue || 0) - (h.expense || 0));
+    acc.totalRooms += Number(h.totalRooms) || 0;
+    acc.emptyRooms += Number(h.emptyRooms) || 0;
+    acc.revenue += Number(h.revenue) || 0;
+    acc.profit += Number(h.profit ?? ((Number(h.revenue) || 0) - (Number(h.expense) || 0)));
     return acc;
   }, { totalHouses: 0, totalRooms: 0, emptyRooms: 0, revenue: 0, profit: 0 });
 
+  const rentedRooms = Math.max(0, hubStats.totalRooms - hubStats.emptyRooms);
   const occupancyRate = hubStats.totalRooms > 0
-    ? Math.round(((hubStats.totalRooms - hubStats.emptyRooms) / hubStats.totalRooms) * 100)
+    ? Math.round((rentedRooms / hubStats.totalRooms) * 100)
     : 0;
   const recentHouses = houses.slice(0, 3);
 
@@ -89,7 +90,7 @@ const HubView = ({
           {[
             { label: 'Cơ sở', value: hubStats.totalHouses, tone: 'text-blue-700 bg-blue-50' },
             { label: 'Phòng', value: hubStats.totalRooms, tone: 'text-slate-700 bg-slate-50' },
-            { label: 'Trống', value: hubStats.emptyRooms, tone: 'text-amber-700 bg-amber-50' },
+            { label: 'Trống', value: Math.max(0, hubStats.emptyRooms), tone: 'text-amber-700 bg-amber-50' },
             { label: 'Lấp đầy', value: `${occupancyRate}%`, tone: 'text-emerald-700 bg-emerald-50' }
           ].map(item => (
             <div key={item.label} className={`rounded-xl border border-slate-200 p-2.5 text-center ${item.tone}`}>
@@ -121,7 +122,7 @@ const HubView = ({
             </div>
             <div className="text-right">
               <p className="text-[8px] font-black uppercase tracking-widest text-slate-500">Phòng đang thuê</p>
-              <p className="text-sm font-black text-white tabular-nums mt-1">{hubStats.totalRooms - hubStats.emptyRooms}/{hubStats.totalRooms}</p>
+              <p className="text-sm font-black text-white tabular-nums mt-1">{rentedRooms}/{hubStats.totalRooms}</p>
             </div>
           </div>
         </section>
@@ -153,7 +154,7 @@ const HubView = ({
         <section className="grid grid-cols-2 gap-3">
           {[
             { label: 'Quản lý cơ sở', desc: `${hubStats.totalHouses} cơ sở`, icon: Building2, tone: 'bg-blue-600 text-white', action: () => { setIsHubMode(false); setActiveTab('dashboard'); } },
-            { label: 'Sổ chi tiêu', desc: 'Quản lý 6 hũ tài chính', icon: CircleDollarSign, tone: 'bg-white text-orange-600', action: () => { setIsHubMode(false); setActiveTab('fund'); setSelectedHouse(null); } },
+            { label: 'Sổ chi tiêu', desc: 'Quản lý sổ quỹ', icon: CircleDollarSign, tone: 'bg-white text-orange-600', action: () => { setIsHubMode(false); setActiveTab('fund'); setSelectedHouse(null); } },
             { label: 'Sổ tiết kiệm', desc: 'Theo dõi tiền gửi', icon: PiggyBank, tone: 'bg-white text-emerald-600', action: () => { setIsHubMode(false); setActiveTab('savings'); setSelectedHouse(null); } },
             { label: 'AI Chat', desc: 'Hỗ trợ thao tác', icon: Sparkles, tone: 'bg-white text-indigo-600', action: () => { setIsHubMode(false); setActiveTab('ai'); setSelectedHouse(null); } }
           ].map(item => (

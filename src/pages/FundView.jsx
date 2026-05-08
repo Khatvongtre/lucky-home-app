@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CircleDollarSign, PieChart, Plus, TrendingDown, TrendingUp, Wallet, ChevronRight, GraduationCap, HeartHandshake, Plane, X, Settings2, Trash2, ChevronDown, Check, LayoutGrid, List, Search } from 'lucide-react';
+import { CircleDollarSign, PieChart, Plus, TrendingDown, TrendingUp, Wallet, ChevronRight, GraduationCap, HeartHandshake, Plane, X, Settings2, Trash2, ChevronDown, Check, LayoutGrid, List, Search, ArrowRightLeft } from 'lucide-react';
 import { formatN, parseN } from '../utils/formatters';
 import { api } from '../services/api';
 
@@ -36,12 +36,13 @@ const FundView = ({ showToast = () => { }, requestConfirm = async () => window.c
 
     const [isTxModalOpen, setIsTxModalOpen] = useState(false);
     const [txType, setTxType] = useState('in');
-    const [txForm, setTxForm] = useState({ amount: '', note: '', fundId: 1, isAutoDistribute: true });
+    const [txForm, setTxForm] = useState({ amount: '', note: '', fundId: 1, toFundId: '', isDistribute: false, allocations: {} });
     const [isFundDropdownOpen, setIsFundDropdownOpen] = useState(false);
+    const [isFromDropdownOpen, setIsFromDropdownOpen] = useState(false);
+    const [isToDropdownOpen, setIsToDropdownOpen] = useState(false);
 
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
     const [tempFunds, setTempFunds] = useState([]);
-    const [simulatedIncome, setSimulatedIncome] = useState(10000000);
     const [viewMode, setViewMode] = useState('grid');
     const [activePanel, setActivePanel] = useState('funds');
     const [isFundCardExpanded, setIsFundCardExpanded] = useState(true);
@@ -73,21 +74,27 @@ const FundView = ({ showToast = () => { }, requestConfirm = async () => window.c
         loadData();
     }, []);
 
-    // Lắng nghe sự kiện từ Nút + của Header
-    useEffect(() => {
-        const handleOpenModal = () => openTxModal('out');
-        window.addEventListener('openFundModal', handleOpenModal);
-        return () => window.removeEventListener('openFundModal', handleOpenModal);
-    }, []);
-
     const totalBalance = funds.reduce((sum, fund) => sum + fund.balance, 0);
     const totalIncome = transactions.filter(t => t.type === 'in').reduce((sum, t) => sum + t.amount, 0);
     const totalExpense = transactions.filter(t => t.type === 'out').reduce((sum, t) => sum + t.amount, 0);
 
-    const openTxModal = (type) => {
+    const fundStats = transactions.reduce((stats, tx) => {
+        const current = stats[tx.fundId] || { initial: 0, spent: 0 };
+        if (tx.type === 'in') current.initial += tx.amount;
+        if (tx.type === 'out') current.spent += tx.amount;
+        stats[tx.fundId] = current;
+        return stats;
+    }, {});
+
+    const openTxModal = (type, defaultFundId = null) => {
         if (funds.length === 0) return showToast("Bạn chưa có hũ nào để giao dịch!", "error");
         setTxType(type);
-        setTxForm({ amount: '', note: '', fundId: funds[0].id, isAutoDistribute: type === 'in' });
+        const fundIdToSet = defaultFundId || funds[0].id;
+        let toFundIdToSet = funds.length > 1 ? funds[1].id : '';
+        if (type === 'transfer' && fundIdToSet === toFundIdToSet && funds.length > 1) {
+            toFundIdToSet = funds.find(f => f.id !== fundIdToSet)?.id || '';
+        }
+        setTxForm({ amount: '', note: '', fundId: fundIdToSet, toFundId: toFundIdToSet, isDistribute: false, allocations: {} });
         setIsTxModalOpen(true);
     };
 
@@ -99,16 +106,29 @@ const FundView = ({ showToast = () => { }, requestConfirm = async () => window.c
         let newTxs = [];
 
         try {
-            if (txType === 'in') {
-                if (txForm.isAutoDistribute) {
-                    let remaining = amount;
-                    funds.forEach((f, index) => {
-                        let added = Math.round(amount * (f.percent / 100));
-                        if (index === funds.length - 1) added = remaining; // Bù trừ sai số làm tròn vào hũ cuối
-                        remaining -= added;
+            if (txType === 'transfer') {
+                if (!txForm.toFundId) return showToast("Vui lòng chọn hũ nhận tiền!", "error");
+                if (txForm.fundId === txForm.toFundId) return showToast("Hũ chuyển và hũ nhận phải khác nhau!", "error");
 
-                        if (added > 0) {
-                            newTxs.push({ type: 'in', amount: added, fundId: f.id, note: txForm.note || `Phân bổ tự động (${f.percent}%)` });
+                const fromFund = funds.find(f => f.id === Number(txForm.fundId));
+                const toFund = funds.find(f => f.id === Number(txForm.toFundId));
+
+                if (fromFund.balance < amount) {
+                    return showToast(`Hũ ${fromFund.name} không đủ số dư! (Còn ${formatN(fromFund.balance)}đ)`, "error");
+                }
+
+                newTxs.push({ type: 'out', amount: amount, fundId: fromFund.id, note: txForm.note || `Chuyển sang ${toFund.name}` });
+                newTxs.push({ type: 'in', amount: amount, fundId: toFund.id, note: txForm.note || `Nhận từ ${fromFund.name}` });
+            } else if (txType === 'in') {
+                if (txForm.isDistribute) {
+                    const totalAllocated = Object.values(txForm.allocations).reduce((sum, val) => sum + (Number(val) || 0), 0);
+                    if (totalAllocated !== amount) {
+                        return showToast(`Tổng số tiền phân bổ (${formatN(totalAllocated)}đ) phải bằng đúng số tiền nạp (${formatN(amount)}đ)!`, "error");
+                    }
+                    funds.forEach(f => {
+                        const allocatedAmount = Number(txForm.allocations[f.id]) || 0;
+                        if (allocatedAmount > 0) {
+                            newTxs.push({ type: 'in', amount: allocatedAmount, fundId: f.id, note: txForm.note || `Nạp tiền hũ ${f.name}` });
                         }
                     });
                 } else {
@@ -127,7 +147,7 @@ const FundView = ({ showToast = () => { }, requestConfirm = async () => window.c
             await api.post('/funds/transactions', newTxs);
             await loadData();
             setIsTxModalOpen(false);
-            showToast(txType === 'in' ? "Đã ghi nhận nạp tiền!" : "Đã ghi nhận chi tiêu!", "success");
+            showToast(txType === 'in' ? "Đã ghi nhận nạp tiền!" : txType === 'out' ? "Đã ghi nhận chi tiêu!" : "Đã chuyển tiền thành công!", "success");
         } catch (e) {
             showToast("Lỗi giao dịch: " + e.message, "error");
         }
@@ -139,12 +159,7 @@ const FundView = ({ showToast = () => { }, requestConfirm = async () => window.c
     };
 
     const handleSaveSettings = async () => {
-        const payload = tempFunds.map(f => ({ ...f, percent: Math.round(Number(f.percent || 0)) }));
-        const totalPercent = payload.reduce((sum, f) => sum + f.percent, 0);
-
-        if (totalPercent !== 100) {
-            return showToast(`Tổng tỉ lệ phân bổ phải đúng bằng 100% (Hiện tại: ${totalPercent}%)`, "error");
-        }
+        const payload = tempFunds.map(({ percent, ...f }) => f);
         try {
             const updatedFunds = await api.put('/funds', payload);
             setFunds(updatedFunds);
@@ -161,7 +176,6 @@ const FundView = ({ showToast = () => { }, requestConfirm = async () => window.c
         setTempFunds([...tempFunds, {
             id: newId,
             name: 'Hũ mới',
-            percent: 0,
             balance: 0,
             ...palette
         }]);
@@ -219,13 +233,6 @@ const FundView = ({ showToast = () => { }, requestConfirm = async () => window.c
         const haystack = `${t.note || ''} ${fund?.name || ''} ${formatN(t.amount)} ${t.amount}`.toLowerCase();
         return haystack.includes(normalizedTxSearch);
     });
-    const fundStats = transactions.reduce((stats, tx) => {
-        const current = stats[tx.fundId] || { initial: 0, spent: 0 };
-        if (tx.type === 'in') current.initial += tx.amount;
-        if (tx.type === 'out') current.spent += tx.amount;
-        stats[tx.fundId] = current;
-        return stats;
-    }, {});
     const topFund = funds.reduce((top, fund) => fund.balance > (top?.balance || 0) ? fund : top, null);
     const fundSegments = funds
         .filter(fund => fund.balance > 0)
@@ -308,11 +315,14 @@ const FundView = ({ showToast = () => { }, requestConfirm = async () => window.c
                                     </div>
                                 </div>
                                 <div className="flex gap-2">
-                                    <button onClick={() => openTxModal('in')} className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-white py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-500/20 active:scale-95">
-                                        <TrendingUp className="w-4 h-4" /> Nạp Tiền
+                                    <button onClick={() => openTxModal('in')} className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-white py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-1 shadow-lg shadow-emerald-500/20 active:scale-95">
+                                        <TrendingUp className="w-3.5 h-3.5" /> Nạp
                                     </button>
-                                    <button onClick={() => openTxModal('out')} className="flex-1 bg-white/10 hover:bg-white/20 text-indigo-50 py-2.5 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 backdrop-blur-md border border-white/10 active:scale-95">
-                                        <TrendingDown className="w-4 h-4" /> Chi Tiêu
+                                    <button onClick={() => openTxModal('out')} className="flex-1 bg-rose-500 hover:bg-rose-400 text-white py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-1 shadow-lg shadow-rose-500/20 active:scale-95">
+                                        <TrendingDown className="w-3.5 h-3.5" /> Chi
+                                    </button>
+                                    <button onClick={() => openTxModal('transfer')} className="flex-1 bg-white/10 hover:bg-white/20 text-indigo-50 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-1 backdrop-blur-md border border-white/10 active:scale-95">
+                                        <ArrowRightLeft className="w-3.5 h-3.5" /> Chuyển
                                     </button>
                                 </div>
                             </>
@@ -423,22 +433,19 @@ const FundView = ({ showToast = () => { }, requestConfirm = async () => window.c
                             <div className="grid grid-cols-2 gap-2">
                                 {funds.map(fund => {
                                     const Icon = ICONS[fund.iconName] || Wallet;
+                                    const isOverLimit = fund.balance < 0;
                                     const stats = fundStats[fund.id] || { initial: fund.balance, spent: 0 };
                                     const initialAmount = Math.max(stats.initial, fund.balance);
                                     const remainingRate = initialAmount > 0 ? Math.max(0, Math.min(100, (fund.balance / initialAmount) * 100)) : 0;
-                                    const isOverLimit = fund.balance < 0;
                                     return (
-                                        <div key={fund.id} onClick={() => openTxModal('out')} className={`rounded-xl border p-3 shadow-sm active:scale-[0.98] transition-all cursor-pointer hover:shadow-md ${isOverLimit ? 'bg-rose-50 border-rose-200' : `${fund.bg} ${getFundBorder(fund)}`}`}>
+                                        <div key={fund.id} onClick={() => openTxModal('out', fund.id)} className={`rounded-xl border p-3 shadow-sm active:scale-[0.98] transition-all cursor-pointer hover:shadow-md ${isOverLimit ? 'bg-rose-50 border-rose-200' : `${fund.bg} ${getFundBorder(fund)}`}`}>
                                             <div className="flex items-start gap-2.5">
                                                 <div className={`w-8 h-8 rounded-lg border border-white/90 shadow-sm flex items-center justify-center shrink-0 ${isOverLimit ? 'bg-rose-50' : 'bg-white'}`}>
                                                     <Icon className={`w-4 h-4 ${isOverLimit ? 'text-rose-600' : fund.text}`} strokeWidth={2.5} />
                                                 </div>
                                                 <div className="min-w-0 flex-1">
                                                     <p className={`text-[11px] font-black uppercase tracking-widest truncate ${isOverLimit ? 'text-rose-700' : fund.text}`}>{fund.name}</p>
-                                                    <div className="mt-1 flex items-center gap-1.5 min-w-0">
-                                                        <p className={`min-w-0 truncate text-[9px] font-black tabular-nums ${isOverLimit ? 'text-rose-500' : fund.text}`}>{formatN(initialAmount)}đ</p>
-                                                        <span className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[8px] font-black ${isOverLimit ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>{Math.round(remainingRate)}%</span>
-                                                    </div>
+                                                    <p className="text-[8px] font-bold text-slate-400 mt-1 truncate">Hạn mức: {formatN(initialAmount)}đ</p>
                                                 </div>
                                             </div>
 
@@ -452,7 +459,7 @@ const FundView = ({ showToast = () => { }, requestConfirm = async () => window.c
                                                         Quá hạn mức
                                                     </p>
                                                 )}
-                                                <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-white/70">
+                                                <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-black/5">
                                                     <div
                                                         className={`h-full rounded-full ${isOverLimit ? 'bg-rose-500' : fund.color}`}
                                                         style={{ width: `${isOverLimit ? 100 : remainingRate}%` }}
@@ -470,32 +477,29 @@ const FundView = ({ showToast = () => { }, requestConfirm = async () => window.c
                                     const stats = fundStats[fund.id] || { initial: fund.balance, spent: 0 };
                                     const initialAmount = Math.max(stats.initial, fund.balance);
                                     const remainingRate = initialAmount > 0 ? Math.max(0, Math.min(100, (fund.balance / initialAmount) * 100)) : 0;
+                                    const isOverLimit = fund.balance < 0;
                                     return (
-                                        <div key={fund.id} onClick={() => openTxModal('out')} className={`${fund.bg} p-2.5 rounded-xl border border-white/70 shadow-sm active:scale-[0.98] transition-all cursor-pointer hover:shadow-md`}>
+                                        <div key={fund.id} onClick={() => openTxModal('out', fund.id)} className={`p-2.5 rounded-xl border shadow-sm active:scale-[0.98] transition-all cursor-pointer hover:shadow-md ${isOverLimit ? 'bg-rose-50 border-rose-200' : `${fund.bg} ${getFundBorder(fund)}`}`}>
                                             <div className="flex items-center justify-between gap-2.5">
                                                 <div className="flex items-center gap-2.5 min-w-0">
                                                     <div className="w-9 h-9 rounded-lg border border-white/90 bg-white/65 flex items-center justify-center shadow-sm shrink-0">
-                                                        <Icon className={`w-4.5 h-4.5 ${fund.text}`} strokeWidth={2.5} />
+                                                        <Icon className={`w-4.5 h-4.5 ${isOverLimit ? 'text-rose-600' : fund.text}`} strokeWidth={2.5} />
                                                     </div>
                                                     <div className="min-w-0">
                                                         <p className="text-[10px] font-black text-slate-600 uppercase tracking-widest leading-none mb-1 truncate">{fund.name}</p>
-                                                        <span className="inline-block max-w-[120px] truncate text-[8px] font-black text-emerald-700 px-1.5 py-0.5 rounded border border-emerald-200 bg-emerald-50/80">
-                                                            {formatN(initialAmount)}đ · {Math.round(remainingRate)}%
-                                                        </span>
+                                                        <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest truncate">Hạn mức: {formatN(initialAmount)}đ</p>
                                                     </div>
                                                 </div>
                                                 <div className="text-right shrink-0">
                                                     <p className="text-[8px] font-black uppercase text-slate-400">Còn lại</p>
-                                                    <p className={`mt-0.5 text-[13px] font-black tabular-nums ${fund.text}`}>{formatN(fund.balance)}đ</p>
+                                                    <p className={`mt-0.5 text-[13px] font-black tabular-nums ${isOverLimit ? 'text-rose-600' : fund.text}`}>{formatN(fund.balance)}đ</p>
                                                 </div>
                                             </div>
-                                            <div className="mt-2">
-                                                <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-white/70">
-                                                    <div
-                                                        className={`h-full rounded-full ${fund.color}`}
-                                                        style={{ width: `${remainingRate}%` }}
-                                                    />
-                                                </div>
+                                            <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-black/5">
+                                                <div
+                                                    className={`h-full rounded-full ${isOverLimit ? 'bg-rose-500' : fund.color}`}
+                                                    style={{ width: `${isOverLimit ? 100 : remainingRate}%` }}
+                                                />
                                             </div>
                                         </div>
                                     )
@@ -636,50 +640,147 @@ const FundView = ({ showToast = () => { }, requestConfirm = async () => window.c
                     <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl relative z-10 overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh]">
                         <div className="p-4 border-b border-slate-100 flex items-center justify-between">
                             <h3 className="text-[14px] font-black text-indigo-900 uppercase tracking-tight">
-                                {txType === 'in' ? 'Ghi nhận Thu nhập' : 'Ghi nhận Chi tiêu'}
+                                {txType === 'in' ? 'Ghi nhận Thu nhập' : txType === 'out' ? 'Ghi nhận Chi tiêu' : 'Chuyển quỹ'}
                             </h3>
                             <button onClick={() => setIsTxModalOpen(false)} className="p-2 bg-slate-50 text-slate-400 rounded-full hover:bg-slate-100"><X className="w-4 h-4" /></button>
                         </div>
                         <div className="p-4 overflow-y-auto no-scrollbar flex-1">
                             <form id="txForm" onSubmit={handleSaveTx} className="space-y-4">
+                                {txType === 'in' && (
+                                    <div className="bg-slate-100 p-1 rounded-xl flex mb-1">
+                                        <button type="button" onClick={() => setTxForm({ ...txForm, isDistribute: false })} className={`flex-1 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${!txForm.isDistribute ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500'}`}>Nạp 1 hũ</button>
+                                        <button type="button" onClick={() => setTxForm({ ...txForm, isDistribute: true })} className={`flex-1 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${txForm.isDistribute ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500'}`}>Chia nhiều hũ</button>
+                                    </div>
+                                )}
+
                                 <div>
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block px-1">Số tiền</label>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block px-1">
+                                        {txType === 'in' && txForm.isDistribute ? 'Tổng số tiền nạp' : txType === 'transfer' ? 'Số tiền chuyển' : 'Số tiền'}
+                                    </label>
                                     <div className="relative">
                                         <input type="text" value={txForm.amount} onChange={e => {
                                             const val = e.target.value.replace(/[^0-9]/g, '');
                                             setTxForm({ ...txForm, amount: val !== '' ? formatN(Number(val)) : '' });
-                                        }} className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-lg font-black outline-none focus:bg-white transition-all text-right ${txType === 'in' ? 'text-emerald-600 focus:border-emerald-500' : 'text-rose-600 focus:border-rose-500'}`} placeholder="0" required />
+                                        }} className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-lg font-black outline-none focus:bg-white transition-all text-right ${txType === 'in' ? 'text-emerald-600 focus:border-emerald-500' : txType === 'transfer' ? 'text-blue-600 focus:border-blue-500' : 'text-rose-600 focus:border-rose-500'}`} placeholder="0" required />
                                         <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">VNĐ</span>
                                     </div>
                                 </div>
 
-                                {txType === 'in' && (
-                                    <div className="bg-blue-50/50 border border-blue-100 rounded-xl p-1 mb-2 flex">
-                                        <button type="button" onClick={() => setTxForm({ ...txForm, isAutoDistribute: true })} className={`flex-1 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${txForm.isAutoDistribute ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'}`}>Phân bổ theo %</button>
-                                        <button type="button" onClick={() => setTxForm({ ...txForm, isAutoDistribute: false })} className={`flex-1 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${!txForm.isAutoDistribute ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500'}`}>Chọn hũ</button>
+                                {txType === 'transfer' && (
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex-1 w-0">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block px-1">Từ hũ</label>
+                                            <div className="relative">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setIsFromDropdownOpen(!isFromDropdownOpen); setIsToDropdownOpen(false); setIsFundDropdownOpen(false); }}
+                                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-3.5 text-xs font-bold outline-none focus:border-blue-600 focus:bg-white transition-all flex items-center justify-between text-indigo-900"
+                                                >
+                                                    <span className="truncate pr-2">
+                                                        {funds.find(f => f.id === txForm.fundId)?.name || 'Chọn hũ'}
+                                                    </span>
+                                                    <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isFromDropdownOpen ? 'rotate-180' : ''}`} />
+                                                </button>
+                                                {isFromDropdownOpen && (
+                                                    <>
+                                                        <div className="fixed inset-0 z-40" onClick={() => setIsFromDropdownOpen(false)}></div>
+                                                        <div className="absolute top-full left-0 w-max min-w-full mt-1 bg-white border border-slate-100 rounded-xl shadow-xl z-50 overflow-hidden animate-in slide-in-from-top-2">
+                                                            <div className="max-h-48 overflow-y-auto no-scrollbar">
+                                                                {funds.map(f => {
+                                                                    const Icon = ICONS[f.iconName] || Wallet;
+                                                                    return (
+                                                                        <button key={f.id} type="button" onClick={() => { setTxForm({ ...txForm, fundId: f.id }); setIsFromDropdownOpen(false); }} className={`w-full px-3 py-2.5 flex items-center gap-2 hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0 ${txForm.fundId === f.id ? 'bg-blue-50/50' : ''}`}>
+                                                                            <div className={`w-6 h-6 rounded-md flex items-center justify-center ${f.bg} ${f.text}`}><Icon className="w-3 h-3" /></div>
+                                                                            <div className="text-left flex-1"><p className="text-[11px] font-black text-indigo-900 leading-tight whitespace-nowrap">{f.name}</p><p className="text-[9px] font-bold text-slate-400 whitespace-nowrap">Còn {formatN(f.balance)}đ</p></div>
+                                                                        </button>
+                                                                    )
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="pt-5 text-slate-400 shrink-0"><ArrowRightLeft className="w-4 h-4" /></div>
+                                        <div className="flex-1 w-0">
+                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block px-1">Sang hũ</label>
+                                            <div className="relative">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setIsToDropdownOpen(!isToDropdownOpen); setIsFromDropdownOpen(false); setIsFundDropdownOpen(false); }}
+                                                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-3.5 text-xs font-bold outline-none focus:border-blue-600 focus:bg-white transition-all flex items-center justify-between text-indigo-900"
+                                                >
+                                                    <span className="truncate pr-2">
+                                                        {funds.find(f => f.id === txForm.toFundId)?.name || 'Chọn hũ'}
+                                                    </span>
+                                                    <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform ${isToDropdownOpen ? 'rotate-180' : ''}`} />
+                                                </button>
+                                                {isToDropdownOpen && (
+                                                    <>
+                                                        <div className="fixed inset-0 z-40" onClick={() => setIsToDropdownOpen(false)}></div>
+                                                        <div className="absolute top-full right-0 w-max min-w-full mt-1 bg-white border border-slate-100 rounded-xl shadow-xl z-50 overflow-hidden animate-in slide-in-from-top-2">
+                                                            <div className="max-h-48 overflow-y-auto no-scrollbar">
+                                                                {funds.map(f => {
+                                                                    const Icon = ICONS[f.iconName] || Wallet;
+                                                                    const isDisabled = f.id === txForm.fundId;
+                                                                    return (
+                                                                        <button key={f.id} type="button" disabled={isDisabled} onClick={() => { setTxForm({ ...txForm, toFundId: f.id }); setIsToDropdownOpen(false); }} className={`w-full px-3 py-2.5 flex items-center gap-2 hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0 ${txForm.toFundId === f.id ? 'bg-blue-50/50' : ''} ${isDisabled ? 'opacity-50 cursor-not-allowed grayscale' : ''}`}>
+                                                                            <div className={`w-6 h-6 rounded-md flex items-center justify-center ${f.bg} ${f.text}`}><Icon className="w-3 h-3" /></div>
+                                                                            <div className="text-left flex-1"><p className="text-[11px] font-black text-indigo-900 leading-tight whitespace-nowrap">{f.name}</p></div>
+                                                                        </button>
+                                                                    )
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
                                 )}
 
-                                {txType === 'in' && txForm.isAutoDistribute && parseN(txForm.amount) > 0 && (
+                                {txType === 'in' && txForm.isDistribute && (
                                     <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-3 space-y-2 mt-2">
-                                        <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-1.5 border-b border-emerald-100 pb-1.5">Dự kiến phân bổ</p>
-                                        {funds.map((f) => {
-                                            const total = parseN(txForm.amount);
-                                            let amountForFund = Math.round(total * (f.percent / 100));
+                                        <div className="flex justify-between items-center border-b border-emerald-100 pb-2 mb-2">
+                                            <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">Chưa phân bổ</span>
+                                            <span className={`text-sm font-black ${parseN(txForm.amount) - Object.values(txForm.allocations).reduce((sum, val) => sum + (Number(val) || 0), 0) < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                                {formatN(parseN(txForm.amount) - Object.values(txForm.allocations).reduce((sum, val) => sum + (Number(val) || 0), 0))}đ
+                                            </span>
+                                        </div>
+                                        {funds.map(f => {
+                                            const allocated = txForm.allocations[f.id] || '';
                                             return (
-                                                <div key={f.id} className="flex justify-between items-center">
-                                                    <span className="text-[11px] font-bold text-slate-600 flex items-center gap-1.5">
-                                                        <span className={`w-2 h-2 rounded-full ${f.bg} border border-slate-300`}></span>
-                                                        {f.name} <span className="text-[9px] text-slate-400">({f.percent}%)</span>
+                                                <div key={f.id} className="flex items-center justify-between gap-2">
+                                                    <span className="text-[11px] font-bold text-slate-600 flex items-center gap-1.5 flex-1 truncate">
+                                                        <span className={`w-2 h-2 rounded-full ${f.bg} border border-slate-300 shrink-0`}></span>
+                                                        <span className="truncate">{f.name}</span>
                                                     </span>
-                                                    <span className="text-[11px] font-black text-emerald-600">+{formatN(amountForFund)}đ</span>
+                                                    <div className="relative w-[130px] shrink-0">
+                                                        <input
+                                                            type="text"
+                                                            value={allocated ? formatN(allocated) : ''}
+                                                            onChange={e => {
+                                                                const val = e.target.value.replace(/[^0-9]/g, '');
+                                                                setTxForm({
+                                                                    ...txForm,
+                                                                    allocations: {
+                                                                        ...txForm.allocations,
+                                                                        [f.id]: val ? Number(val) : ''
+                                                                    }
+                                                                });
+                                                            }}
+                                                            className="w-full bg-white border border-emerald-200 rounded-lg pr-5 pl-2 py-1.5 text-xs font-black outline-none focus:border-emerald-500 text-right text-emerald-600 transition-all"
+                                                            placeholder="0"
+                                                        />
+                                                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[9px]">đ</span>
+                                                    </div>
                                                 </div>
                                             )
                                         })}
                                     </div>
                                 )}
 
-                                {(!txForm.isAutoDistribute || txType === 'out') && (
+                                {txType !== 'transfer' && (!txForm.isDistribute || txType === 'out') && (
                                     <div>
                                         <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block px-1">Chọn Hũ</label>
                                         <div className="relative">
@@ -726,8 +827,8 @@ const FundView = ({ showToast = () => { }, requestConfirm = async () => window.c
                             </form>
                         </div>
                         <div className="p-4 border-t border-slate-100 bg-slate-50">
-                            <button form="txForm" type="submit" className={`w-full py-3.5 rounded-xl font-black text-[11px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95 ${txType === 'in' ? 'bg-emerald-500 hover:bg-emerald-400 text-white border-b-[3px] border-emerald-700' : 'bg-rose-500 hover:bg-rose-400 text-white border-b-[3px] border-rose-700'}`}>
-                                {txType === 'in' ? 'Xác nhận Nạp' : 'Xác nhận Chi'}
+                            <button form="txForm" type="submit" className={`w-full py-3.5 rounded-xl font-black text-[11px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95 ${txType === 'in' ? 'bg-emerald-500 hover:bg-emerald-400 text-white border-b-[3px] border-emerald-700' : txType === 'out' ? 'bg-rose-500 hover:bg-rose-400 text-white border-b-[3px] border-rose-700' : 'bg-blue-600 hover:bg-blue-500 text-white border-b-[3px] border-blue-800'}`}>
+                                {txType === 'in' ? 'Xác nhận Nạp' : txType === 'out' ? 'Xác nhận Chi' : 'Xác nhận Chuyển'}
                             </button>
                         </div>
                     </div>
@@ -739,30 +840,11 @@ const FundView = ({ showToast = () => { }, requestConfirm = async () => window.c
                     <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300" onClick={() => setIsSettingsModalOpen(false)}></div>
                     <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl relative z-10 overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh]">
                         <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                            <h3 className="text-[14px] font-black text-indigo-900 uppercase tracking-tight">Thiết lập tỉ lệ Hũ</h3>
+                            <h3 className="text-[14px] font-black text-indigo-900 uppercase tracking-tight">Thiết lập Hũ</h3>
                             <button onClick={() => setIsSettingsModalOpen(false)} className="p-2 bg-slate-50 text-slate-400 rounded-full hover:bg-slate-100"><X className="w-4 h-4" /></button>
                         </div>
                         <div className="p-4 overflow-y-auto no-scrollbar flex-1 space-y-4">
-                            {/* Thu nhập giả định */}
-                            <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-100">
-                                <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1.5 block px-1">Nhập số tiền mẫu (VNĐ)</label>
-                                <div className="relative">
-                                    <input type="text" value={simulatedIncome === '' ? '' : formatN(Number(simulatedIncome))} onChange={e => {
-                                        const val = e.target.value.replace(/[^0-9]/g, '');
-                                        setSimulatedIncome(val !== '' ? Number(val) : '');
-                                    }} className="w-full bg-white border border-blue-200 rounded-xl pl-14 pr-4 py-2.5 text-sm font-black outline-none focus:border-blue-600 focus:bg-white transition-all text-right shadow-sm text-blue-700" placeholder="0" />
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-400 font-bold text-[10px] uppercase">MẪU:</span>
-                                </div>
-                                <p className="text-[9px] text-blue-500 font-semibold mt-1.5 px-1 leading-snug">Nhập số tiền để tự động chia theo %, hoặc sửa số tiền của từng hũ bên dưới để tự tính %.</p>
-                            </div>
-
-                            <div className={`border p-3 rounded-xl flex items-center justify-between mb-2 shadow-sm ${tempFunds.reduce((s, f) => s + Math.round(Number(f.percent || 0)), 0) === 100 ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'}`}>
-                                <span className="text-[10px] font-black text-slate-600 uppercase">Tổng phần trăm</span>
-                                <span className={`text-sm font-black ${tempFunds.reduce((s, f) => s + Math.round(Number(f.percent || 0)), 0) === 100 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                    {tempFunds.reduce((s, f) => s + Math.round(Number(f.percent || 0)), 0)}%
-                                </span>
-                            </div>
-                            <div className="space-y-2">
+                            <div className="space-y-2 mt-2">
                                 {tempFunds.map((f, idx) => (
                                     <div key={f.id} className="flex items-center justify-between gap-1.5">
                                         <div className="flex-1">
@@ -771,26 +853,6 @@ const FundView = ({ showToast = () => { }, requestConfirm = async () => window.c
                                                 newTemp[idx].name = e.target.value;
                                                 setTempFunds(newTemp);
                                             }} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-2 text-xs font-bold outline-none focus:border-blue-600 focus:bg-white transition-all text-indigo-900" placeholder="Tên hũ" />
-                                        </div>
-                                        <div className="w-[90px] relative shrink-0">
-                                            <input type="text" value={f.percent === '' ? '' : formatN(Math.round(((simulatedIncome || 0) * (f.percent || 0)) / 100))} onChange={e => {
-                                                const val = e.target.value.replace(/[^0-9]/g, '');
-                                                const amount = val !== '' ? Number(val) : 0;
-                                                const newPercent = (simulatedIncome || 0) > 0 ? (amount / simulatedIncome) * 100 : 0;
-                                                const newTemp = [...tempFunds];
-                                                newTemp[idx].percent = val === '' ? '' : newPercent;
-                                                setTempFunds(newTemp);
-                                            }} className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-2 pr-5 py-2 text-xs font-black outline-none focus:border-blue-600 focus:bg-white text-right transition-all text-indigo-600" placeholder="0" />
-                                            <span className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[9px]">đ</span>
-                                        </div>
-                                        <div className="w-[60px] relative shrink-0">
-                                            <input type="number" value={f.percent === '' ? '' : Math.round(Number(f.percent))} onChange={e => {
-                                                const val = e.target.value;
-                                                const newTemp = [...tempFunds];
-                                                newTemp[idx].percent = val === '' ? '' : Math.round(Number(val));
-                                                setTempFunds(newTemp);
-                                            }} className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-2 pr-4 py-2 text-xs font-black outline-none focus:border-blue-600 focus:bg-white text-center transition-all text-blue-600" placeholder="0" />
-                                            <span className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-[9px]">%</span>
                                         </div>
                                         <button onClick={() => handleRemoveTempFund(f.id)} className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all shrink-0">
                                             <Trash2 className="w-4 h-4" />

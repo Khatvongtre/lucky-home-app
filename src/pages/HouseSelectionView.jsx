@@ -101,12 +101,12 @@ const HouseSelectionView = ({
 
     const houseStats = housesForStats.reduce((acc, h) => {
         acc.totalHouses += 1;
-        acc.totalRooms += (h.totalRooms || 0);
-        acc.emptyRooms += (h.emptyRooms || 0);
+        acc.totalRooms += Number(h.totalRooms) || 0;
+        acc.emptyRooms += Number(h.emptyRooms) || 0;
 
-        acc.totalRevenue += (h.revenue || 0);
-        acc.totalExpense += (h.expense || 0);
-        acc.totalProfit += (h.profit || ((h.revenue || 0) - (h.expense || 0)));
+        acc.totalRevenue += Number(h.revenue) || 0;
+        acc.totalExpense += Number(h.expense) || 0;
+        acc.totalProfit += Number(h.profit ?? ((Number(h.revenue) || 0) - (Number(h.expense) || 0)));
         return acc;
     }, { totalHouses: 0, totalRooms: 0, emptyRooms: 0, totalRevenue: 0, totalExpense: 0, totalProfit: 0 });
 
@@ -180,7 +180,7 @@ const HouseSelectionView = ({
                             </div>
                             <div className="flex flex-col items-center">
                                 <p className="text-[8px] font-bold text-slate-400 uppercase mb-0.5">Đang trống</p>
-                                <p className="text-sm font-black text-orange-400">{houseStats.emptyRooms}</p>
+                                <p className="text-sm font-black text-orange-400">{Math.max(0, houseStats.emptyRooms)}</p>
                             </div>
                         </div>
                     </div>

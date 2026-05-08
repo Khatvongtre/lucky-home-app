@@ -8,7 +8,9 @@ const TabBar = ({
     shouldShowMeterBanner,
     canAccessFinance,
     showQuickMenu,
-    setShowQuickMenu
+    setShowQuickMenu,
+    setIsHubMode,
+    selectedHouse
 }) => {
     return (
         <div className="fixed bottom-0 left-0 right-0 z-[70] pointer-events-none">
@@ -24,7 +26,13 @@ const TabBar = ({
                     { id: 'ai', icon: Sparkles, label: 'AI Chat', hidden: canAccessFinance }
                 ].filter(i => !i.hidden).map((item, i) => (
                     item.id === 'spacer' ? <div key={i} className="w-12" /> : (
-                        <button key={item.id} onClick={() => { setActiveTab(item.id); setSearchQuery(""); }} className={`flex flex-col items-center justify-center px-1 transition-all ${activeTab === item.id ? 'text-blue-600 scale-105' : 'text-slate-400 opacity-60'}`}>
+                        <button key={item.id} onClick={() => {
+                            if (!selectedHouse && item.id !== 'ai' && setIsHubMode) {
+                                setIsHubMode(true);
+                            }
+                            setActiveTab(item.id);
+                            setSearchQuery("");
+                        }} className={`flex flex-col items-center justify-center px-1 transition-all ${activeTab === item.id ? 'text-blue-600 scale-105' : 'text-slate-400 opacity-60'}`}>
                             <div className={`p-1.5 rounded-lg ${activeTab === item.id ? 'bg-blue-50 shadow-inner' : ''} flex items-center justify-center`}><item.icon className="w-4.5 h-4.5" strokeWidth={activeTab === item.id ? 3 : 2} /></div>
                             <span className={`text-[6px] font-black uppercase mt-1 transition-all ${activeTab === item.id ? 'opacity-100' : 'opacity-0'}`}>{item.label}</span>
                         </button>
