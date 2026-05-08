@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CircleDollarSign, PieChart, Plus, TrendingDown, TrendingUp, Wallet, ChevronRight, GraduationCap, HeartHandshake, Plane, X, Settings2, Trash2, ChevronDown, Check, LayoutGrid, List, Search, ArrowRightLeft } from 'lucide-react';
+import { CircleDollarSign, PieChart, Plus, TrendingDown, TrendingUp, Wallet, ChevronRight, GraduationCap, HeartHandshake, Plane, X, Settings2, Trash2, ChevronDown, Check, LayoutGrid, List, Search, ArrowRightLeft, Zap } from 'lucide-react';
 import { formatN, parseN } from '../utils/formatters';
 import { api } from '../services/api';
 
@@ -30,7 +30,7 @@ const BORDER_BY_TEXT = {
 
 const getFundBorder = (fund) => BORDER_BY_TEXT[fund.text] || 'border-slate-200';
 
-const FundView = ({ showToast = () => { }, requestConfirm = async () => window.confirm("Xác nhận?") }) => {
+const FundView = ({ showToast = () => { }, requestConfirm = async () => window.confirm("Xác nhận?"), setActiveTab }) => {
     const [funds, setFunds] = useState([]);
     const [transactions, setTransactions] = useState([]);
 
@@ -314,15 +314,24 @@ const FundView = ({ showToast = () => { }, requestConfirm = async () => window.c
                                         <p className="mt-1 text-[13px] font-black text-rose-100 tabular-nums">{formatN(totalExpense)}đ</p>
                                     </div>
                                 </div>
-                                <div className="flex gap-2">
-                                    <button onClick={() => openTxModal('in')} className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-white py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-1 shadow-lg shadow-emerald-500/20 active:scale-95">
-                                        <TrendingUp className="w-3.5 h-3.5" /> Nạp
-                                    </button>
-                                    <button onClick={() => openTxModal('out')} className="flex-1 bg-rose-500 hover:bg-rose-400 text-white py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-1 shadow-lg shadow-rose-500/20 active:scale-95">
-                                        <TrendingDown className="w-3.5 h-3.5" /> Chi
-                                    </button>
-                                    <button onClick={() => openTxModal('transfer')} className="flex-1 bg-white/10 hover:bg-white/20 text-indigo-50 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-1 backdrop-blur-md border border-white/10 active:scale-95">
-                                        <ArrowRightLeft className="w-3.5 h-3.5" /> Chuyển
+                                <div className="flex flex-col gap-2">
+                                    <div className="flex gap-2">
+                                        <button onClick={() => openTxModal('in')} className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-white py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-1 shadow-lg shadow-emerald-500/20 active:scale-95">
+                                            <TrendingUp className="w-3.5 h-3.5" /> Nạp
+                                        </button>
+                                        <button onClick={() => openTxModal('out')} className="flex-1 bg-rose-500 hover:bg-rose-400 text-white py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-1 shadow-lg shadow-rose-500/20 active:scale-95">
+                                            <TrendingDown className="w-3.5 h-3.5" /> Chi
+                                        </button>
+                                        <button onClick={() => openTxModal('transfer')} className="flex-1 bg-white/10 hover:bg-white/20 text-indigo-50 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-1 backdrop-blur-md border border-white/10 active:scale-95">
+                                            <ArrowRightLeft className="w-3.5 h-3.5" /> Chuyển
+                                        </button>
+                                    </div>
+                                    <button onClick={() => {
+                                        window.history.pushState({}, '', '/chitieu');
+                                        if (setActiveTab) setActiveTab('fast_input');
+                                        else window.location.href = '/chitieu';
+                                    }} className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white py-3 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-blue-500/30 border border-blue-400/30 active:scale-95">
+                                        <Zap className="w-4 h-4 fill-yellow-400 text-yellow-400" /> Nhập Siêu Tốc Bằng AI
                                     </button>
                                 </div>
                             </>
@@ -642,7 +651,6 @@ const FundView = ({ showToast = () => { }, requestConfirm = async () => window.c
                             <h3 className="text-[14px] font-black text-indigo-900 uppercase tracking-tight">
                                 {txType === 'in' ? 'Ghi nhận Thu nhập' : txType === 'out' ? 'Ghi nhận Chi tiêu' : 'Chuyển quỹ'}
                             </h3>
-                            <button onClick={() => setIsTxModalOpen(false)} className="p-2 bg-slate-50 text-slate-400 rounded-full hover:bg-slate-100"><X className="w-4 h-4" /></button>
                         </div>
                         <div className="p-4 overflow-y-auto no-scrollbar flex-1">
                             <form id="txForm" onSubmit={handleSaveTx} className="space-y-4">
@@ -826,9 +834,12 @@ const FundView = ({ showToast = () => { }, requestConfirm = async () => window.c
                                 </div>
                             </form>
                         </div>
-                        <div className="p-4 border-t border-slate-100 bg-slate-50">
+                        <div className="p-4 border-t border-slate-100 bg-slate-50 flex flex-col gap-2">
                             <button form="txForm" type="submit" className={`w-full py-3.5 rounded-xl font-black text-[11px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95 ${txType === 'in' ? 'bg-emerald-500 hover:bg-emerald-400 text-white border-b-[3px] border-emerald-700' : txType === 'out' ? 'bg-rose-500 hover:bg-rose-400 text-white border-b-[3px] border-rose-700' : 'bg-blue-600 hover:bg-blue-500 text-white border-b-[3px] border-blue-800'}`}>
                                 {txType === 'in' ? 'Xác nhận Nạp' : txType === 'out' ? 'Xác nhận Chi' : 'Xác nhận Chuyển'}
+                            </button>
+                            <button type="button" onClick={() => setIsTxModalOpen(false)} className="w-full bg-slate-100 text-slate-600 py-3.5 rounded-xl font-black text-[11px] uppercase tracking-widest active:scale-95 flex items-center justify-center gap-2 transition-all border border-slate-200 shadow-sm">
+                                <X className="w-4 h-4" /> Đóng
                             </button>
                         </div>
                     </div>
@@ -841,7 +852,6 @@ const FundView = ({ showToast = () => { }, requestConfirm = async () => window.c
                     <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl relative z-10 overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[90vh]">
                         <div className="p-4 border-b border-slate-100 flex items-center justify-between">
                             <h3 className="text-[14px] font-black text-indigo-900 uppercase tracking-tight">Thiết lập Hũ</h3>
-                            <button onClick={() => setIsSettingsModalOpen(false)} className="p-2 bg-slate-50 text-slate-400 rounded-full hover:bg-slate-100"><X className="w-4 h-4" /></button>
                         </div>
                         <div className="p-4 overflow-y-auto no-scrollbar flex-1 space-y-4">
                             <div className="space-y-2 mt-2">
@@ -864,9 +874,12 @@ const FundView = ({ showToast = () => { }, requestConfirm = async () => window.c
                                 <Plus className="w-4 h-4" /> Thêm hũ mới
                             </button>
                         </div>
-                        <div className="p-4 border-t border-slate-100 bg-slate-50">
+                        <div className="p-4 border-t border-slate-100 bg-slate-50 flex flex-col gap-2">
                             <button onClick={handleSaveSettings} className="w-full bg-blue-600 hover:bg-blue-500 text-white py-3.5 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all shadow-sm active:scale-95 border-b-[3px] border-blue-800">
                                 Lưu thiết lập
+                            </button>
+                            <button type="button" onClick={() => setIsSettingsModalOpen(false)} className="w-full bg-slate-100 text-slate-600 py-3.5 rounded-xl font-black text-[11px] uppercase tracking-widest active:scale-95 flex items-center justify-center gap-2 transition-all border border-slate-200 shadow-sm">
+                                <X className="w-4 h-4" /> Đóng
                             </button>
                         </div>
                     </div>

@@ -45,6 +45,7 @@ import AddTransactionForm from './components/finance/AddTransactionForm';
 import BillReceipt from './components/bills/BillReceipt';
 import AddHouseForm from './components/houses/AddHouseForm';
 import FundView from './pages/FundView';
+import FastInputView from './pages/FastInputView';
 
 import AiPromptModal from './components/houses/AiPromptModal';
 import ShareHouseModal from './components/houses/ShareHouseModal';
@@ -348,6 +349,44 @@ const App = () => {
   // ==========================================
   // 4. MAIN EFFECTS
   // ==========================================
+
+  // Hỗ trợ Direct Link (Truy cập bằng link trực tiếp /chitieu)
+  useEffect(() => {
+    const pathName = window.location.pathname;
+
+    let targetTab = null;
+    if (pathName === '/chitieu' || pathName === '/chitieu/') {
+      targetTab = 'fast_input';
+    }
+
+    if (targetTab) {
+      const token = localStorage.getItem('smartstay_token');
+      if (!token) {
+        // Nếu chưa đăng nhập, lưu lại ý định để chuyển hướng sau
+        sessionStorage.setItem('redirectAfterLogin', targetTab);
+      } else {
+        setIsHubMode(false);
+        setActiveTab(targetTab);
+      }
+    }
+  }, []);
+
+  // Lắng nghe đăng nhập thành công để chuyển hướng nếu có Direct Link
+  useEffect(() => {
+    if (isLoggedIn) {
+      const pendingTab = sessionStorage.getItem('redirectAfterLogin');
+      if (pendingTab) {
+        setIsHubMode(false);
+        setActiveTab(pendingTab);
+        sessionStorage.removeItem('redirectAfterLogin');
+
+        // Dọn dẹp URL trên thanh địa chỉ nếu đang ở /chitieu
+        if (window.location.pathname.includes('/chitieu')) {
+          window.history.replaceState({}, document.title, "/");
+        }
+      }
+    }
+  }, [isLoggedIn]);
 
   useEffect(() => {
     if (isLoggedIn && isHubMode) {
@@ -992,7 +1031,7 @@ const App = () => {
   // ==========================================
 
   // Các tab hiển thị độc lập, không cần thiết phải ở trong một House cụ thể
-  const isGlobalTab = ['savings', 'ai', 'profile', 'fund'].includes(activeTab);
+  const isGlobalTab = ['savings', 'ai', 'profile', 'fund', 'fast_input'].includes(activeTab);
 
   // 1. CHƯA ĐĂNG NHẬP -> HIỂN THỊ FORM LOGIN/REGISTER
   if (!isLoggedIn) {
@@ -1072,6 +1111,16 @@ const App = () => {
         handleAiGenerateHouse={handleAiGenerateHouse}
         editingHouse={editingHouse}
       />
+    );
+  }
+
+  // MÀN HÌNH NHẬP NHANH BẰNG AI (Full screen)
+  if (activeTab === 'fast_input') {
+    return (
+      <div className="h-screen bg-slate-900 font-sans flex flex-col max-w-lg mx-auto w-full relative border-x border-slate-800 shadow-2xl overflow-hidden">
+        <ToastNotification toast={toast} />
+        <FastInputView setActiveTab={setActiveTab} showToast={showToast} />
+      </div>
     );
   }
 
@@ -1202,6 +1251,7 @@ const App = () => {
         {activeTab === 'fund' && <FundView
           showToast={showToast}
           requestConfirm={requestConfirm}
+          setActiveTab={setActiveTab}
         />}
 
         {activeTab === 'ai' && <AiChatView
@@ -1210,6 +1260,11 @@ const App = () => {
           handleAiChat={handleAiChat}
         />
         }
+
+        {activeTab === 'fast_input' && (
+          // Dự phòng render ở đây
+          <FastInputView setActiveTab={setActiveTab} showToast={showToast} />
+        )}
 
         {activeTab === 'profile' && <ProfileView
           user={user}
@@ -1371,7 +1426,7 @@ const App = () => {
         )}
       </main>
 
-      {!['savings', 'profile', 'fund', 'ai'].includes(activeTab) && (
+      {!['savings', 'profile', 'fund', 'ai', 'fast_input'].includes(activeTab) && (
         <>
           {/* FOOTER TAB BAR */}
           <TabBar
