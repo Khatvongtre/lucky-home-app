@@ -578,7 +578,7 @@ const FundView = ({ showToast = () => { }, requestConfirm = async () => window.c
                             )}
                         </div>
 
-                        <div className="max-h-[500px] overflow-y-auto overscroll-contain rounded-2xl border border-slate-200 bg-white shadow-sm">
+                        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
                             {currentTransactions.length === 0 ? (
                                 <div className="p-8 text-center flex flex-col items-center justify-center">
                                     <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center mb-3">
