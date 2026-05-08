@@ -179,6 +179,14 @@ const FastInputView = ({ setActiveTab, showToast }) => {
         if (!parsedResult.amount || parsedResult.amount <= 0) {
             return showToast("Vui lòng nhập số tiền hợp lệ lớn hơn 0", "error");
         }
+
+        if (parsedResult.type === 'out') {
+            const selectedFund = funds.find(f => f.id === parsedResult.fundId);
+            if (selectedFund && parsedResult.amount > selectedFund.balance) {
+                return showToast(`Hũ ${selectedFund.name} không đủ số dư! (Còn ${formatN(selectedFund.balance)}đ)`, "error");
+            }
+        }
+
         try {
             await api.post('/funds/transactions', [parsedResult]);
             showToast("Đã lưu giao dịch thành công!", "success");
