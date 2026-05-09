@@ -143,6 +143,7 @@ const App = () => {
   const [isSavingsStatsOpen, setIsSavingsStatsOpen] = useState(true);
   const [pendingAction, setPendingAction] = useState(null);
   const [actionToSelectHouse, setActionToSelectHouse] = useState(null);
+  const [highlightedItemId, setHighlightedItemId] = useState(null);
 
   // Quản lý lịch sử điều hướng nội bộ
   const historyRef = useRef([]);
@@ -384,6 +385,7 @@ const App = () => {
       setIsHubMode(prevState.isHubMode);
       setSelectedHouse(prevState.selectedHouse);
       setActiveTab(prevState.activeTab);
+      setHighlightedItemId(null);
     } else {
       // Fallback khi hết lịch sử
       if (!selectedHouse || activeTab === 'dashboard') {
@@ -393,6 +395,7 @@ const App = () => {
       } else {
         setActiveTab('dashboard');
       }
+      setHighlightedItemId(null);
     }
   }, [selectedHouse, activeTab]);
 
@@ -1197,6 +1200,7 @@ const App = () => {
         handleLogout={handleLogout}
         toast={toast}
         dashboardWarnings={dashboardWarnings}
+        setHighlightedItemId={setHighlightedItemId}
       />
     );
   }
@@ -1244,6 +1248,7 @@ const App = () => {
         isListening={isListening}
         handleAiGenerateHouse={handleAiGenerateHouse}
         editingHouse={editingHouse}
+        setHighlightedItemId={setHighlightedItemId}
       />
     );
   }
@@ -1346,6 +1351,10 @@ const App = () => {
           setIsAddMeterModalOpen={setIsAddMeterModalOpen}
           setMappingMeter={setMappingMeter}
           handleSaveMetersAndGenerateBills={handleSaveMetersAndGenerateBills}
+          viewDate={viewDate}
+          rooms={rooms}
+          highlightedItemId={highlightedItemId}
+          setHighlightedItemId={setHighlightedItemId}
         />
         }
 

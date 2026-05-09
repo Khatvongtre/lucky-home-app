@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Calendar, Flame, Zap, Edit, Boxes, Receipt, ZapOff } from 'lucide-react';
 import { formatN, parseN } from '../utils/formatters';
 
@@ -14,8 +14,32 @@ const MetersView = ({
     setEditingMeter,
     setIsAddMeterModalOpen,
     setMappingMeter,
-    handleSaveMetersAndGenerateBills
+    handleSaveMetersAndGenerateBills,
+    viewDate,
+    rooms,
+    highlightedItemId,
+    setHighlightedItemId
 }) => {
+    useEffect(() => {
+        if (highlightedItemId && currentMeters?.length > 0) {
+            const hId = String(highlightedItemId);
+            const targetMeter = currentMeters.find(m => String(m.id) === hId || m.roomIds?.map(String).includes(hId));
+            if (targetMeter) {
+                let attempts = 0;
+                const scrollInterval = setInterval(() => {
+                    const element = document.getElementById(`meter-card-${targetMeter.id}`);
+                    if (element) {
+                        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        clearInterval(scrollInterval);
+                    }
+                    attempts++;
+                    if (attempts >= 10) clearInterval(scrollInterval); // Thử tối đa 2 giây
+                }, 200);
+                return () => clearInterval(scrollInterval);
+            }
+        }
+    }, [highlightedItemId, currentMeters]);
+
     return (
         <div className="space-y-4 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="sticky top-0 z-30 bg-blue-600 rounded-xl border border-blue-600 backdrop-blur-md p-4 space-y-4">
@@ -73,15 +97,51 @@ const MetersView = ({
                         totalPrice = consumption * (config.priceElec || 0);
                     }
 
+                    // Tính toán số ngày quá hạn
+                    const linkedRooms = rooms?.filter(r => m.roomIds?.includes(r.id)) || [];
+                    let minPaymentDay = null;
+                    linkedRooms.forEach(r => {
+                        if (r.paymentDate) {
+                            const pd = Number(r.paymentDate);
+                            if (!isNaN(pd) && (minPaymentDay === null || pd < minPaymentDay)) minPaymentDay = pd;
+                        }
+                    });
+                    if (minPaymentDay === null && config?.paymentDay) minPaymentDay = Number(config.paymentDay);
+
+                    let daysPastDue = 0;
+                    if (minPaymentDay !== null && isNewEmpty && viewDate) {
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        const dueDate = new Date(viewDate.getFullYear(), viewDate.getMonth(), minPaymentDay);
+                        const diffDaysVal = Math.floor((today - dueDate) / (1000 * 60 * 60 * 24));
+                        if (diffDaysVal > 0) daysPastDue = diffDaysVal;
+                    }
+
+                    const hId = highlightedItemId ? String(highlightedItemId) : null;
+                    const isHighlighted = hId && (String(m.id) === hId || m.roomIds?.map(String).includes(hId));
+                    const hasWarning = daysPastDue > 0;
+
+                    let cardClasses = "p-5 rounded-xl border shadow-sm transition-all ";
+                    if (isHighlighted) cardClasses += "border-red-500 shadow-red-200 animate-pulse bg-red-50 ring-2 ring-red-200";
+                    else if (hasWarning) cardClasses += "bg-white border-red-300";
+                    else cardClasses += "bg-white border-slate-100";
+
                     return (
-                        <div key={m.id} className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm">
+                        <div id={`meter-card-${m.id}`} key={m.id} onClick={() => { if (isHighlighted && setHighlightedItemId) setHighlightedItemId(null) }} className={cardClasses}>
                             <div className="flex justify-between items-start mb-4">
                                 <div className="flex items-center space-x-3">
-                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${m.type === 'heater' ? 'bg-orange-50 text-orange-500' : 'bg-blue-50 text-blue-600'}`}>
+                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${m.type === 'heater' ? (hasWarning || isHighlighted ? 'bg-red-100 text-red-600' : 'bg-orange-50 text-orange-500') : (hasWarning || isHighlighted ? 'bg-red-100 text-red-600' : 'bg-blue-50 text-blue-600')}`}>
                                         {m.type === 'heater' ? <Flame className="w-5 h-5" /> : <Zap className="w-5 h-5" />}
                                     </div>
                                     <div>
-                                        <p className="text-[11px] font-black uppercase text-rose-800 leading-none">{m.name}</p>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <p className={`text-[11px] font-black uppercase leading-none ${hasWarning || isHighlighted ? 'text-red-700' : 'text-rose-800'}`}>{m.name}</p>
+                                            {hasWarning && (
+                                                <span className="text-[8px] font-black text-white bg-red-500 px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap">
+                                                    Quá {daysPastDue} ngày
+                                                </span>
+                                            )}
+                                        </div>
                                         <p className="text-[8px] font-bold text-blue-400 mt-1">
                                             Tổng: {formatN(consumption)} số - Tiền: {formatN(totalPrice)} đ
                                         </p>

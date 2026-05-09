@@ -11,7 +11,8 @@ const HubView = ({
   user, houses, setIsHubMode, setActiveTab, setSelectedHouse,
   setConfig, setSearchQuery, setEditingHouse, setIsAiCreateHouseOpen,
   setIsAiPromptModalOpen, setAiPrompt, setIsListening, showToast,
-  handleLogout, toast, dashboardWarnings = []
+  handleLogout, toast, dashboardWarnings = [],
+  setHighlightedItemId
 }) => {
   const hubStats = houses.reduce((acc, h) => {
     acc.totalHouses += 1;
@@ -40,7 +41,10 @@ const HubView = ({
         setConfig({ ...house });
         setIsHubMode(false);
         switch (warning.type) {
-          case 'METER': setActiveTab('meters_list'); break;
+          case 'METER':
+            setActiveTab('meters_list');
+            if (setHighlightedItemId) setHighlightedItemId(warning.meterId || warning.targetId || warning.roomId || warning.id);
+            break;
           case 'BILL': setActiveTab('bills'); break;
           case 'CONTRACT': setActiveTab('rooms'); break;
           default: setActiveTab('dashboard');
