@@ -21,18 +21,23 @@ const Header = ({
     isOwnerOrAdmin,
     setIsHubMode,
     setSelectedHouse,
-    setActiveTab
+    setActiveTab,
+    goBack
 }) => {
     return (
         <header className="px-4 h-14 flex items-center justify-between shrink-0 bg-blue-600 text-white z-50 shadow-md relative">
             <div className="flex items-center space-x-2">
                 <button onClick={() => {
-                    if (!selectedHouse || activeTab === 'dashboard') {
-                        setIsHubMode(true);
-                        setSelectedHouse(null);
-                        setActiveTab('dashboard');
+                    if (goBack) {
+                        goBack();
                     } else {
-                        setActiveTab('dashboard');
+                        if (!selectedHouse || activeTab === 'dashboard') {
+                            setIsHubMode(true);
+                            setSelectedHouse(null);
+                            setActiveTab('dashboard');
+                        } else {
+                            setActiveTab('dashboard');
+                        }
                     }
                 }} className="p-1.5 bg-white/10 rounded-lg active:scale-90 transition-all flex items-center justify-center">
                     <ChevronLeft className="w-4 h-4" />
