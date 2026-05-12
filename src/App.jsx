@@ -149,6 +149,16 @@ const App = () => {
   const historyRef = useRef([]);
   const isGoingBackRef = useRef(false);
 
+  // Tự động tắt hiệu ứng nhấp nháy đỏ (highlight) sau 4 giây
+  useEffect(() => {
+    if (highlightedItemId) {
+      const timer = setTimeout(() => {
+        setHighlightedItemId(null);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [highlightedItemId]);
+
   // ==========================================
   // 2. HELPER FUNCTIONS & EFFECTS
   // ==========================================
@@ -206,6 +216,19 @@ const App = () => {
     setSavings([]);
     setTransactions([]);
     setDashboardSummary(null);
+    setAiMessages([{
+      role: 'assistant',
+      text: 'Chào bạn! Tôi là trợ lý AI. Hệ thống đang sẵn sàng. Bạn có thể hỏi tôi để phân tích dữ liệu hoặc chọn thao tác nhanh dưới đây:',
+      actions: [
+        { code: 'FAST_INPUT', label: 'Nhập siêu tốc AI' },
+        { code: 'ADD_TRANSACTION', label: 'Ghi sổ thu chi' },
+        { code: 'VIEW_FUNDS', label: 'Xem sổ quỹ' },
+        { code: 'METER_INPUT', label: 'Chốt điện nước' },
+        { code: 'VIEW_BILLS', label: 'Quản lý hóa đơn' },
+        { code: 'ADD_ROOM', label: 'Thêm phòng mới' },
+        { code: 'ADD_SAVING', label: 'Sổ tiết kiệm' }
+      ]
+    }]);
     historyRef.current = [];
   }, []);
 
@@ -1325,6 +1348,8 @@ const App = () => {
           setEditingRoom={setEditingRoom}
           setIsAddRoomModalOpen={setIsAddRoomModalOpen}
           isManagerOrAbove={isManagerOrAbove}
+          highlightedItemId={highlightedItemId}
+          setHighlightedItemId={setHighlightedItemId}
         />
         }
 
@@ -1335,6 +1360,8 @@ const App = () => {
           billStats={billStats}
           currentBills={currentBills}
           setBottomSheet={setBottomSheet}
+          highlightedItemId={highlightedItemId}
+          setHighlightedItemId={setHighlightedItemId}
         />
         }
 
@@ -1389,6 +1416,8 @@ const App = () => {
           setUnselectedSavingsBanks={setUnselectedSavingsBanks}
           setEditingSaving={setEditingSaving}
           setIsAddSavingModalOpen={setIsAddSavingModalOpen}
+          highlightedItemId={highlightedItemId}
+          setHighlightedItemId={setHighlightedItemId}
         />
         }
 

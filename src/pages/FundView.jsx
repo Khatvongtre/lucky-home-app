@@ -314,24 +314,15 @@ const FundView = ({ showToast = () => { }, requestConfirm = async () => window.c
                                         <p className="mt-1 text-[13px] font-black text-rose-100 tabular-nums">{formatN(totalExpense)}đ</p>
                                     </div>
                                 </div>
-                                <div className="flex flex-col gap-2">
-                                    <div className="flex gap-2">
-                                        <button onClick={() => openTxModal('in')} className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-white py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-1 shadow-lg shadow-emerald-500/20 active:scale-95">
-                                            <TrendingUp className="w-3.5 h-3.5" /> Nạp
-                                        </button>
-                                        <button onClick={() => openTxModal('out')} className="flex-1 bg-rose-500 hover:bg-rose-400 text-white py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-1 shadow-lg shadow-rose-500/20 active:scale-95">
-                                            <TrendingDown className="w-3.5 h-3.5" /> Chi
-                                        </button>
-                                        <button onClick={() => openTxModal('transfer')} className="flex-1 bg-white/10 hover:bg-white/20 text-indigo-50 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-1 backdrop-blur-md border border-white/10 active:scale-95">
-                                            <ArrowRightLeft className="w-3.5 h-3.5" /> Chuyển
-                                        </button>
-                                    </div>
-                                    <button onClick={() => {
-                                        window.history.pushState({}, '', '/chitieu');
-                                        if (setActiveTab) setActiveTab('fast_input');
-                                        else window.location.href = '/chitieu';
-                                    }} className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white py-3 rounded-xl font-black text-[11px] uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-blue-500/30 border border-blue-400/30 active:scale-95">
-                                        <Zap className="w-4 h-4 fill-yellow-400 text-yellow-400" /> Nhập Siêu Tốc Bằng AI
+                                <div className="flex gap-2 mt-2">
+                                    <button onClick={() => openTxModal('in')} className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-white py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-1 shadow-lg shadow-emerald-500/20 active:scale-95">
+                                        <TrendingUp className="w-3.5 h-3.5" /> Nạp
+                                    </button>
+                                    <button onClick={() => openTxModal('out')} className="flex-1 bg-rose-500 hover:bg-rose-400 text-white py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-1 shadow-lg shadow-rose-500/20 active:scale-95">
+                                        <TrendingDown className="w-3.5 h-3.5" /> Chi
+                                    </button>
+                                    <button onClick={() => openTxModal('transfer')} className="flex-1 bg-white/10 hover:bg-white/20 text-indigo-50 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-1 backdrop-blur-md border border-white/10 active:scale-95">
+                                        <ArrowRightLeft className="w-3.5 h-3.5" /> Chuyển
                                     </button>
                                 </div>
                             </>
@@ -642,6 +633,20 @@ const FundView = ({ showToast = () => { }, requestConfirm = async () => window.c
                     </div>
                 </div>
             )}
+
+            {/* Nút Nhập Siêu Tốc AI Floating */}
+            <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg z-40 pointer-events-none">
+                <div className="bg-gradient-to-t from-slate-50 via-slate-50/95 to-transparent pt-8 pb-6 px-4 flex justify-center">
+                    <button onClick={() => {
+                        window.history.pushState({}, '', '/chitieu');
+                        if (setActiveTab) setActiveTab('fast_input');
+                        else window.location.href = '/chitieu';
+                    }} className="pointer-events-auto bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-8 py-3.5 rounded-full font-black text-[12px] uppercase tracking-widest transition-all flex items-center justify-center gap-2.5 shadow-[0_8px_30px_rgba(59,130,246,0.4)] border border-blue-400/50 active:scale-95 hover:scale-105">
+                        <Zap className="w-5 h-5 fill-yellow-400 text-yellow-400 animate-pulse" /> Nhập Siêu Tốc AI
+                    </button>
+                </div>
+            </div>
+
             {/* MODALS */}
             {isTxModalOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">

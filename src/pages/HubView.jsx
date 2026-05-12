@@ -34,6 +34,7 @@ const HubView = ({
       setIsHubMode(false);
       setActiveTab('savings');
       setSelectedHouse(null);
+      if (setHighlightedItemId) setHighlightedItemId(warning.savingId || warning.targetId || warning.id);
     } else if (warning.houseId) {
       const house = houses.find(h => h.id === warning.houseId);
       if (house) {
@@ -45,8 +46,14 @@ const HubView = ({
             setActiveTab('meters_list');
             if (setHighlightedItemId) setHighlightedItemId(warning.meterId || warning.targetId || warning.roomId || warning.id);
             break;
-          case 'BILL': setActiveTab('bills'); break;
-          case 'CONTRACT': setActiveTab('rooms'); break;
+          case 'BILL':
+            setActiveTab('bills');
+            if (setHighlightedItemId) setHighlightedItemId(warning.billId || warning.targetId || warning.roomId || warning.id);
+            break;
+          case 'CONTRACT':
+            setActiveTab('rooms');
+            if (setHighlightedItemId) setHighlightedItemId(warning.roomId || warning.targetId || warning.id);
+            break;
           default: setActiveTab('dashboard');
         }
       } else {

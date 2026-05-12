@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { LucideEdit, CreditCard, Calendar, Users2, Bike, PlusCircle } from 'lucide-react';
 import { formatN } from '../utils/formatters';
 import { diffDays, getDueInfo, endContract } from '../utils/date';
@@ -7,8 +7,30 @@ const RoomsView = ({
     currentRooms,
     setEditingRoom,
     setIsAddRoomModalOpen,
-    isManagerOrAbove
+    isManagerOrAbove,
+    highlightedItemId,
+    setHighlightedItemId
 }) => {
+    useEffect(() => {
+        if (highlightedItemId && currentRooms?.length > 0) {
+            const hId = String(highlightedItemId);
+            const targetRoom = currentRooms.find(r => String(r.id) === hId || String(r.roomCode) === hId);
+            if (targetRoom) {
+                let attempts = 0;
+                const scrollInterval = setInterval(() => {
+                    const element = document.getElementById(`room-card-${targetRoom.id}`);
+                    if (element) {
+                        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        clearInterval(scrollInterval);
+                    }
+                    attempts++;
+                    if (attempts >= 10) clearInterval(scrollInterval);
+                }, 200);
+                return () => clearInterval(scrollInterval);
+            }
+        }
+    }, [highlightedItemId, currentRooms]);
+
     return (
         <div className="space-y-4 pb-20 animate-in slide-in-from-right">
             <div className="grid grid-cols-2 gap-2">
@@ -20,13 +42,19 @@ const RoomsView = ({
                     const isPayUrgent = r.status === 'full' && payDays <= 3;
                     const isPaySoon = r.status === 'full' && payDays > 3 && payDays <= 7;
                     const showContractWarning = r.status === 'full' && contractEndDate && endDays <= 30;
-                    const cardStyle = r.status !== 'full'
+
+                    const hId = highlightedItemId ? String(highlightedItemId) : null;
+                    const isHighlighted = hId && (String(r.id) === hId || String(r.roomCode) === hId);
+
+                    let cardStyle = r.status !== 'full'
                         ? 'bg-white/70 border-dashed border-slate-200 opacity-75'
                         : isPayUrgent
                             ? 'bg-red-50 border-red-200 shadow-red-100'
                             : isPaySoon
                                 ? 'bg-amber-50 border-amber-200 shadow-amber-100'
                                 : 'bg-white border-slate-200 shadow-slate-100';
+                    if (isHighlighted) cardStyle += " border-red-500 shadow-red-200 animate-pulse bg-red-50 ring-2 ring-red-200";
+
                     const roomBadgeStyle = r.status !== 'full'
                         ? 'bg-slate-200 text-slate-600'
                         : isPayUrgent
@@ -38,7 +66,7 @@ const RoomsView = ({
                     const endColor = endDays <= 7 ? 'bg-red-100 text-red-700 border-red-200' : 'bg-amber-100 text-amber-700 border-amber-200';
 
                     return (
-                        <div key={r.id} className={`p-3 rounded-xl border-2 shadow-sm relative transition-all flex flex-col active:scale-[0.99] ${cardStyle}`}>
+                        <div id={`room-card-${r.id}`} key={r.id} onClick={() => { if (isHighlighted && setHighlightedItemId) setHighlightedItemId(null); }} className={`p-3 rounded-xl border-2 shadow-sm relative transition-all flex flex-col active:scale-[0.99] ${cardStyle}`}>
                             <div className="flex justify-between items-center mb-1.5">
                                 <span className={`px-2 py-0.5 rounded-md font-black text-[10px] shadow-sm ${roomBadgeStyle}`}>
                                     {r.roomType === 'mbkd' ? 'MBKD ' : 'P.'}{r.roomCode || r.id} {r.status === 'empty' ? '- TRỐNG' : ''}

@@ -56,8 +56,7 @@ const AiChatView = ({ aiMessages, isAiLoading, handleAiChat, setAiMessages, requ
         if (aiMessages.length === 1) {
             fetchHistory();
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [aiMessages.length, setAiMessages]);
 
     const clearChat = async () => {
         const performDelete = async () => {

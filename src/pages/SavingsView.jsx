@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ChevronDown, PiggyBank, Landmark } from 'lucide-react';
 import { formatN } from '../utils/formatters';
 
@@ -14,7 +14,36 @@ const SavingsView = ({
     setUnselectedSavingsBanks,
     setEditingSaving,
     setIsAddSavingModalOpen,
+    highlightedItemId,
+    setHighlightedItemId
 }) => {
+    useEffect(() => {
+        let scrollInterval;
+        if (highlightedItemId && currentSavings?.length > 0) {
+            const hId = String(highlightedItemId);
+            const targetSaving = currentSavings.find(s => String(s.id) === hId);
+            if (targetSaving) {
+                const bank = targetSaving.bankName || 'Khác';
+
+                // Tự động mở rộng và check chọn ngân hàng nếu đang bị ẩn
+                setCollapsedSavingsBanks(prev => prev.includes(bank) ? prev.filter(b => b !== bank) : prev);
+                setUnselectedSavingsBanks(prev => prev.includes(bank) ? prev.filter(b => b !== bank) : prev);
+
+                let attempts = 0;
+                scrollInterval = setInterval(() => {
+                    const element = document.getElementById(`saving-card-${targetSaving.id}`);
+                    if (element) {
+                        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        clearInterval(scrollInterval);
+                    }
+                    attempts++;
+                    if (attempts >= 10) clearInterval(scrollInterval);
+                }, 200);
+            }
+        }
+        return () => { if (scrollInterval) clearInterval(scrollInterval); };
+    }, [highlightedItemId, currentSavings, setCollapsedSavingsBanks, setUnselectedSavingsBanks]);
+
     return (
         <div className="animate-in fade-in pb-20">
             <div className="sticky top-0 z-30 bg-slate-50/80 backdrop-blur-md px-1">
@@ -145,15 +174,25 @@ const SavingsView = ({
                                         const passedDays = Math.max(0, totalDays - daysLeft);
                                         const progress = totalDays > 0 ? Math.min(100, (passedDays / totalDays) * 100) : 100;
 
+                                        const hId = highlightedItemId ? String(highlightedItemId) : null;
+                                        const isHighlighted = hId && String(s.id) === hId;
+
+                                        let cardClasses = "bg-white p-3.5 rounded-xl border shadow-sm active:scale-[0.98] transition-all cursor-pointer relative overflow-hidden ml-2 border-l-4 ";
+                                        if (isHighlighted) cardClasses += " border-red-500 border-l-red-500 shadow-red-200 animate-pulse bg-red-50 ring-2 ring-red-200";
+                                        else cardClasses += " border-slate-200 border-l-amber-500";
+
                                         return (
-                                            <div key={s.id} onClick={() => { setEditingSaving(s); setIsAddSavingModalOpen(true); }} className="bg-white p-3.5 rounded-xl border border-slate-200 shadow-sm active:scale-[0.98] transition-all cursor-pointer relative overflow-hidden ml-2 border-l-4 border-l-amber-500">
+                                            <div id={`saving-card-${s.id}`} key={s.id} onClick={() => { setEditingSaving(s); setIsAddSavingModalOpen(true); if (isHighlighted && setHighlightedItemId) setHighlightedItemId(null); }} className={cardClasses}>
                                                 {isMatured && <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[8px] font-black px-2 py-1 rounded-bl-lg uppercase z-10 shadow-sm">Đã đến hạn</div>}
                                                 <div className="flex justify-between items-center mb-3">
                                                     <div className="flex items-center space-x-3 w-[60%]">
                                                         <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-100 text-amber-600 flex items-center justify-center shadow-inner shrink-0"><PiggyBank className="w-5 h-5" /></div>
                                                         <div className="overflow-hidden w-full">
-                                                            <h4 className="font-black text-[13px] text-blue-900 uppercase leading-tight mb-0.5">{s.note || `Sổ tiết kiệm`}</h4>
-                                                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate">Gửi: {startDate.toLocaleDateString('vi-VN')}</p>
+                                                            <h4 className="font-black text-[13px] text-blue-900 uppercase leading-tight mb-1 truncate">{s.note || `Sổ tiết kiệm`}</h4>
+                                                            <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest space-y-0.5">
+                                                                <p>Ngày Gửi: {startDate.toLocaleDateString('vi-VN')}</p>
+                                                                <p>Đáo hạn: {endDate.toLocaleDateString('vi-VN')}</p>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                     <div className="text-right w-[40%] pl-2 shrink-0">
