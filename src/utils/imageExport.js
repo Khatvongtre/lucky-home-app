@@ -5,7 +5,7 @@ const withCacheBust = (src, exportToken) => {
         const url = new URL(src, window.location.href);
         url.searchParams.set('_export', exportToken);
         return url.toString();
-    } catch (e) {
+    } catch {
         return src;
     }
 };
@@ -15,7 +15,7 @@ const waitForImage = async (img) => {
         try {
             await img.decode();
             return;
-        } catch (e) {
+        } catch {
             // Fall back to load/error listeners below.
         }
     }
@@ -75,7 +75,7 @@ const inlineRenderedImages = async (sourceRoot, cloneRoot, exportToken) => {
 
         try {
             cloneImg.src = await imageElementToDataUrl(sourceImg);
-        } catch (e) {
+        } catch {
             cloneImg.src = await fetchImageAsDataUrl(src, exportToken);
         }
     }));
@@ -84,8 +84,6 @@ const inlineRenderedImages = async (sourceRoot, cloneRoot, exportToken) => {
 export const exportToClipboard = async (elementId) => {
     const el = document.getElementById(elementId);
     if (!el) throw new Error("Giao diện chưa sẵn sàng, vui lòng thử lại sau");
-
-    const isMobile = /iPhone|iPad|Android/i.test(navigator.userAgent);
 
     const generateImageBlob = async () => {
         const width = el.offsetWidth;

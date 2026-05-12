@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import React, { Suspense, lazy, useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   LayoutDashboard, Home, Zap, Wallet, Plus,
   TrendingUp, ChevronRight, Sparkles, Send,
@@ -14,10 +14,10 @@ import {
 // --- Tách Component & Utils (Giai đoạn 1 & 2) ---
 import { TRANSACTION_CATEGORIES } from './utils/constants';
 import { formatN, parseN } from './utils/formatters';
-import { diffDays, getDueInfo, endContract, getSafeDate } from './utils/date';
 import { parseVietQR, getBankNameFromBin } from './utils/qr';
 import { exportToClipboard } from './utils/imageExport';
 import { readQRFromFile } from './utils/qrReader';
+import { INITIAL_AI_MESSAGES } from './utils/aiChat';
 
 import Modal from './components/common/Modal';
 import ToastNotification from './components/common/Toast';
@@ -27,37 +27,47 @@ import Header from './components/layout/Header';
 import TabBar from './components/layout/TabBar';
 import QuickMenu from './components/layout/QuickMenu';
 
-import AuthView from './pages/AuthView';
-import HubView from './pages/HubView';
-import DashboardView from './pages/DashboardView';
-import RoomsView from './pages/RoomsView';
-import BillsView from './pages/BillsView';
-import MetersView from './pages/MetersView';
-import FinanceView from './pages/FinanceView';
-import SavingsView from './pages/SavingsView';
-import AiChatView from './pages/AiChatView';
-import ProfileView from './pages/ProfileView';
-import HouseSelectionView from './pages/HouseSelectionView';
 import AddRoomForm from './components/rooms/AddRoomForm';
 import AddMeterForm from './components/meters/AddMeterForm';
 import AddSavingForm from './components/savings/AddSavingForm';
 import AddTransactionForm from './components/finance/AddTransactionForm';
 import BillReceipt from './components/bills/BillReceipt';
 import AddHouseForm from './components/houses/AddHouseForm';
-import FundView from './pages/FundView';
-import FastInputView from './pages/FastInputView';
-
 import AiPromptModal from './components/houses/AiPromptModal';
 import ShareHouseModal from './components/houses/ShareHouseModal';
 import OverwriteBillModal from './components/bills/OverwriteBillModal';
 import MeterMappingModal from './components/meters/MeterMappingModal';
 import { api } from './services/api';
+import { authStorage } from './services/authStorage';
+import { useHouseData } from './hooks/useHouseData';
+
+const AuthView = lazy(() => import('./pages/AuthView'));
+const HubView = lazy(() => import('./pages/HubView'));
+const DashboardView = lazy(() => import('./pages/DashboardView'));
+const RoomsView = lazy(() => import('./pages/RoomsView'));
+const BillsView = lazy(() => import('./pages/BillsView'));
+const MetersView = lazy(() => import('./pages/MetersView'));
+const FinanceView = lazy(() => import('./pages/FinanceView'));
+const SavingsView = lazy(() => import('./pages/SavingsView'));
+const AiChatView = lazy(() => import('./pages/AiChatView'));
+const ProfileView = lazy(() => import('./pages/ProfileView'));
+const HouseSelectionView = lazy(() => import('./pages/HouseSelectionView'));
+const FundView = lazy(() => import('./pages/FundView'));
+const FastInputView = lazy(() => import('./pages/FastInputView'));
+
+const PageLoading = () => (
+  <div className="flex-1 flex items-center justify-center p-8 text-[10px] font-black uppercase tracking-widest text-slate-400">
+    Đang tải...
+  </div>
+);
 
 // ==========================================
 // CẤU HÌNH API BACKEND (.NET 8)
 // ==========================================
 const API_URL = import.meta.env.VITE_API_URL;
-console.log("API URL:", API_URL);
+if (import.meta.env.DEV) {
+  console.log("API URL:", API_URL);
+}
 
 // ==========================================
 // ỨNG DỤNG CHÍNH
@@ -109,28 +119,8 @@ const App = () => {
   const [collapsedSavingsBanks, setCollapsedSavingsBanks] = useState([]);
   const [settingsExpanded, setSettingsExpanded] = useState({ services: true, qr: false, pass: false });
 
-  const [houses, setHouses] = useState([]);
-  const [rooms, setRooms] = useState([]);
-  const [meters, setMeters] = useState([]);
-  const [dashboardWarnings, setDashboardWarnings] = useState([]);
-  const [transactions, setTransactions] = useState([]);
-  const [dashboardSummary, setDashboardSummary] = useState(null);
-  const [bills, setBills] = useState([]);
-  const [billStats, setBillStats] = useState({ totalRooms: 0, totalBillPaids: 0, totalBillNotPaids: 0, totalAmountPaids: 0 });
   const [config, setConfig] = useState({});
-  const [aiMessages, setAiMessages] = useState([{
-    role: 'assistant',
-    text: 'Chào bạn! Tôi là trợ lý AI. Hệ thống đang sẵn sàng. Bạn có thể hỏi tôi để phân tích dữ liệu hoặc chọn thao tác nhanh dưới đây:',
-    actions: [
-      { code: 'FAST_INPUT', label: 'Nhập siêu tốc AI' },
-      { code: 'ADD_TRANSACTION', label: 'Ghi sổ thu chi' },
-      { code: 'VIEW_FUNDS', label: 'Xem sổ quỹ' },
-      { code: 'METER_INPUT', label: 'Chốt điện nước' },
-      { code: 'VIEW_BILLS', label: 'Quản lý hóa đơn' },
-      { code: 'ADD_ROOM', label: 'Thêm phòng mới' },
-      { code: 'ADD_SAVING', label: 'Sổ tiết kiệm' }
-    ]
-  }]);
+  const [aiMessages, setAiMessages] = useState(INITIAL_AI_MESSAGES);
 
   const [isOverwriteModalOpen, setIsOverwriteModalOpen] = useState(false);
   const [viewDate, setViewDate] = useState(new Date());
@@ -144,6 +134,27 @@ const App = () => {
   const [pendingAction, setPendingAction] = useState(null);
   const [actionToSelectHouse, setActionToSelectHouse] = useState(null);
   const [highlightedItemId, setHighlightedItemId] = useState(null);
+  const {
+    houses,
+    setHouses,
+    rooms,
+    meters,
+    setMeters,
+    dashboardWarnings,
+    transactions,
+    dashboardSummary,
+    bills,
+    setBills,
+    billStats,
+    loadHouses,
+    loadWarnings,
+    loadDashboardData,
+    loadRoomsData,
+    loadMetersData,
+    loadBillsData,
+    loadTransactions,
+    resetHouseData,
+  } = useHouseData({ viewDate, selectedMonth });
 
   // Quản lý lịch sử điều hướng nội bộ
   const historyRef = useRef([]);
@@ -202,35 +213,17 @@ const App = () => {
   const [isScanningQR, setIsScanningQR] = useState(false);
 
   const handleLogout = useCallback(() => {
-    localStorage.removeItem('smartstay_token');
-    localStorage.removeItem('smartstay_user');
+    authStorage.clearSession();
     setIsLoggedIn(false);
     setUser(null);
     setSelectedHouse(null);
     setIsHubMode(true); // Đảm bảo reset lại màn hình về Hub
     setActiveTab('dashboard');
-    setHouses([]);
-    setRooms([]);
-    setBills([]);
-    setBillStats({ totalRooms: 0, totalBillPaids: 0, totalBillNotPaids: 0, totalAmountPaids: 0 });
+    resetHouseData();
     setSavings([]);
-    setTransactions([]);
-    setDashboardSummary(null);
-    setAiMessages([{
-      role: 'assistant',
-      text: 'Chào bạn! Tôi là trợ lý AI. Hệ thống đang sẵn sàng. Bạn có thể hỏi tôi để phân tích dữ liệu hoặc chọn thao tác nhanh dưới đây:',
-      actions: [
-        { code: 'FAST_INPUT', label: 'Nhập siêu tốc AI' },
-        { code: 'ADD_TRANSACTION', label: 'Ghi sổ thu chi' },
-        { code: 'VIEW_FUNDS', label: 'Xem sổ quỹ' },
-        { code: 'METER_INPUT', label: 'Chốt điện nước' },
-        { code: 'VIEW_BILLS', label: 'Quản lý hóa đơn' },
-        { code: 'ADD_ROOM', label: 'Thêm phòng mới' },
-        { code: 'ADD_SAVING', label: 'Sổ tiết kiệm' }
-      ]
-    }]);
+    setAiMessages(INITIAL_AI_MESSAGES);
     historyRef.current = [];
-  }, []);
+  }, [resetHouseData]);
 
   useEffect(() => {
     const handleUnauthorized = () => handleLogout();
@@ -267,85 +260,11 @@ const App = () => {
     try {
       const savingsData = await api.get(`/saving`);
       setSavings(savingsData);
-    } catch (e) {
+    } catch {
       setSavings([]);
     }
   }, []);
 
-  const parseMeters = useCallback((metersData) =>
-    metersData.map(m => ({ ...m, roomIds: JSON.parse(m.roomIdsJson || '[]') })), []);
-
-  const parseBills = useCallback((billsData) =>
-    billsData.map(b => ({
-      ...b,
-      roomId: b.roomCode,
-      details: JSON.parse(b.detailsJson || '{}'),
-      meter: JSON.parse(b.meterInfoJson || '{}'),
-      heaterMeter: b.heaterInfoJson ? JSON.parse(b.heaterInfoJson) : null
-    })), []);
-
-  const loadHouses = useCallback(async () => {
-    const data = await api.get('/house');
-    setHouses(data);
-    return data;
-  }, []);
-
-  const loadWarnings = useCallback(async () => {
-    try {
-      const data = await api.get('/management/dashboard/warnings');
-      setDashboardWarnings(data);
-    } catch (e) {
-      console.error("Lỗi tải cảnh báo:", e.message);
-    }
-  }, []);
-
-  const loadDashboardData = useCallback(async (houseId) => {
-    const month = viewDate.getMonth() + 1;
-    const year = viewDate.getFullYear();
-    const [summaryData] = await Promise.all([
-      api.get(`/management/dashboard/summary/${houseId}?year=${year}&month=${month}`),
-    ]);
-    setDashboardSummary(summaryData);
-  }, [viewDate]);
-
-  const loadRoomsData = useCallback(async (houseId) => {
-    const month = viewDate.getMonth() + 1;
-    const year = viewDate.getFullYear();
-    const [roomsData] = await Promise.all([
-      api.get(`/room/${houseId}`),
-    ]);
-    setRooms(roomsData);
-  }, [viewDate]);
-
-  const loadMetersData = useCallback(async (houseId) => {
-    const month = viewDate.getMonth() + 1;
-    const year = viewDate.getFullYear();
-    const [metersData] = await Promise.all([
-      api.get(`/meter/${houseId}?year=${year}&month=${month}`)
-    ]);
-    setMeters(parseMeters(metersData));
-  }, [parseMeters, viewDate]);
-
-  const loadBillsData = useCallback(async (houseId) => {
-    const month = viewDate.getMonth() + 1;
-    const year = viewDate.getFullYear();
-    const [billsResult] = await Promise.all([
-      api.get(`/bill/${houseId}?year=${year}&month=${month}`)
-    ]);
-    const billsData = Array.isArray(billsResult) ? billsResult : (billsResult?.bills || []);
-    setBillStats({
-      totalRooms: billsResult?.totalRooms ?? 0,
-      totalBillPaids: billsResult?.totalBillPaids ?? billsData.filter(b => b.status === 'paid').length,
-      totalBillNotPaids: billsResult?.totalBillNotPaids ?? billsData.filter(b => b.status !== 'paid').length,
-      totalAmountPaids: billsResult?.totalAmountPaids ?? billsData.filter(b => b.status === 'paid').reduce((sum, b) => sum + (b.total || 0), 0)
-    });
-    setBills(parseBills(billsData));
-  }, [parseBills, viewDate]);
-
-  const loadTransactions = useCallback(async (houseId) => {
-    const txData = await api.get(`/transaction/${houseId}?type=${selectedMonth}`);
-    setTransactions(txData);
-  }, [selectedMonth]);
 
   const loadTabData = useCallback(async (tab = activeTab, houseId = selectedHouse?.id) => {
     try {
@@ -436,7 +355,7 @@ const App = () => {
     }
 
     if (targetTab) {
-      const token = localStorage.getItem('smartstay_token');
+      const token = authStorage.getToken();
       if (!token) {
         // Nếu chưa đăng nhập, lưu lại ý định để chuyển hướng sau
         sessionStorage.setItem('redirectAfterLogin', targetTab);
@@ -471,11 +390,11 @@ const App = () => {
   }, [isLoggedIn, isHubMode, loadWarnings]);
 
   useEffect(() => {
-    const token = localStorage.getItem('smartstay_token');
-    const savedUser = localStorage.getItem('smartstay_user');
+    const token = authStorage.getToken();
+    const savedUser = authStorage.getUser();
 
     if (token && savedUser) {
-      setUser(JSON.parse(savedUser));
+      setUser(savedUser);
       setIsLoggedIn(true);
     } else {
       handleLogout();
@@ -495,15 +414,9 @@ const App = () => {
   }, [isLoggedIn, activeTab, selectedHouse?.id, viewDate, selectedMonth, loadTabData]);
 
   useEffect(() => {
-    const loadTransactions = async () => {
-      if (activeTab !== 'finance' || !selectedHouse?.id) return;
-      try {
-        const txData = await api.get(`/transaction/${selectedHouse.id}?type=${selectedMonth}`);
-        setTransactions(txData);
-      } catch (e) { console.error("Lỗi khi tải giao dịch:", e.message); }
-    };
-    loadTransactions();
-  }, [activeTab, selectedMonth, selectedHouse?.id]);
+    if (activeTab !== 'finance' || !selectedHouse?.id) return;
+    loadTransactions(selectedHouse.id).catch(e => console.error("Lỗi khi tải giao dịch:", e.message));
+  }, [activeTab, selectedHouse?.id, loadTransactions]);
 
   // ==========================================
   // 5. MEMOIZED DATA & COMPUTED VALUES
@@ -756,7 +669,9 @@ const App = () => {
       const endDate = new Date(start);
       endDate.setMonth(endDate.getMonth() + months);
       endDateStr = endDate.toISOString().split('T')[0];
-    } catch (err) { }
+    } catch {
+      // Keep the submitted start date if the derived end date cannot be calculated.
+    }
 
     const payload = {
       id: editingRoom ? editingRoom.id : crypto.randomUUID(),
@@ -915,19 +830,6 @@ const App = () => {
 
       await loadHouseData(selectedHouse?.id);
     } catch (e) { showToast("Lỗi: " + e.message, "error"); }
-  };
-
-  const handleGenerateClick = () => {
-    const now = new Date();
-    const month = now.getMonth() + 1;
-    const year = now.getFullYear();
-
-    const alreadyGenerated = bills.some(b => b.month === month && b.year === year);
-    if (alreadyGenerated) {
-      setIsOverwriteModalOpen(true);
-    } else {
-      executeGenerateBills();
-    }
   };
 
   const executeGenerateBills = async () => {
@@ -1198,7 +1100,9 @@ const App = () => {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-left animate-in fade-in duration-700">
         <ToastNotification toast={toast} />
-        <AuthView setIsLoggedIn={setIsLoggedIn} setUser={setUser} showToast={showToast} />
+        <Suspense fallback={<PageLoading />}>
+          <AuthView setIsLoggedIn={setIsLoggedIn} setUser={setUser} showToast={showToast} />
+        </Suspense>
       </div>
     );
   }
@@ -1206,73 +1110,77 @@ const App = () => {
   // 2. MÀN HÌNH HUB TỔNG QUAN (Ngay sau khi đăng nhập)
   if (isLoggedIn && isHubMode) {
     return (
-      <HubView
-        user={user}
-        houses={houses}
-        setIsHubMode={setIsHubMode}
-        setActiveTab={setActiveTab}
-        setSelectedHouse={setSelectedHouse}
-        setConfig={setConfig}
-        setSearchQuery={setSearchQuery}
-        setEditingHouse={setEditingHouse}
-        setIsAiCreateHouseOpen={setIsAiCreateHouseOpen}
-        setIsAiPromptModalOpen={setIsAiPromptModalOpen}
-        setAiPrompt={setAiPrompt}
-        setIsListening={setIsListening}
-        showToast={showToast}
-        handleLogout={handleLogout}
-        toast={toast}
-        dashboardWarnings={dashboardWarnings}
-        setHighlightedItemId={setHighlightedItemId}
-      />
+      <Suspense fallback={<PageLoading />}>
+        <HubView
+          user={user}
+          houses={houses}
+          setIsHubMode={setIsHubMode}
+          setActiveTab={setActiveTab}
+          setSelectedHouse={setSelectedHouse}
+          setConfig={setConfig}
+          setSearchQuery={setSearchQuery}
+          setEditingHouse={setEditingHouse}
+          setIsAiCreateHouseOpen={setIsAiCreateHouseOpen}
+          setIsAiPromptModalOpen={setIsAiPromptModalOpen}
+          setAiPrompt={setAiPrompt}
+          setIsListening={setIsListening}
+          showToast={showToast}
+          handleLogout={handleLogout}
+          toast={toast}
+          dashboardWarnings={dashboardWarnings}
+          setHighlightedItemId={setHighlightedItemId}
+        />
+      </Suspense>
     );
   }
 
   // 3. ĐÃ ĐĂNG NHẬP NHƯNG CHƯA CHỌN CƠ SỞ (Đang ở mode Quản lý nhà)
   if (isLoggedIn && !selectedHouse && !isGlobalTab) {
     return (
-      <HouseSelectionView
-        user={user}
-        houses={houses}
-        houseSearchQuery={houseSearchQuery}
-        setHouseSearchQuery={setHouseSearchQuery}
-        selectedStatsHouses={selectedStatsHouses}
-        setSelectedStatsHouses={setSelectedStatsHouses}
-        setIsHubMode={setIsHubMode}
-        handleLogout={handleLogout}
-        setSelectedHouse={setSelectedHouse}
-        setConfig={setConfig}
-        setActiveTab={setActiveTab}
-        setSearchQuery={setSearchQuery}
-        handleOpenShare={handleOpenShare}
-        setEditingHouse={setEditingHouse}
-        setIsAiCreateHouseOpen={setIsAiCreateHouseOpen}
-        handleDeleteHouse={handleDeleteHouse}
-        toast={toast}
-        confirmDialog={confirmDialog}
-        closeConfirmDialog={closeConfirmDialog}
-        isShareModalOpen={isShareModalOpen}
-        setIsShareModalOpen={setIsShareModalOpen}
-        sharingHouse={sharingHouse}
-        setSharingHouse={setSharingHouse}
-        assignForm={assignForm}
-        setAssignForm={setAssignForm}
-        handleAssignRole={handleAssignRole}
-        isAiCreateHouseOpen={isAiCreateHouseOpen}
-        handleAddHouse={handleAddHouse}
-        isAiPromptModalOpen={isAiPromptModalOpen}
-        setIsAiPromptModalOpen={setIsAiPromptModalOpen}
-        setIsListening={setIsListening}
-        aiFeedback={aiFeedback}
-        setAiFeedback={setAiFeedback}
-        aiPrompt={aiPrompt}
-        setAiPrompt={setAiPrompt}
-        handleMicClick={handleMicClick}
-        isListening={isListening}
-        handleAiGenerateHouse={handleAiGenerateHouse}
-        editingHouse={editingHouse}
-        setHighlightedItemId={setHighlightedItemId}
-      />
+      <Suspense fallback={<PageLoading />}>
+        <HouseSelectionView
+          user={user}
+          houses={houses}
+          houseSearchQuery={houseSearchQuery}
+          setHouseSearchQuery={setHouseSearchQuery}
+          selectedStatsHouses={selectedStatsHouses}
+          setSelectedStatsHouses={setSelectedStatsHouses}
+          setIsHubMode={setIsHubMode}
+          handleLogout={handleLogout}
+          setSelectedHouse={setSelectedHouse}
+          setConfig={setConfig}
+          setActiveTab={setActiveTab}
+          setSearchQuery={setSearchQuery}
+          handleOpenShare={handleOpenShare}
+          setEditingHouse={setEditingHouse}
+          setIsAiCreateHouseOpen={setIsAiCreateHouseOpen}
+          handleDeleteHouse={handleDeleteHouse}
+          toast={toast}
+          confirmDialog={confirmDialog}
+          closeConfirmDialog={closeConfirmDialog}
+          isShareModalOpen={isShareModalOpen}
+          setIsShareModalOpen={setIsShareModalOpen}
+          sharingHouse={sharingHouse}
+          setSharingHouse={setSharingHouse}
+          assignForm={assignForm}
+          setAssignForm={setAssignForm}
+          handleAssignRole={handleAssignRole}
+          isAiCreateHouseOpen={isAiCreateHouseOpen}
+          handleAddHouse={handleAddHouse}
+          isAiPromptModalOpen={isAiPromptModalOpen}
+          setIsAiPromptModalOpen={setIsAiPromptModalOpen}
+          setIsListening={setIsListening}
+          aiFeedback={aiFeedback}
+          setAiFeedback={setAiFeedback}
+          aiPrompt={aiPrompt}
+          setAiPrompt={setAiPrompt}
+          handleMicClick={handleMicClick}
+          isListening={isListening}
+          handleAiGenerateHouse={handleAiGenerateHouse}
+          editingHouse={editingHouse}
+          setHighlightedItemId={setHighlightedItemId}
+        />
+      </Suspense>
     );
   }
 
@@ -1281,7 +1189,9 @@ const App = () => {
     return (
       <div className="h-screen bg-slate-900 font-sans flex flex-col max-w-lg mx-auto w-full relative border-x border-slate-800 shadow-2xl overflow-hidden">
         <ToastNotification toast={toast} />
-        <FastInputView setActiveTab={setActiveTab} showToast={showToast} />
+        <Suspense fallback={<PageLoading />}>
+          <FastInputView setActiveTab={setActiveTab} showToast={showToast} />
+        </Suspense>
       </div>
     );
   }
@@ -1332,6 +1242,7 @@ const App = () => {
 
       {/* KHU VỰC HIỂN THỊ NỘI DUNG CHÍNH */}
       <main className="flex-1 w-full overflow-y-auto px-4 pt-2 pb-32 no-scrollbar scroll-smooth">
+        <Suspense fallback={<PageLoading />}>
 
         {activeTab === 'dashboard' && <DashboardView
           shouldShowMeterBanner={shouldShowMeterBanner}
@@ -1601,6 +1512,7 @@ const App = () => {
             <button onClick={() => setActiveTab('dashboard')} className="mt-6 px-6 py-2 bg-blue-600 text-white rounded-lg font-black text-[10px] uppercase">Về trang chủ</button>
           </div>
         )}
+        </Suspense>
       </main>
 
       {!['savings', 'profile', 'fund', 'ai', 'fast_input'].includes(activeTab) && (

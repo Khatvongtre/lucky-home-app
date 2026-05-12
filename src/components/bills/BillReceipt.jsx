@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Loader2, Image as ImageIcon, Trash2, CheckCircle2, X } from 'lucide-react';
 import { formatN, parseN } from '../../utils/formatters';
 
@@ -16,13 +16,13 @@ const BillReceipt = ({
     handlePayBill
 }) => {
     // Local state quản lý riêng input giảm giá khi người dùng đang gõ
-    const [localDiscount, setLocalDiscount] = useState("");
+    const [discountDraftByBill, setDiscountDraftByBill] = useState({});
+    const billKey = bottomSheet?.data?.id || 'none';
+    const localDiscount = discountDraftByBill[billKey] ?? formatN(bottomSheet?.data?.details?.discount || 0);
+    const setLocalDiscount = (value) => {
+        setDiscountDraftByBill(prev => ({ ...prev, [billKey]: value }));
+    };
 
-    useEffect(() => {
-        if (bottomSheet?.data?.details) {
-            setLocalDiscount(formatN(bottomSheet.data.details.discount || 0));
-        }
-    }, [bottomSheet?.data?.id]); // Chỉ đồng bộ khi đổi bill, cho phép gõ tự do
 
     if (!bottomSheet || bottomSheet.type !== 'bill') return null;
 

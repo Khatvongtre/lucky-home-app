@@ -3,21 +3,9 @@ import { Loader2, Sparkles, Bot, Trash2 } from 'lucide-react';
 import { api } from '../services/api';
 import AiMessageItem from '../components/ai/AiMessageItem';
 import AiChatInput from '../components/ai/AiChatInput';
+import { INITIAL_AI_MESSAGES } from '../utils/aiChat';
 import '../styles/AiChat.css';
 
-const INITIAL_MSG = [{
-    role: 'assistant',
-    text: 'Chào bạn! Tôi là trợ lý AI. Hệ thống đang sẵn sàng. Bạn có thể hỏi tôi để phân tích dữ liệu hoặc chọn thao tác nhanh dưới đây:',
-    actions: [
-        { code: 'FAST_INPUT', label: 'Nhập siêu tốc AI' },
-        { code: 'ADD_TRANSACTION', label: 'Ghi sổ thu chi' },
-        { code: 'VIEW_FUNDS', label: 'Xem sổ quỹ' },
-        { code: 'METER_INPUT', label: 'Chốt điện nước' },
-        { code: 'VIEW_BILLS', label: 'Quản lý hóa đơn' },
-        { code: 'ADD_ROOM', label: 'Thêm phòng mới' },
-        { code: 'ADD_SAVING', label: 'Sổ tiết kiệm' }
-    ]
-}];
 
 const AiChatView = ({ aiMessages, isAiLoading, handleAiChat, setAiMessages, requestConfirm, showToast, executeAiAction }) => {
     const messagesEndRef = useRef(null);
@@ -44,7 +32,7 @@ const AiChatView = ({ aiMessages, isAiLoading, handleAiChat, setAiMessages, requ
                         { role: 'assistant', text: item.response }
                     ]);
                     if (setAiMessages) {
-                        setAiMessages([...INITIAL_MSG, ...mappedHistory]);
+                        setAiMessages([...INITIAL_AI_MESSAGES, ...mappedHistory]);
                     }
                 }
             } catch (error) {
@@ -62,7 +50,7 @@ const AiChatView = ({ aiMessages, isAiLoading, handleAiChat, setAiMessages, requ
         const performDelete = async () => {
             try {
                 await api.delete('/ai/chat');
-                if (setAiMessages) setAiMessages(INITIAL_MSG);
+                if (setAiMessages) setAiMessages(INITIAL_AI_MESSAGES);
                 if (showToast) showToast("Đã xóa lịch sử trò chuyện!", "success");
             } catch (error) {
                 if (showToast) showToast("Lỗi xóa lịch sử chat: " + error.message, "error");

@@ -4,7 +4,7 @@ export const diffDays = (dateStr) => {
         const target = new Date(dateStr);
         const now = new Date();
         return Math.ceil((target - now) / (1000 * 60 * 60 * 24));
-    } catch (e) { return 0; }
+    } catch { return 0; }
 };
 
 export const getDueInfo = (dueDay) => {
@@ -35,7 +35,7 @@ export const endContract = (startDateStr, months) => {
         endDate.setMonth(endDate.getMonth() + months);
         endDate.setDate(endDate.getDate() - 1);
         return endDate;
-    } catch (e) {
+    } catch {
         return null;
     }
 };

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Building2, Mail, User, Lock, Loader2 } from 'lucide-react';
 import { api } from '../services/api';
+import { authStorage } from '../services/authStorage';
 
 const AuthView = ({ setIsLoggedIn, setUser, showToast }) => {
   const [isRegistering, setIsRegistering] = useState(false);
@@ -23,8 +24,7 @@ const AuthView = ({ setIsLoggedIn, setUser, showToast }) => {
         setIsForgotPassword(false);
       } else {
         const res = await api.post('/auth/login', authForm);
-        localStorage.setItem('smartstay_token', res.token);
-        localStorage.setItem('smartstay_user', JSON.stringify(res.user));
+        authStorage.setSession({ token: res.token, user: res.user });
         setUser(res.user);
         setIsLoggedIn(true);
       }

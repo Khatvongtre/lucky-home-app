@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, X, Loader2, Zap, Camera, CheckCircle2, Pencil, TrendingUp, TrendingDown, Wallet, Delete } from 'lucide-react';
-import { formatN, parseN } from '../utils/formatters';
+import { formatN } from '../utils/formatters';
 import { api } from '../services/api';
 
 const COMMON_SUGGESTIONS = {
@@ -36,7 +36,7 @@ const FastInputView = ({ setActiveTab, showToast }) => {
             try {
                 const data = await api.get('/funds');
                 if (isMounted) setFunds(data || []);
-            } catch (e) {
+            } catch {
                 if (isMounted) setFunds([]);
                 showToast("Không thể tải danh sách hũ", "error");
             }
@@ -54,7 +54,7 @@ const FastInputView = ({ setActiveTab, showToast }) => {
                 setActiveField(null);
             }
         }
-    }, [parsedResult !== null]);
+    }, [parsedResult]);
 
     // Xử lý phím bấm trên Numpad ảo
     const handleNumpadClick = (key) => {

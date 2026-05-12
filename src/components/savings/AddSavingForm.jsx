@@ -1,22 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Landmark } from 'lucide-react';
 import { formatN, parseN } from '../../utils/formatters';
 import { getSafeDate } from '../../utils/date';
 
 const AddSavingForm = ({ onSave, onDelete, editingSaving, uniqueBankNames }) => {
-    const [savingCalc, setSavingCalc] = useState({ amount: 0, rate: 0, months: 0 });
-
-    useEffect(() => {
-        if (editingSaving) {
-            setSavingCalc({
-                amount: editingSaving.amount || 0,
-                rate: editingSaving.interestRate || 0,
-                months: editingSaving.termMonths || 0
-            });
-        } else {
-            setSavingCalc({ amount: 0, rate: 0, months: 0 });
-        }
-    }, [editingSaving]);
+    const calcKey = editingSaving?.id || 'new';
+    const [calcDraftByKey, setCalcDraftByKey] = useState({});
+    const baseSavingCalc = useMemo(() => ({
+        amount: editingSaving?.amount || 0,
+        rate: editingSaving?.interestRate || 0,
+        months: editingSaving?.termMonths || 0
+    }), [editingSaving]);
+    const savingCalc = { ...baseSavingCalc, ...(calcDraftByKey[calcKey] || {}) };
+    const updateSavingCalc = (patch) => {
+        setCalcDraftByKey(prev => ({
+            ...prev,
+            [calcKey]: { ...(prev[calcKey] || {}), ...patch }
+        }));
+    };
 
     return (
         <form onSubmit={onSave} className="space-y-4 text-left p-1">
@@ -41,11 +42,11 @@ const AddSavingForm = ({ onSave, onDelete, editingSaving, uniqueBankNames }) => 
             </div>
             <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Số tiền gửi (VNĐ)</label>
-                <input type="text" name="amount" required defaultValue={editingSaving ? formatN(editingSaving.amount) : ''} onInput={(e) => { e.target.value = formatN(parseN(e.target.value)); setSavingCalc(prev => ({ ...prev, amount: parseN(e.target.value) })); }} placeholder="0" className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-black text-xl text-slate-800 outline-none focus:border-amber-500 shadow-inner" />
+                <input type="text" name="amount" required defaultValue={editingSaving ? formatN(editingSaving.amount) : ''} onInput={(e) => { e.target.value = formatN(parseN(e.target.value)); updateSavingCalc({ amount: parseN(e.target.value) }); }} placeholder="0" className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-black text-xl text-slate-800 outline-none focus:border-amber-500 shadow-inner" />
             </div>
             <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Lãi suất (%/năm)</label><input type="number" step="0.1" name="interestRate" required defaultValue={editingSaving?.interestRate} onChange={(e) => setSavingCalc(prev => ({ ...prev, rate: Number(e.target.value) }))} placeholder="VD: 5.5" className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-amber-500 shadow-inner" /></div>
-                <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Kỳ hạn (Tháng)</label><input type="number" step="any" name="termMonths" required defaultValue={editingSaving?.termMonths} onChange={(e) => setSavingCalc(prev => ({ ...prev, months: Number(e.target.value) }))} placeholder="VD: 6, hoặc 0.5..." className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-amber-500 shadow-inner" /></div>
+                <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Lãi suất (%/năm)</label><input type="number" step="0.1" name="interestRate" required defaultValue={editingSaving?.interestRate} onChange={(e) => updateSavingCalc({ rate: Number(e.target.value) })} placeholder="VD: 5.5" className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-amber-500 shadow-inner" /></div>
+                <div className="space-y-1"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Kỳ hạn (Tháng)</label><input type="number" step="any" name="termMonths" required defaultValue={editingSaving?.termMonths} onChange={(e) => updateSavingCalc({ months: Number(e.target.value) })} placeholder="VD: 6, hoặc 0.5..." className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-amber-500 shadow-inner" /></div>
             </div>
             <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Ngày gửi</label>

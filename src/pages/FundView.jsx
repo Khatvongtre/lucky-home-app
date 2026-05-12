@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { CircleDollarSign, PieChart, Plus, TrendingDown, TrendingUp, Wallet, ChevronRight, GraduationCap, HeartHandshake, Plane, X, Settings2, Trash2, ChevronDown, Check, LayoutGrid, List, Search, ArrowRightLeft, Zap } from 'lucide-react';
 import { formatN, parseN } from '../utils/formatters';
-import { api } from '../services/api';
+import { useFunds } from '../hooks/useFunds';
 
 const ICONS = { Wallet, TrendingUp, PieChart, GraduationCap, Plane, HeartHandshake };
 
@@ -31,8 +31,7 @@ const BORDER_BY_TEXT = {
 const getFundBorder = (fund) => BORDER_BY_TEXT[fund.text] || 'border-slate-200';
 
 const FundView = ({ showToast = () => { }, requestConfirm = async () => window.confirm("Xác nhận?"), setActiveTab }) => {
-    const [funds, setFunds] = useState([]);
-    const [transactions, setTransactions] = useState([]);
+    const { funds, transactions, saveFunds, saveTransactions, deleteTransaction } = useFunds({ showToast });
 
     const [isTxModalOpen, setIsTxModalOpen] = useState(false);
     const [txType, setTxType] = useState('in');
@@ -55,24 +54,6 @@ const FundView = ({ showToast = () => { }, requestConfirm = async () => window.c
     const [isMonthOpen, setIsMonthOpen] = useState(false);
     const monthLabels = { 'this-month': 'Tháng này', 'last-month': 'Tháng trước', 'all': 'Tất cả' };
     const txFilterLabels = { all: 'Tất cả', in: 'Thu', out: 'Chi' };
-
-    const loadData = async () => {
-        try {
-            const [fundsData, txData] = await Promise.all([
-                api.get('/funds'),
-                api.get('/funds/transactions')
-            ]);
-            setFunds(fundsData);
-            setTransactions(txData);
-        } catch (error) {
-            console.error(error);
-            showToast("Không thể tải dữ liệu sổ chi tiêu", "error");
-        }
-    };
-
-    useEffect(() => {
-        loadData();
-    }, []);
 
     const totalBalance = funds.reduce((sum, fund) => sum + fund.balance, 0);
     const totalIncome = transactions.filter(t => t.type === 'in').reduce((sum, t) => sum + t.amount, 0);
@@ -144,8 +125,7 @@ const FundView = ({ showToast = () => { }, requestConfirm = async () => window.c
 
             if (newTxs.length === 0) return showToast("Không có giao dịch nào được tạo", "error");
 
-            await api.post('/funds/transactions', newTxs);
-            await loadData();
+            await saveTransactions(newTxs);
             setIsTxModalOpen(false);
             showToast(txType === 'in' ? "Đã ghi nhận nạp tiền!" : txType === 'out' ? "Đã ghi nhận chi tiêu!" : "Đã chuyển tiền thành công!", "success");
         } catch (e) {
@@ -159,10 +139,12 @@ const FundView = ({ showToast = () => { }, requestConfirm = async () => window.c
     };
 
     const handleSaveSettings = async () => {
-        const payload = tempFunds.map(({ percent, ...f }) => f);
+        const payload = tempFunds.map((fund) => {
+            const { percent: _percent, ...rest } = fund;
+            return rest;
+        });
         try {
-            const updatedFunds = await api.put('/funds', payload);
-            setFunds(updatedFunds);
+            await saveFunds(payload);
             setIsSettingsModalOpen(false);
             showToast("Đã lưu thiết lập Hũ!", "success");
         } catch (e) {
@@ -203,8 +185,7 @@ const FundView = ({ showToast = () => { }, requestConfirm = async () => window.c
         if (!confirmed) return;
 
         try {
-            await api.delete(`/funds/transactions/${txId}`);
-            await loadData();
+            await deleteTransaction(txId);
             showToast("Đã xóa giao dịch và hoàn lại số dư!", "success");
         } catch (e) {
             showToast("Lỗi xóa: " + e.message, "error");
