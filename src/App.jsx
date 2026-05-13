@@ -29,6 +29,7 @@ import { useFeedback } from './hooks/useFeedback';
 import { useAutoClearHighlight } from './hooks/useAutoClearHighlight';
 import { useMonthNavigation } from './hooks/useMonthNavigation';
 import { useUnauthorizedLogout } from './hooks/useUnauthorizedLogout';
+import { useAppUiState } from './hooks/useAppUiState';
 
 // ==========================================
 // CẤU HÌNH API BACKEND (.NET 8)
@@ -49,18 +50,29 @@ const App = () => {
   const [isHubMode, setIsHubMode] = useState(true); // NEW: Manage global HUB screen visibility
   const [selectedHouse, setSelectedHouse] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [showQuickMenu, setShowQuickMenu] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-
   const [bottomSheet, setBottomSheet] = useState(null);
-  const [houseSearchQuery, setHouseSearchQuery] = useState("");
-  const [selectedStatsHouses, setSelectedStatsHouses] = useState([]);
-  const [unselectedSavingsBanks, setUnselectedSavingsBanks] = useState([]);
-  const [collapsedSavingsBanks, setCollapsedSavingsBanks] = useState([]);
-  const [settingsExpanded, setSettingsExpanded] = useState({ services: true, qr: false, pass: false });
-
   const [config, setConfig] = useState({});
   const [isOverwriteModalOpen, setIsOverwriteModalOpen] = useState(false);
+  const {
+    showQuickMenu,
+    setShowQuickMenu,
+    searchQuery,
+    setSearchQuery,
+    houseSearchQuery,
+    setHouseSearchQuery,
+    selectedStatsHouses,
+    setSelectedStatsHouses,
+    unselectedSavingsBanks,
+    setUnselectedSavingsBanks,
+    collapsedSavingsBanks,
+    setCollapsedSavingsBanks,
+    settingsExpanded,
+    setSettingsExpanded,
+    isFinanceStatsOpen,
+    setIsFinanceStatsOpen,
+    isSavingsStatsOpen,
+    setIsSavingsStatsOpen,
+  } = useAppUiState();
   const {
     viewDate,
     isMonthOpen,
@@ -71,8 +83,6 @@ const App = () => {
     handleNextMonth,
     monthDisplay,
   } = useMonthNavigation();
-  const [isFinanceStatsOpen, setIsFinanceStatsOpen] = useState(true);
-  const [isSavingsStatsOpen, setIsSavingsStatsOpen] = useState(true);
   const { highlightedItemId, setHighlightedItemId } = useAutoClearHighlight();
   const {
     houses,

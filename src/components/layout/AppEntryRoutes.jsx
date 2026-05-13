@@ -1,16 +1,11 @@
 import React, { Suspense, lazy } from 'react';
 import ToastNotification from '../common/Toast';
+import PageLoading from '../common/PageLoading';
 
 const AuthView = lazy(() => import('../../pages/AuthView'));
 const HubView = lazy(() => import('../../pages/HubView'));
 const HouseSelectionView = lazy(() => import('../../pages/HouseSelectionView'));
 const FastInputView = lazy(() => import('../../pages/FastInputView'));
-
-const PageLoading = () => (
-  <div className="flex-1 flex items-center justify-center p-8 text-[10px] font-black uppercase tracking-widest text-slate-400">
-    Dang tai...
-  </div>
-);
 
 const AppEntryRoutes = ({
   activeTab,

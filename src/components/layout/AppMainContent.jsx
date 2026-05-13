@@ -1,5 +1,6 @@
 import React, { Suspense, lazy } from 'react';
 import PermissionDenied from '../common/PermissionDenied';
+import PageLoading from '../common/PageLoading';
 import { monthLabels } from '../../hooks/useAppDerivedData';
 
 const DashboardView = lazy(() => import('../../pages/DashboardView'));
@@ -13,12 +14,6 @@ const ProfileView = lazy(() => import('../../pages/ProfileView'));
 const FundView = lazy(() => import('../../pages/FundView'));
 const FastInputView = lazy(() => import('../../pages/FastInputView'));
 const SettingsView = lazy(() => import('../../pages/SettingsView'));
-
-const PageLoading = () => (
-  <div className="flex-1 flex items-center justify-center p-8 text-[10px] font-black uppercase tracking-widest text-slate-400">
-    Dang tai...
-  </div>
-);
 
 const AppMainContent = ({
   activeTab,
