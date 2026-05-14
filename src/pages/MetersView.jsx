@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Calendar, Flame, Zap, Edit, Boxes, Receipt, ZapOff } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, Flame, Zap, Edit, Boxes, Receipt, ZapOff, Copy, Loader2 } from 'lucide-react';
+import { api } from '../services/api';
 import { formatN, parseN } from '../utils/formatters';
 
 const MetersView = ({
@@ -15,11 +16,53 @@ const MetersView = ({
     setIsAddMeterModalOpen,
     setMappingMeter,
     handleSaveMetersAndGenerateBills,
+    showToast,
     viewDate,
     rooms,
     highlightedItemId,
     setHighlightedItemId
 }) => {
+    const [copyingRoomId, setCopyingRoomId] = React.useState(null);
+
+    const resolvePublicLink = (result) => {
+        const rawUrl = result?.url || result?.link || result?.publicUrl;
+        if (rawUrl) {
+            if (rawUrl.startsWith('http')) return rawUrl;
+            if (rawUrl.startsWith('/')) return `${window.location.origin}${rawUrl}`;
+            if (rawUrl.startsWith('meter-reading/')) return `${window.location.origin}/${rawUrl}`;
+            if (!rawUrl.includes('/')) return `${window.location.origin}/meter-reading/${encodeURIComponent(rawUrl)}`;
+            return `${window.location.origin}/${rawUrl}`;
+        }
+
+        if (result?.tokenHash || result?.hash) {
+            throw new Error('API đang trả token hash nên link không mở được. BE cần trả url hoặc token gốc một lần khi tạo link.');
+        }
+
+        const token = result?.token || result?.publicToken;
+        if (token) return `${window.location.origin}/meter-reading/${encodeURIComponent(token)}`;
+
+        throw new Error('Máy chủ chưa trả về link ghi điện.');
+    };
+
+    const handleCopyMeterReadingLink = async (event, room, roomLabel) => {
+        event.stopPropagation();
+
+        try {
+            setCopyingRoomId(room.id);
+            const result = await api.post('/meter-reading/link', {
+                roomId: room.id,
+                houseId: room.houseId || room.houseID,
+            });
+            const link = resolvePublicLink(result);
+            await navigator.clipboard.writeText(link);
+            showToast?.(`Đã copy link công tơ cố định phòng ${roomLabel}`, 'success');
+        } catch (error) {
+            showToast?.(error.message || 'Không copy được link, vui lòng thử lại.', 'error');
+        } finally {
+            setCopyingRoomId(null);
+        }
+    };
+
     useEffect(() => {
         if (highlightedItemId && currentMeters?.length > 0) {
             const hId = String(highlightedItemId);
@@ -152,6 +195,27 @@ const MetersView = ({
                                     <button onClick={() => setMappingMeter(m)} className="p-2 bg-slate-50 text-slate-400 rounded-xl active:bg-orange-50 active:text-orange-500 transition-all"><Boxes className="w-4 h-4" /></button>
                                 </div>
                             </div>
+                            {linkedRooms.length > 0 && (
+                                <div className="mb-4 flex flex-wrap gap-2">
+                                    {linkedRooms.map(room => {
+                                        const roomLabel = room.roomCode || room.id;
+                                        const isCopying = copyingRoomId === room.id;
+                                        return (
+                                            <button
+                                                key={room.id}
+                                                type="button"
+                                                disabled={isCopying}
+                                                onClick={(event) => handleCopyMeterReadingLink(event, room, roomLabel)}
+                                                className="inline-flex items-center gap-1.5 rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-[9px] font-black uppercase text-blue-700 active:scale-95 disabled:opacity-60"
+                                                title={`Copy link ghi điện phòng ${roomLabel}`}
+                                            >
+                                                {isCopying ? <Loader2 className="w-3 h-3 animate-spin" /> : <Copy className="w-3 h-3" />}
+                                                {isCopying ? 'Đang tạo link' : `Copy link phòng ${roomLabel}`}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="text-[8px] font-black text-slate-400 uppercase mb-1 block px-1">Số cũ</label>

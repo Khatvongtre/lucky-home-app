@@ -23,6 +23,7 @@ export const useMonthNavigation = () => {
 
   return {
     viewDate,
+    setViewDate,
     isMonthOpen,
     setIsMonthOpen,
     selectedMonth,

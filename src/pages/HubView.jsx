@@ -1,18 +1,20 @@
 import React from 'react';
 import {
-  Building2, Bell, User, TrendingUp, Sparkles, ChevronRight,
+  Building2, User, TrendingUp, Sparkles, ChevronRight,
   CircleDollarSign, PiggyBank, PlusCircle, LogOut,
   AlertTriangle, Zap, Receipt, FileText
 } from 'lucide-react';
 import { formatN } from '../utils/formatters';
 import ToastNotification from '../components/common/Toast';
+import NotificationBell from '../components/notifications/NotificationBell';
 
 const HubView = ({
   user, houses, setIsHubMode, setActiveTab, setSelectedHouse,
   setConfig, setSearchQuery, setEditingHouse, setIsAiCreateHouseOpen,
   setIsAiPromptModalOpen, setAiPrompt, setIsListening, showToast,
   handleLogout, toast, dashboardWarnings = [],
-  setHighlightedItemId
+  setHighlightedItemId,
+  setViewDate,
 }) => {
   const hubStats = houses.reduce((acc, h) => {
     acc.totalHouses += 1;
@@ -88,9 +90,17 @@ const HubView = ({
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <button type="button" className="w-10 h-10 rounded-full bg-slate-50 border border-slate-200 text-slate-600 flex items-center justify-center active:scale-95 transition-all" aria-label="Thông báo">
-              <Bell className="w-5 h-5" />
-            </button>
+            <NotificationBell
+              houses={houses}
+              setSelectedHouse={setSelectedHouse}
+              setConfig={setConfig}
+              setIsHubMode={setIsHubMode}
+              setActiveTab={setActiveTab}
+              setHighlightedItemId={setHighlightedItemId}
+              setViewDate={setViewDate}
+              buttonClassName="w-10 h-10 rounded-full bg-slate-50 border border-slate-200 text-slate-600 flex items-center justify-center active:scale-95 transition-all"
+              panelAlign="right-0"
+            />
             <button type="button" onClick={() => { setIsHubMode(false); setActiveTab('profile'); setSelectedHouse(null); }} className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-sm active:scale-95 transition-all" aria-label="Tài khoản">
               <User className="w-5 h-5" />
             </button>

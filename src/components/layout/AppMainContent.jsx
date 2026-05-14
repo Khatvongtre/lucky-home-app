@@ -74,6 +74,8 @@ const AppMainContent = ({
             isManagerOrAbove={isManagerOrAbove}
             highlightedItemId={highlightedItemId}
             setHighlightedItemId={setHighlightedItemId}
+            showToast={showToast}
+            requestConfirm={requestConfirm}
           />
         )}
 
@@ -104,6 +106,7 @@ const AppMainContent = ({
             setIsAddMeterModalOpen={meterState.setIsAddMeterModalOpen}
             setMappingMeter={meterState.setMappingMeter}
             handleSaveMetersAndGenerateBills={meterState.handleSaveMetersAndGenerateBills}
+            showToast={meterState.showToast}
             viewDate={meterState.viewDate}
             rooms={meterState.rooms}
             highlightedItemId={highlightedItemId}

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { Suspense, lazy, useState, useCallback } from 'react';
 
 // --- Tách Component & Utils (Giai đoạn 1 & 2) ---
 
@@ -30,6 +30,9 @@ import { useAutoClearHighlight } from './hooks/useAutoClearHighlight';
 import { useMonthNavigation } from './hooks/useMonthNavigation';
 import { useUnauthorizedLogout } from './hooks/useUnauthorizedLogout';
 import { useAppUiState } from './hooks/useAppUiState';
+import PageLoading from './components/common/PageLoading';
+
+const MeterReadingPublicView = lazy(() => import('./pages/MeterReadingPublicView'));
 
 // ==========================================
 // CẤU HÌNH API BACKEND (.NET 8)
@@ -42,7 +45,7 @@ if (import.meta.env.DEV) {
 // ==========================================
 // ỨNG DỤNG CHÍNH
 // ==========================================
-const App = () => {
+const MainApp = () => {
   // ==========================================
   // 1. GLOBAL STATES
   // ==========================================
@@ -75,6 +78,7 @@ const App = () => {
   } = useAppUiState();
   const {
     viewDate,
+    setViewDate,
     isMonthOpen,
     setIsMonthOpen,
     selectedMonth,
@@ -414,6 +418,7 @@ const App = () => {
         handleLogout,
         dashboardWarnings,
         setHighlightedItemId,
+        setViewDate,
       }}
       houseSelectionState={{
         selectedHouse,
@@ -480,9 +485,13 @@ const App = () => {
         activeTab={activeTab}
         isGlobalTab={isGlobalTab}
         isOwnerOrAdmin={isOwnerOrAdmin}
+        houses={houses}
         setIsHubMode={setIsHubMode}
         setSelectedHouse={setSelectedHouse}
         setActiveTab={setActiveTab}
+        setConfig={setConfig}
+        setHighlightedItemId={setHighlightedItemId}
+        setViewDate={setViewDate}
         goBack={goBack}
       />
 
@@ -546,6 +555,7 @@ const App = () => {
           setIsAddMeterModalOpen,
           setMappingMeter,
           handleSaveMetersAndGenerateBills,
+          showToast,
           viewDate,
           rooms,
         }}
@@ -710,5 +720,19 @@ const App = () => {
     </div>
   );
 }
+
+const App = () => {
+  const isMeterReadingRoute = window.location.pathname.startsWith('/meter-reading/');
+
+  if (isMeterReadingRoute) {
+    return (
+      <Suspense fallback={<PageLoading />}>
+        <MeterReadingPublicView />
+      </Suspense>
+    );
+  }
+
+  return <MainApp />;
+};
 
 export default App;

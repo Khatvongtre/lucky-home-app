@@ -1,5 +1,6 @@
 import React from 'react';
 import { ChevronLeft, Building2, User } from 'lucide-react';
+import NotificationBell from '../notifications/NotificationBell';
 
 const TAB_TITLES = {
     dashboard: 'Trang chủ',
@@ -22,6 +23,10 @@ const Header = ({
     setIsHubMode,
     setSelectedHouse,
     setActiveTab,
+    setConfig,
+    houses,
+    setHighlightedItemId,
+    setViewDate,
     goBack
 }) => {
     return (
@@ -51,6 +56,18 @@ const Header = ({
                 <h2 className="text-sm font-black uppercase tracking-tighter mt-0.5">Lucky Home</h2>
             </div>
             <div className="flex items-center space-x-2">
+                <NotificationBell
+                    selectedHouse={selectedHouse}
+                    houses={houses}
+                    setSelectedHouse={setSelectedHouse}
+                    setConfig={setConfig}
+                    setIsHubMode={setIsHubMode}
+                    setActiveTab={setActiveTab}
+                    setHighlightedItemId={setHighlightedItemId}
+                    setViewDate={setViewDate}
+                    buttonClassName="w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center active:scale-90 transition-all"
+                    panelAlign="right-0"
+                />
                 <div className="flex flex-row items-center space-x-1 cursor-pointer active:opacity-80" onClick={() => {
                     if (!selectedHouse) {
                         setIsHubMode(true);

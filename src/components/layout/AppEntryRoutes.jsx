@@ -49,6 +49,7 @@ const AppEntryRoutes = ({
           toast={toast}
           dashboardWarnings={hubState.dashboardWarnings}
           setHighlightedItemId={hubState.setHighlightedItemId}
+          setViewDate={hubState.setViewDate}
         />
       </Suspense>
     );
