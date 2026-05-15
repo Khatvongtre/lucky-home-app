@@ -470,6 +470,7 @@ const MeterReadingPublicView = () => {
   const [torchOn, setTorchOn] = useState(false);
   const videoRef = useRef(null);
   const overlayRef = useRef(null);
+  const cameraFileRef = useRef(null);
   const fileRef = useRef(null);
   const correctionFileRef = useRef(null);
 
@@ -598,6 +599,10 @@ const MeterReadingPublicView = () => {
     setTorchOn(false);
   }, [stream]);
 
+  const openImagePicker = useCallback(() => {
+    fileRef.current?.click();
+  }, []);
+
   const processMeterImage = useCallback(async (meter, imageDataUrl) => {
     if (!meter || !imageDataUrl) return;
 
@@ -674,12 +679,13 @@ const MeterReadingPublicView = () => {
 
     try {
       const imageDataUrl = await compressImageFile(file);
+      stopCamera();
       await processMeterImage(activeMeter, imageDataUrl);
     } catch (imageError) {
       setError(imageError.message || 'Không xử lý được ảnh.');
     }
     event.target.value = '';
-  }, [activeMeter, processMeterImage]);
+  }, [activeMeter, processMeterImage, stopCamera]);
 
   const handleCorrectionImagePicked = useCallback(async (event) => {
     const file = event.target.files?.[0];
@@ -1005,14 +1011,24 @@ const MeterReadingPublicView = () => {
                       </div>
                     </div>
                   ) : activeMeter.imageDataUrl ? (
-                    <div className="relative bg-white">
+                    <button
+                      type="button"
+                      onClick={openImagePicker}
+                      className="relative block w-full bg-white text-left transition active:scale-[0.99]"
+                      aria-label="Đổi ảnh chỉ số công tơ"
+                    >
                       <img src={activeMeter.imageDataUrl} alt="Ảnh chỉ số công tơ" className="aspect-video w-full object-cover" />
                       <div className="absolute left-3 top-3 rounded-full bg-emerald-600 px-3 py-1 text-[10px] font-black uppercase text-white">
                         Đã có ảnh
                       </div>
-                    </div>
+                    </button>
                   ) : (
-                    <div className="flex aspect-video flex-col items-center justify-center gap-2 bg-slate-900 text-slate-300">
+                    <button
+                      type="button"
+                      onClick={openImagePicker}
+                      className="flex aspect-video w-full flex-col items-center justify-center gap-2 bg-slate-900 text-slate-300 transition active:scale-[0.99]"
+                      aria-label="Chụp hoặc chọn ảnh chỉ số công tơ"
+                    >
                       <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-500/20 text-blue-100 ring-1 ring-blue-300/25">
                         <Camera className="h-6 w-6" />
                       </div>
@@ -1020,7 +1036,7 @@ const MeterReadingPublicView = () => {
                         <p className="text-xs font-black text-white">Chụp vùng chỉ số công tơ</p>
                         <p className="mt-0.5 text-[11px] font-semibold text-slate-400">Canh rõ dãy số trong khung.</p>
                       </div>
-                    </div>
+                    </button>
                   )}
                 </div>
 
@@ -1031,15 +1047,19 @@ const MeterReadingPublicView = () => {
                   </div>
                 ) : null}
 
-                <div className="mt-2 grid grid-cols-2 gap-2">
+                <div className="mt-2 grid grid-cols-3 gap-2">
                   <button type="button" onClick={startCamera} className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 py-3 text-xs font-black uppercase text-white shadow-sm active:scale-95">
-                    <Camera className="h-4 w-4" /> Mở camera
+                    <Camera className="h-4 w-4" /> Canh dòng
+                  </button>
+                  <button type="button" onClick={() => cameraFileRef.current?.click()} className="flex items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-3 text-xs font-black uppercase text-blue-700 active:scale-95">
+                    <Camera className="h-4 w-4" /> Chụp ảnh
                   </button>
                   <button type="button" onClick={() => fileRef.current?.click()} className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs font-black uppercase text-slate-700 active:scale-95">
                     <ImageIcon className="h-4 w-4" /> Chọn ảnh
                   </button>
                 </div>
-                <input ref={fileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFilePicked} />
+                <input ref={cameraFileRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFilePicked} />
+                <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFilePicked} />
 
                 <div className="mt-4">
                   <div className="mb-2 flex items-center justify-between gap-3">
@@ -1255,7 +1275,6 @@ const MeterReadingPublicView = () => {
                     ref={correctionFileRef}
                     type="file"
                     accept="image/*"
-                    capture="environment"
                     className="hidden"
                     onChange={handleCorrectionImagePicked}
                   />
