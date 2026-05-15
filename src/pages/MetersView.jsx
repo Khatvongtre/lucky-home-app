@@ -1,14 +1,8 @@
 import React, { useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Calendar, Flame, Zap, Edit, Boxes, Receipt, ZapOff, Copy, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, Flame, Zap, Edit, Boxes, Receipt, ZapOff, Copy, Loader2, QrCode } from 'lucide-react';
 import { api } from '../services/api';
 import { formatN, parseN } from '../utils/formatters';
-
-const escapeHtml = (value = '') => String(value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
+import MeterReadingLinkQrModal from '../components/common/MeterReadingLinkQrModal';
 
 const getRoomLinkLabel = (room, fallbackLabel) => {
     const roomLabel = room.roomCode || room.code || room.name || fallbackLabel || room.id;
@@ -18,24 +12,7 @@ const getRoomLinkLabel = (room, fallbackLabel) => {
 
 const copyMeterReadingLink = async (room, link, fallbackLabel) => {
     const label = getRoomLinkLabel(room, fallbackLabel);
-    const plainText = `${label}\n${link}`;
-    const html = `<a href="${escapeHtml(link)}">${escapeHtml(label)}</a>`;
-
-    if (navigator.clipboard?.write && window.ClipboardItem) {
-        try {
-            await navigator.clipboard.write([
-                new ClipboardItem({
-                    'text/plain': new Blob([plainText], { type: 'text/plain' }),
-                    'text/html': new Blob([html], { type: 'text/html' }),
-                }),
-            ]);
-            return;
-        } catch {
-            // Fallback to plain text below.
-        }
-    }
-
-    await navigator.clipboard.writeText(plainText);
+    await navigator.clipboard.writeText(`${label}\n${link}`);
 };
 
 const MetersView = ({
@@ -58,6 +35,7 @@ const MetersView = ({
     setHighlightedItemId
 }) => {
     const [copyingRoomId, setCopyingRoomId] = React.useState(null);
+    const [qrLinkInfo, setQrLinkInfo] = React.useState(null);
 
     const resolvePublicLink = (result) => {
         const rawUrl = result?.url || result?.link || result?.publicUrl;
@@ -93,6 +71,29 @@ const MetersView = ({
             showToast?.(`Đã copy link công tơ cố định phòng ${roomLabel}`, 'success');
         } catch (error) {
             showToast?.(error.message || 'Không copy được link, vui lòng thử lại.', 'error');
+        } finally {
+            setCopyingRoomId(null);
+        }
+    };
+
+    const handleShowMeterReadingQr = async (event, room, roomLabel) => {
+        event.stopPropagation();
+
+        try {
+            setCopyingRoomId(room.id);
+            const result = await api.post('/meter-reading/link', {
+                roomId: room.id,
+                houseId: room.houseId || room.houseID,
+            });
+            const link = resolvePublicLink(result);
+            setQrLinkInfo({
+                url: link,
+                label: getRoomLinkLabel(room, roomLabel),
+                room,
+                roomLabel,
+            });
+        } catch (error) {
+            showToast?.(error.message || 'Không mở được QR link ghi điện.', 'error');
         } finally {
             setCopyingRoomId(null);
         }
@@ -236,8 +237,8 @@ const MetersView = ({
                                         const roomLabel = room.roomCode || room.id;
                                         const isCopying = copyingRoomId === room.id;
                                         return (
+                                            <React.Fragment key={room.id}>
                                             <button
-                                                key={room.id}
                                                 type="button"
                                                 disabled={isCopying}
                                                 onClick={(event) => handleCopyMeterReadingLink(event, room, roomLabel)}
@@ -247,6 +248,18 @@ const MetersView = ({
                                                 {isCopying ? <Loader2 className="w-3 h-3 animate-spin" /> : <Copy className="w-3 h-3" />}
                                                 {isCopying ? 'Đang tạo link' : `Copy link phòng ${roomLabel}`}
                                             </button>
+                                            <button
+                                                key={`${room.id}-qr`}
+                                                type="button"
+                                                disabled={isCopying}
+                                                onClick={(event) => handleShowMeterReadingQr(event, room, roomLabel)}
+                                                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-100 bg-emerald-50 px-2.5 py-1.5 text-[9px] font-black uppercase text-emerald-700 active:scale-95 disabled:opacity-60"
+                                                title={`QR link ghi điện phòng ${roomLabel}`}
+                                            >
+                                                <QrCode className="w-3 h-3" />
+                                                QR
+                                            </button>
+                                            </React.Fragment>
                                         );
                                     })}
                                 </div>
@@ -276,6 +289,12 @@ const MetersView = ({
                     </button>
                 </div>
             )}
+
+            <MeterReadingLinkQrModal
+                linkInfo={qrLinkInfo}
+                onClose={() => setQrLinkInfo(null)}
+                onCopy={() => qrLinkInfo && copyMeterReadingLink(qrLinkInfo.room, qrLinkInfo.url, qrLinkInfo.roomLabel)}
+            />
         </div>
     );
 };
