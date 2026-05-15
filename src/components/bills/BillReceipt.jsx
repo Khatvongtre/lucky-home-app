@@ -2,6 +2,39 @@ import React, { useState } from 'react';
 import { Loader2, Image as ImageIcon, Trash2, CheckCircle2, X } from 'lucide-react';
 import { formatN, parseN } from '../../utils/formatters';
 
+const resolveBackendAssetUrl = (src, API_URL) => {
+    if (!src || typeof src !== 'string') return src;
+    if (src.startsWith('data:') || src.startsWith('blob:')) return src;
+
+    try {
+        return new URL(src, API_URL || 'http://localhost:3000/api').toString();
+    } catch {
+        return src;
+    }
+};
+
+const buildMeterImages = (bill, API_URL) => {
+    const fromMeterList = Array.isArray(bill.meters)
+        ? bill.meters.map((meter, index) => ({
+            label: meter.name || `Công tơ ${index + 1}`,
+            src: resolveBackendAssetUrl(meter.imageUrl || meter.imageDataUrl, API_URL),
+        }))
+        : [];
+
+    if (fromMeterList.length > 0) return fromMeterList;
+
+    return [
+        {
+            label: 'Công tơ điện',
+            src: resolveBackendAssetUrl(bill.meter?.imageUrl || bill.meter?.imageDataUrl || bill.meterImageUrl, API_URL),
+        },
+        {
+            label: 'Công tơ BNL',
+            src: resolveBackendAssetUrl(bill.heaterMeter?.imageUrl || bill.heaterMeter?.imageDataUrl || bill.heaterImageUrl, API_URL),
+        },
+    ];
+};
+
 const BillReceipt = ({
     bottomSheet,
     setBottomSheet,
@@ -28,20 +61,8 @@ const BillReceipt = ({
     if (!bottomSheet || bottomSheet.type !== 'bill') return null;
 
     const bill = bottomSheet.data;
-    const meterImages = [
-        {
-            label: 'Công tơ phòng',
-            src: bill.meter?.imageUrl || bill.meter?.imageDataUrl || bill.meterImageUrl,
-        },
-        {
-            label: 'Công tơ BNL',
-            src: bill.heaterMeter?.imageUrl || bill.heaterMeter?.imageDataUrl || bill.heaterImageUrl,
-        },
-        ...(Array.isArray(bill.meters) ? bill.meters.map((meter, index) => ({
-            label: meter.name || `Công tơ ${index + 1}`,
-            src: meter.imageUrl || meter.imageDataUrl,
-        })) : []),
-    ].filter(item => item.src && !failedMeterImages[item.src]);
+    const meterImages = buildMeterImages(bill, API_URL)
+        .filter(item => item.src && !failedMeterImages[item.src]);
     const bankBin = config.bankBin || '970422';
     const bankAcc = config.bankAcc || '0';
     const qrAddInfo = `P${bill.roomId} ${bill.currentMonthFull}`;

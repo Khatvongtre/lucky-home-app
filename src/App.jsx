@@ -616,6 +616,7 @@ const MainApp = () => {
           setChangePasswordForm,
           handleChangePassword,
         }}
+        selectedHouse={selectedHouse}
       />
 
       <AppFooter

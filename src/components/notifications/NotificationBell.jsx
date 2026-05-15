@@ -2,6 +2,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Bell, CheckCheck, Circle, Loader2, RefreshCw } from 'lucide-react';
 import { api } from '../../services/api';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const NOTIFICATION_PAGE_SIZE = 20;
+
 const parseMetadata = (metadataJson) => {
   if (!metadataJson) return {};
   if (typeof metadataJson === 'object') return metadataJson;
@@ -10,6 +13,17 @@ const parseMetadata = (metadataJson) => {
     return JSON.parse(metadataJson);
   } catch {
     return {};
+  }
+};
+
+const resolveBackendAssetUrl = (src) => {
+  if (!src || typeof src !== 'string') return src;
+  if (src.startsWith('data:') || src.startsWith('blob:')) return src;
+
+  try {
+    return new URL(src, API_URL).toString();
+  } catch {
+    return src;
   }
 };
 
@@ -37,11 +51,12 @@ const formatNotificationTime = (value) => {
   });
 };
 
-const buildNotificationQuery = ({ houseId, unreadOnly, take }) => {
+const buildNotificationQuery = ({ houseId, unreadOnly, take, skip }) => {
   const params = new URLSearchParams();
   if (houseId) params.set('houseId', houseId);
   if (typeof unreadOnly === 'boolean') params.set('unreadOnly', String(unreadOnly));
   if (take) params.set('take', String(take));
+  if (skip) params.set('skip', String(skip));
   const query = params.toString();
   return `/notifications${query ? `?${query}` : ''}`;
 };
@@ -73,28 +88,52 @@ const NotificationBell = ({
   panelAlign,
 }) => {
   const rootRef = useRef(null);
+  const notificationsRef = useRef([]);
   const [isOpen, setIsOpen] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState('');
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState([]);
+  const [failedImageUrls, setFailedImageUrls] = useState({});
 
   const houseId = selectedHouse?.id || '';
   const hasUnread = unreadCount > 0;
 
-  const loadNotifications = useCallback(async ({ silent = false } = {}) => {
+  useEffect(() => {
+    notificationsRef.current = notifications;
+  }, [notifications]);
+
+  const loadNotifications = useCallback(async ({ silent = false, append = false, skip = 0 } = {}) => {
     try {
-      if (!silent) setIsLoading(true);
+      if (append) {
+        setIsLoadingMore(true);
+      } else if (!silent) {
+        setIsLoading(true);
+      }
       setError('');
-      const result = await api.get(buildNotificationQuery({ houseId, unreadOnly: false, take: 20 }));
+      const result = await api.get(buildNotificationQuery({
+        houseId,
+        unreadOnly: false,
+        take: NOTIFICATION_PAGE_SIZE,
+        skip,
+      }));
+      const nextNotifications = Array.isArray(result?.notifications) ? result.notifications : [];
+      const existingIds = new Set(notificationsRef.current.map(item => String(item.id)));
+      const uniqueNext = append
+        ? nextNotifications.filter(item => !existingIds.has(String(item.id)))
+        : nextNotifications;
       setUnreadCount(Number(result?.unreadCount) || 0);
-      setNotifications(Array.isArray(result?.notifications) ? result.notifications : []);
+      setNotifications(prev => (append ? [...prev, ...uniqueNext] : nextNotifications));
+      setHasMore(nextNotifications.length === NOTIFICATION_PAGE_SIZE && (!append || uniqueNext.length > 0));
       setHasLoaded(true);
     } catch (loadError) {
       setError(loadError.message || 'Không tải được thông báo.');
     } finally {
       setIsLoading(false);
+      setIsLoadingMore(false);
     }
   }, [houseId]);
 
@@ -146,6 +185,11 @@ const NotificationBell = ({
     setIsOpen(nextOpen);
     if (nextOpen && !hasLoaded) await loadNotifications();
     if (nextOpen && hasLoaded) loadNotifications({ silent: true });
+  };
+
+  const handleLoadMore = () => {
+    if (isLoadingMore || !hasMore) return;
+    loadNotifications({ append: true, skip: notifications.length });
   };
 
   const markReadLocally = (notificationId) => {
@@ -260,6 +304,8 @@ const NotificationBell = ({
             {notifications.map(notification => {
               const unread = !notification.isRead;
               const metadata = parseMetadata(notification.metadataJson);
+              const imageUrl = resolveBackendAssetUrl(metadata.imageUrl);
+              const showImage = imageUrl && !failedImageUrls[imageUrl];
 
               return (
                 <button
@@ -293,9 +339,14 @@ const NotificationBell = ({
                           {metadata.total && <span className="rounded-md bg-white px-2 py-1 text-[9px] font-black uppercase text-emerald-700 ring-1 ring-emerald-100">{Number(metadata.total).toLocaleString('vi-VN')} đ</span>}
                         </div>
                       )}
-                      {metadata.imageUrl ? (
+                      {showImage ? (
                         <div className="mt-2 overflow-hidden rounded-lg border border-slate-200 bg-white">
-                          <img src={metadata.imageUrl} alt="Ảnh minh chứng" className="max-h-32 w-full object-cover" />
+                          <img
+                            src={imageUrl}
+                            alt="Ảnh minh chứng"
+                            className="max-h-32 w-full object-cover"
+                            onError={() => setFailedImageUrls(prev => ({ ...prev, [imageUrl]: true }))}
+                          />
                         </div>
                       ) : null}
                     </div>
@@ -303,6 +354,20 @@ const NotificationBell = ({
                 </button>
               );
             })}
+
+            {hasMore && (
+              <div className="border-t border-slate-100 bg-white p-3">
+                <button
+                  type="button"
+                  onClick={handleLoadMore}
+                  disabled={isLoadingMore}
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-slate-50 px-3 py-2.5 text-[11px] font-black uppercase text-slate-600 ring-1 ring-slate-200 transition-all hover:bg-blue-50 hover:text-blue-700 disabled:opacity-60"
+                >
+                  {isLoadingMore && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  {isLoadingMore ? 'Đang tải thêm...' : 'Tải thêm thông báo'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -31,6 +31,7 @@ const AppMainContent = ({
   roomsState,
   savingsState,
   settingsState,
+  selectedHouse,
 }) => {
   const { requestConfirm, showToast } = feedback;
   const { highlightedItemId, setHighlightedItemId } = highlightState;
@@ -76,6 +77,7 @@ const AppMainContent = ({
             setHighlightedItemId={setHighlightedItemId}
             showToast={showToast}
             requestConfirm={requestConfirm}
+            selectedHouse={selectedHouse}
           />
         )}
 
@@ -109,6 +111,7 @@ const AppMainContent = ({
             showToast={meterState.showToast}
             viewDate={meterState.viewDate}
             rooms={meterState.rooms}
+            selectedHouse={selectedHouse}
             highlightedItemId={highlightedItemId}
             setHighlightedItemId={setHighlightedItemId}
           />

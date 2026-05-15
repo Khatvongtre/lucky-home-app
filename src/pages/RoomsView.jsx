@@ -2,9 +2,7 @@ import React, { useEffect } from 'react';
 import {
     Bike,
     Calendar,
-    Copy,
     CreditCard,
-    Link2,
     Loader2,
     LucideEdit,
     PlusCircle,
@@ -42,6 +40,10 @@ const copyMeterReadingLink = async (room, link) => {
     await navigator.clipboard.writeText(`${label}\n${link}`);
 };
 
+const getHouseLabel = (selectedHouse) => (
+    selectedHouse?.houseName || selectedHouse?.name || selectedHouse?.title || ''
+);
+
 const resolvePublicLink = (result) => {
     const rawUrl = result?.url || result?.link || result?.publicUrl;
     if (rawUrl) {
@@ -62,13 +64,6 @@ const resolvePublicLink = (result) => {
     throw new Error('Máy chủ chưa trả về link công tơ.');
 };
 
-const formatExpiresAt = (value) => {
-    if (!value) return 'Dùng hàng tháng';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return 'Dùng hàng tháng';
-    return date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
-};
-
 const RoomsView = ({
     currentRooms,
     setEditingRoom,
@@ -78,6 +73,7 @@ const RoomsView = ({
     setHighlightedItemId,
     showToast,
     requestConfirm,
+    selectedHouse,
 }) => {
     const [meterLinks, setMeterLinks] = React.useState(() => readLinkCache());
     const [linkLoadingRoomId, setLinkLoadingRoomId] = React.useState(null);
@@ -122,38 +118,6 @@ const RoomsView = ({
         return fullUrl;
     };
 
-    const handleCreateMeterLink = async (event, room) => {
-        event.stopPropagation();
-
-        try {
-            setLinkLoadingRoomId(room.id);
-            const result = await api.post('/meter-reading/link', { roomId: room.id });
-            const fullUrl = saveMeterLink(room.id, result);
-            await copyMeterReadingLink(room, fullUrl);
-            showToast?.(`Đã tạo và copy link công tơ phòng ${room.roomCode || room.id}`, 'success');
-        } catch (error) {
-            showToast?.(error.message || 'Không tạo được link công tơ.', 'error');
-        } finally {
-            setLinkLoadingRoomId(null);
-        }
-    };
-
-    const handleCopyMeterLink = async (event, room) => {
-        event.stopPropagation();
-        const link = meterLinks[room.id]?.url;
-        if (!link) {
-            await handleCreateMeterLink(event, room);
-            return;
-        }
-
-        try {
-            await copyMeterReadingLink(room, link);
-            showToast?.(`Đã copy link công tơ phòng ${room.roomCode || room.id}`, 'success');
-        } catch {
-            showToast?.('Không copy được link, vui lòng thử lại.', 'error');
-        }
-    };
-
     const handleShowMeterLinkQr = async (event, room) => {
         event.stopPropagation();
 
@@ -163,6 +127,8 @@ const RoomsView = ({
             setQrLinkInfo({
                 url: link,
                 label: getRoomLinkLabel(room),
+                houseLabel: getHouseLabel(selectedHouse),
+                roomLabel: room.roomCode || room.code || room.name || room.id,
                 room,
             });
         } catch (error) {
@@ -211,7 +177,6 @@ const RoomsView = ({
                     const showContractWarning = room.status === 'full' && contractEndDate && endDays <= 30;
                     const hId = highlightedItemId ? String(highlightedItemId) : null;
                     const isHighlighted = hId && (String(room.id) === hId || String(room.roomCode) === hId);
-                    const roomLink = meterLinks[room.id];
                     const isLinkLoading = linkLoadingRoomId === room.id;
 
                     let cardStyle = room.status !== 'full'
@@ -285,37 +250,15 @@ const RoomsView = ({
 
                             {isManagerOrAbove && (
                                 <div className="mt-2 border-t border-slate-200/70 pt-2">
-                                    <div className="mb-1.5 flex items-center justify-between gap-2">
-                                        <div className="min-w-0">
-                                            <p className="text-[8px] font-black uppercase tracking-widest text-blue-600">Link chụp công tơ</p>
-                                            <p className="truncate text-[8px] font-semibold text-slate-400">
-                                                {roomLink?.url || 'Chưa tạo link cố định'}
-                                            </p>
-                                        </div>
-                                        {roomLink?.url && (
-                                            <span className="shrink-0 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[7px] font-black uppercase text-emerald-700">
-                                                {formatExpiresAt(roomLink.expiresAt)}
-                                            </span>
-                                        )}
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-1.5">
-                                        <button
-                                            type="button"
-                                            onClick={(event) => roomLink?.url ? handleCopyMeterLink(event, room) : handleCreateMeterLink(event, room)}
-                                            disabled={isLinkLoading}
-                                            className="flex items-center justify-center gap-1 rounded-lg bg-blue-600 px-2 py-2 text-[8px] font-black uppercase text-white active:scale-95 disabled:opacity-60"
-                                        >
-                                            {isLinkLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : roomLink?.url ? <Copy className="h-3 w-3" /> : <Link2 className="h-3 w-3" />}
-                                            {roomLink?.url ? 'Copy link' : 'Tạo link'}
-                                        </button>
+                                    <div className="grid grid-cols-2 gap-1.5">
                                         <button
                                             type="button"
                                             onClick={(event) => handleShowMeterLinkQr(event, room)}
                                             disabled={isLinkLoading}
-                                            className="flex items-center justify-center gap-1 rounded-lg border border-emerald-100 bg-emerald-50 px-2 py-2 text-[8px] font-black uppercase text-emerald-700 active:scale-95 disabled:opacity-60"
+                                            className="flex items-center justify-center gap-1 rounded-lg border border-rose-100 bg-rose-50 px-2 py-2 text-[8px] font-black uppercase text-rose-700 active:scale-95 disabled:opacity-60"
                                         >
-                                            <QrCode className="h-3 w-3" />
-                                            QR
+                                            {isLinkLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <QrCode className="h-3 w-3" />}
+                                            QR link
                                         </button>
                                         <button
                                             type="button"
@@ -354,3 +297,5 @@ const RoomsView = ({
 };
 
 export default RoomsView;
+
+

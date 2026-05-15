@@ -32,7 +32,7 @@ const HubView = ({
   const recentHouses = houses.slice(0, 3);
 
   const handleWarningClick = (warning) => {
-    if (warning.type === 'SAVING') {
+    if (warning.type === 'SAVING' || warning.type === 'SAVING_OVERDUE') {
       setIsHubMode(false);
       setActiveTab('savings');
       setSelectedHouse(null);
@@ -67,6 +67,7 @@ const HubView = ({
   const getWarningConfig = (type) => {
     switch (type) {
       case 'SAVING': return { icon: PiggyBank, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100', borderL: 'border-l-emerald-500', lightBg: 'bg-emerald-50/50' };
+      case 'SAVING_OVERDUE': return { icon: AlertTriangle, color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-100', borderL: 'border-l-rose-500', lightBg: 'bg-rose-50/50' };
       case 'METER': return { icon: Zap, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100', borderL: 'border-l-amber-500', lightBg: 'bg-amber-50/50' };
       case 'BILL': return { icon: Receipt, color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-100', borderL: 'border-l-rose-500', lightBg: 'bg-rose-50/50' };
       case 'CONTRACT': return { icon: FileText, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100', borderL: 'border-l-blue-500', lightBg: 'bg-blue-50/50' };
