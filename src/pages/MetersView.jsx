@@ -3,6 +3,41 @@ import { ChevronLeft, ChevronRight, Calendar, Flame, Zap, Edit, Boxes, Receipt, 
 import { api } from '../services/api';
 import { formatN, parseN } from '../utils/formatters';
 
+const escapeHtml = (value = '') => String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+
+const getRoomLinkLabel = (room, fallbackLabel) => {
+    const roomLabel = room.roomCode || room.code || room.name || fallbackLabel || room.id;
+    const houseLabel = room.houseName || room.house?.name || room.house?.houseName || '';
+    return `${houseLabel ? `${houseLabel} - ` : ''}Phòng ${roomLabel}`;
+};
+
+const copyMeterReadingLink = async (room, link, fallbackLabel) => {
+    const label = getRoomLinkLabel(room, fallbackLabel);
+    const plainText = `${label}\n${link}`;
+    const html = `<a href="${escapeHtml(link)}">${escapeHtml(label)}</a>`;
+
+    if (navigator.clipboard?.write && window.ClipboardItem) {
+        try {
+            await navigator.clipboard.write([
+                new ClipboardItem({
+                    'text/plain': new Blob([plainText], { type: 'text/plain' }),
+                    'text/html': new Blob([html], { type: 'text/html' }),
+                }),
+            ]);
+            return;
+        } catch {
+            // Fallback to plain text below.
+        }
+    }
+
+    await navigator.clipboard.writeText(plainText);
+};
+
 const MetersView = ({
     handlePrevMonth,
     handleNextMonth,
@@ -54,7 +89,7 @@ const MetersView = ({
                 houseId: room.houseId || room.houseID,
             });
             const link = resolvePublicLink(result);
-            await navigator.clipboard.writeText(link);
+            await copyMeterReadingLink(room, link, roomLabel);
             showToast?.(`Đã copy link công tơ cố định phòng ${roomLabel}`, 'success');
         } catch (error) {
             showToast?.(error.message || 'Không copy được link, vui lòng thử lại.', 'error');

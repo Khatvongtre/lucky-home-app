@@ -29,6 +29,41 @@ const writeLinkCache = (links) => {
     localStorage.setItem(LINK_CACHE_KEY, JSON.stringify(links));
 };
 
+const escapeHtml = (value = '') => String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+
+const getRoomLinkLabel = (room) => {
+    const roomLabel = room.roomCode || room.code || room.name || room.id;
+    const houseLabel = room.houseName || room.house?.name || room.house?.houseName || '';
+    return `${houseLabel ? `${houseLabel} - ` : ''}Phòng ${roomLabel}`;
+};
+
+const copyMeterReadingLink = async (room, link) => {
+    const label = getRoomLinkLabel(room);
+    const plainText = `${label}\n${link}`;
+    const html = `<a href="${escapeHtml(link)}">${escapeHtml(label)}</a>`;
+
+    if (navigator.clipboard?.write && window.ClipboardItem) {
+        try {
+            await navigator.clipboard.write([
+                new ClipboardItem({
+                    'text/plain': new Blob([plainText], { type: 'text/plain' }),
+                    'text/html': new Blob([html], { type: 'text/html' }),
+                }),
+            ]);
+            return;
+        } catch {
+            // Fallback to plain text below.
+        }
+    }
+
+    await navigator.clipboard.writeText(plainText);
+};
+
 const resolvePublicLink = (result) => {
     const rawUrl = result?.url || result?.link || result?.publicUrl;
     if (rawUrl) {
@@ -115,7 +150,7 @@ const RoomsView = ({
             setLinkLoadingRoomId(room.id);
             const result = await api.post('/meter-reading/link', { roomId: room.id });
             const fullUrl = saveMeterLink(room.id, result);
-            await navigator.clipboard.writeText(fullUrl);
+            await copyMeterReadingLink(room, fullUrl);
             showToast?.(`Đã tạo và copy link công tơ phòng ${room.roomCode || room.id}`, 'success');
         } catch (error) {
             showToast?.(error.message || 'Không tạo được link công tơ.', 'error');
@@ -133,7 +168,7 @@ const RoomsView = ({
         }
 
         try {
-            await navigator.clipboard.writeText(link);
+            await copyMeterReadingLink(room, link);
             showToast?.(`Đã copy link công tơ phòng ${room.roomCode || room.id}`, 'success');
         } catch {
             showToast?.('Không copy được link, vui lòng thử lại.', 'error');
@@ -152,7 +187,7 @@ const RoomsView = ({
             setLinkLoadingRoomId(room.id);
             const result = await api.post('/meter-reading/link/reset', { roomId: room.id });
             const fullUrl = saveMeterLink(room.id, result);
-            await navigator.clipboard.writeText(fullUrl);
+            await copyMeterReadingLink(room, fullUrl);
             showToast?.(`Đã reset và copy link mới phòng ${room.roomCode || room.id}`, 'success');
         } catch (error) {
             showToast?.(error.message || 'Không reset được link công tơ.', 'error');
