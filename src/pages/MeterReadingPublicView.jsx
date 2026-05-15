@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
-  Calendar,
   Camera,
   CheckCircle2,
   ChevronRight,
+  Copy,
+  Download,
   Flashlight,
-  Home,
   Image as ImageIcon,
   Loader2,
   RotateCcw,
@@ -74,6 +74,7 @@ const normalizeSession = (data, roomToken) => {
       confidence: meter.confidence ?? null,
       imageDataUrl: meter.imageDataUrl || meter.imageUrl || '',
       imageUrl: meter.imageUrl || '',
+      hasFreshImage: false,
       warnings: meter.warnings || [],
     })),
     invoice: normalizeBill(source.invoice),
@@ -176,11 +177,24 @@ const buildReceiptModel = (session, invoice) => {
   };
 };
 
-const PublicInvoiceReceipt = ({ session, invoice }) => {
+const PublicInvoiceReceipt = ({
+  session,
+  invoice,
+  isPaymentNotifying = false,
+  paymentNoticeMessage = '',
+  isTransferOpen = false,
+  transferCopyMessage = '',
+  onTransferClick,
+  onTransferClose,
+  onCopyTransfer,
+  onDownloadQr,
+  onPaymentNotice,
+}) => {
   const bill = buildReceiptModel(session, invoice);
   const config = session.config || {};
   const bankBin = config.bankBin || '970422';
   const bankAcc = config.bankAcc || '0';
+  const bankName = config.bankName || 'MB BANK';
   const qrAddInfo = `P${bill.roomId} ${bill.currentMonthFull}`;
   const qrFingerprint = [
     API_URL,
@@ -196,23 +210,12 @@ const PublicInvoiceReceipt = ({ session, invoice }) => {
 
   return (
     <div
-      className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm mx-auto"
+      className="w-full bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm"
       style={{
-        width: '100%',
-        maxWidth: '420px',
         fontFamily: 'Arial, Helvetica, sans-serif',
         WebkitFontSmoothing: 'antialiased',
       }}
     >
-      <div className="bg-gradient-to-r from-blue-700 to-blue-500 text-white p-4 text-center">
-        <div className="flex items-center justify-center gap-3 mb-0.5">
-          <h1 className="text-2xl font-black uppercase tracking-tight">Lucky Home</h1>
-        </div>
-        <p className="text-[10px] font-bold uppercase tracking-widest opacity-80">
-          Hóa đơn thanh toán
-        </p>
-      </div>
-
       <div className="p-4 space-y-3">
         <div className="bg-blue-50/50 border border-blue-100 p-3 rounded-xl flex justify-between items-center">
           <div>
@@ -288,7 +291,7 @@ const PublicInvoiceReceipt = ({ session, invoice }) => {
           </div>
         </div>
 
-        <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl flex items-stretch gap-3">
+        <div id="public-invoice-transfer" className="bg-slate-50 border border-slate-200 p-3 rounded-xl flex items-stretch gap-3">
           <div className="flex-1 flex flex-col justify-between">
             <div className="px-1">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Thông tin chuyển khoản</p>
@@ -306,7 +309,136 @@ const PublicInvoiceReceipt = ({ session, invoice }) => {
             />
           </div>
         </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={onTransferClick}
+            className="flex items-center justify-center gap-2 rounded-xl bg-blue-700 py-3 text-[10px] font-black uppercase text-white shadow-sm active:scale-95"
+          >
+            <WalletCards className="h-4 w-4" />
+            Chuyển khoản
+          </button>
+          <button
+            type="button"
+            onClick={onPaymentNotice}
+            disabled={isPaymentNotifying || ['paid', 'completed', 'done'].includes(String(bill.status || '').toLowerCase())}
+            className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-[10px] font-black uppercase text-white shadow-sm active:scale-95 disabled:bg-slate-300"
+          >
+            {isPaymentNotifying ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+            Đã thanh toán
+          </button>
+        </div>
+
+        {paymentNoticeMessage ? (
+          <p className="rounded-xl bg-emerald-50 px-3 py-2 text-center text-[11px] font-bold text-emerald-700">
+            {paymentNoticeMessage}
+          </p>
+        ) : null}
       </div>
+
+      {isTransferOpen ? (
+        <div className="fixed inset-0 z-[900] flex items-end justify-center bg-slate-950/55 px-4 pb-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl animate-in slide-in-from-bottom-4 duration-200">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 p-4">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">Chuyển khoản</p>
+                <h2 className="mt-1 text-lg font-black text-slate-950">Quét QR thanh toán</h2>
+              </div>
+              <button
+                type="button"
+                onClick={onTransferClose}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 active:scale-95"
+                aria-label="Đóng"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="p-4">
+              <div className="mx-auto flex h-56 w-56 items-center justify-center rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+                <img
+                  src={qrSrc}
+                  alt="QR chuyển khoản"
+                  className="h-full w-full object-contain"
+                  crossOrigin="anonymous"
+                />
+              </div>
+
+              <div className="mt-4 space-y-2 rounded-xl bg-slate-50 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[10px] font-black uppercase text-slate-400">Ngân hàng</span>
+                  <span className="max-w-[190px] truncate text-sm font-black uppercase text-purple-700">{bankName}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[10px] font-black uppercase text-slate-400">STK</span>
+                  <span className="text-sm font-black text-blue-700">{bankAcc}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[10px] font-black uppercase text-slate-400">Số tiền</span>
+                  <span className="text-sm font-black text-emerald-700">{formatN(bill.total)} đ</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-[10px] font-black uppercase text-slate-400">Nội dung</span>
+                  <span className="text-sm font-black text-slate-900">{qrAddInfo}</span>
+                </div>
+              </div>
+
+              {transferCopyMessage ? (
+                <p className="mt-3 rounded-xl bg-emerald-50 px-3 py-2 text-center text-[11px] font-bold text-emerald-700">
+                  {transferCopyMessage}
+                </p>
+              ) : null}
+
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => onCopyTransfer?.('stk', bankAcc)}
+                  className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 py-2.5 text-[10px] font-black uppercase text-slate-700 active:scale-95"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                  STK
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onCopyTransfer?.('amount', String(bill.total))}
+                  className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 py-2.5 text-[10px] font-black uppercase text-slate-700 active:scale-95"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                  Số tiền
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onCopyTransfer?.('content', qrAddInfo)}
+                  className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 py-2.5 text-[10px] font-black uppercase text-slate-700 active:scale-95"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                  Nội dung
+                </button>
+              </div>
+
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => onCopyTransfer?.('all', { bankName, bankAcc, amount: bill.total, addInfo: qrAddInfo })}
+                  className="flex items-center justify-center gap-2 rounded-xl bg-blue-700 py-3 text-[10px] font-black uppercase text-white shadow-sm active:scale-95"
+                >
+                  <Copy className="h-4 w-4" />
+                  Copy tất cả
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDownloadQr?.({ qrSrc, roomId: bill.roomId, period: bill.currentMonthFull })}
+                  className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-[10px] font-black uppercase text-white shadow-sm active:scale-95"
+                >
+                  <Download className="h-4 w-4" />
+                  Lưu QR
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <div className="pb-3 text-center mt-1">
         <p className="text-[10px] text-slate-400 font-semibold italic">Cảm ơn quý khách đã tin tưởng Lucky Home!</p>
@@ -323,10 +455,14 @@ const MeterReadingPublicView = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isCorrectionOpen, setIsCorrectionOpen] = useState(false);
+  const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [isCorrectionSubmitting, setIsCorrectionSubmitting] = useState(false);
+  const [isPaymentNotifying, setIsPaymentNotifying] = useState(false);
   const [correctionNote, setCorrectionNote] = useState('');
   const [correctionImageDataUrl, setCorrectionImageDataUrl] = useState('');
   const [correctionMessage, setCorrectionMessage] = useState('');
+  const [paymentNoticeMessage, setPaymentNoticeMessage] = useState('');
+  const [transferCopyMessage, setTransferCopyMessage] = useState('');
   const [error, setError] = useState('');
   const [cameraError, setCameraError] = useState('');
   const [stream, setStream] = useState(null);
@@ -338,11 +474,11 @@ const MeterReadingPublicView = () => {
   const correctionFileRef = useRef(null);
 
   const activeMeter = session?.meters?.[activeIndex];
-  const completedCount = session?.meters?.filter(meter => meter.newVal !== '' && meter.newVal !== null).length || 0;
+  const completedCount = session?.meters?.filter(meter => meter.hasFreshImage && meter.newVal !== '' && meter.newVal !== null).length || 0;
   const allDone = session?.meters?.length > 0 && completedCount === session.meters.length;
   const invoicePreview = session?.invoice || null;
   const roomDisplayName = session?.room?.roomCode ? `P.${session.room.roomCode}` : 'Phòng cần ghi điện';
-  const currentDone = activeMeter?.newVal !== '' && activeMeter?.newVal !== null;
+  const currentDone = Boolean(activeMeter?.hasFreshImage && activeMeter?.newVal !== '' && activeMeter?.newVal !== null);
   const activeUsage = activeMeter
     ? Math.max(parseN(String(activeMeter.newVal || 0)) - parseN(String(activeMeter.oldVal || 0)), 0)
     : 0;
@@ -351,6 +487,49 @@ const MeterReadingPublicView = () => {
   const statusPill = invoicePreview || isSubmitted ? 'Hoàn tất' : 'Chưa hoàn tất';
 
   const isInvoicePaid = ['paid', 'completed', 'done'].includes(String(invoicePreview?.status || '').toLowerCase());
+
+  const handleTransferClick = useCallback(() => {
+    setTransferCopyMessage('');
+    setIsTransferOpen(true);
+  }, []);
+
+  const handleCopyTransfer = useCallback(async (type, value) => {
+    const copyConfig = {
+      stk: { text: String(value || ''), message: 'Đã copy số tài khoản.' },
+      amount: { text: String(value || ''), message: 'Đã copy số tiền.' },
+      content: { text: String(value || ''), message: 'Đã copy nội dung chuyển khoản.' },
+      all: {
+        text: `Ngan hang: ${value?.bankName || ''}\nSTK: ${value?.bankAcc || ''}\nSo tien: ${formatN(value?.amount || 0)} d\nNoi dung: ${value?.addInfo || ''}`,
+        message: 'Đã copy đầy đủ thông tin chuyển khoản.',
+      },
+    };
+    const selected = copyConfig[type] || copyConfig.all;
+
+    try {
+      await navigator.clipboard.writeText(selected.text);
+      setTransferCopyMessage(selected.message);
+    } catch {
+      setTransferCopyMessage('Không copy tự động được. Vui lòng copy thủ công thông tin bên trên.');
+    }
+  }, []);
+
+  const handleDownloadQr = useCallback(async ({ qrSrc, roomId, period }) => {
+    try {
+      const response = await fetch(qrSrc);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `QR-P${roomId}-${String(period || '').replace('/', '-')}.png`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setTransferCopyMessage('Đã lưu ảnh QR.');
+    } catch {
+      setTransferCopyMessage('Không lưu được QR. Bạn có thể chụp màn hình QR để thanh toán.');
+    }
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -419,6 +598,39 @@ const MeterReadingPublicView = () => {
     setTorchOn(false);
   }, [stream]);
 
+  const processMeterImage = useCallback(async (meter, imageDataUrl) => {
+    if (!meter || !imageDataUrl) return;
+
+    setError('');
+    updateMeter(meter.id, {
+      imageDataUrl,
+      imageUrl: '',
+      hasFreshImage: true,
+      warnings: [],
+      confidence: null,
+      newVal: meter.newVal || '',
+    });
+
+    try {
+      const result = await requestPublicJson(
+        `/meter-reading/session/${encodeURIComponent(roomToken)}/meters/${encodeURIComponent(meter.id)}/ocr`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ imageDataUrl }),
+        },
+      );
+      updateMeter(meter.id, {
+        newVal: result.detectedValue ?? meter.newVal,
+        confidence: result.confidence ?? 0.8,
+        imageUrl: result.imageUrl || '',
+        warnings: result.warnings || [],
+      });
+    } catch (ocrError) {
+      updateMeter(meter.id, { confidence: 0 });
+      setError(ocrError.message || 'Không nhận diện được chỉ số. Vui lòng nhập tay.');
+    }
+  }, [roomToken, updateMeter]);
+
   const toggleTorch = useCallback(async () => {
     const track = stream?.getVideoTracks?.()[0];
     const capabilities = track?.getCapabilities?.();
@@ -452,15 +664,9 @@ const MeterReadingPublicView = () => {
     ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
     const imageDataUrl = canvas.toDataURL('image/jpeg', 0.88);
 
-    updateMeter(activeMeter.id, {
-      imageDataUrl,
-      imageUrl: '',
-      warnings: [],
-      confidence: activeMeter.confidence,
-      newVal: activeMeter.newVal || '',
-    });
     stopCamera();
-  }, [activeMeter, stopCamera, updateMeter]);
+    await processMeterImage(activeMeter, imageDataUrl);
+  }, [activeMeter, processMeterImage, stopCamera]);
 
   const handleFilePicked = useCallback(async (event) => {
     const file = event.target.files?.[0];
@@ -468,18 +674,12 @@ const MeterReadingPublicView = () => {
 
     try {
       const imageDataUrl = await compressImageFile(file);
-      updateMeter(activeMeter.id, {
-        imageDataUrl,
-        imageUrl: '',
-        warnings: [],
-        confidence: activeMeter.confidence,
-        newVal: activeMeter.newVal || '',
-      });
+      await processMeterImage(activeMeter, imageDataUrl);
     } catch (imageError) {
       setError(imageError.message || 'Không xử lý được ảnh.');
     }
     event.target.value = '';
-  }, [activeMeter, updateMeter]);
+  }, [activeMeter, processMeterImage]);
 
   const handleCorrectionImagePicked = useCallback(async (event) => {
     const file = event.target.files?.[0];
@@ -520,6 +720,12 @@ const MeterReadingPublicView = () => {
 
   const submitReading = useCallback(async () => {
     if (!session || !allDone) return;
+
+    const missingImageMeter = session.meters.find(meter => !meter.hasFreshImage);
+    if (missingImageMeter) {
+      setError(`${missingImageMeter.name}: vui lòng chụp hoặc chọn ảnh công tơ mới trước khi gửi.`);
+      return;
+    }
 
     const invalidMeter = session.meters.find(meter => parseN(String(meter.newVal)) < parseN(String(meter.oldVal)));
     if (invalidMeter) {
@@ -599,6 +805,32 @@ const MeterReadingPublicView = () => {
     }
   }, [correctionImageDataUrl, correctionNote, invoicePreview, isInvoicePaid, roomToken, session]);
 
+  const notifyPaymentCompleted = useCallback(async () => {
+    if (!session || !invoicePreview || isInvoicePaid) return;
+
+    try {
+      setError('');
+      setPaymentNoticeMessage('');
+      setIsPaymentNotifying(true);
+      await requestPublicJson(`/meter-reading/session/${encodeURIComponent(roomToken)}/payment-confirmation`, {
+        method: 'POST',
+        body: JSON.stringify({
+          billId: invoicePreview.id,
+          houseId: session.houseId,
+          roomId: session.room.id,
+          roomCode: session.room.roomCode,
+          period: invoicePreview.currentMonthFull || invoicePreview.period || session.period,
+          total: invoicePreview.total || 0,
+        }),
+      });
+      setPaymentNoticeMessage('Đã báo chủ nhà kiểm tra thanh toán. Cảm ơn bạn!');
+    } catch (paymentError) {
+      setError(paymentError.message || 'Không gửi được thông báo thanh toán. Vui lòng thử lại.');
+    } finally {
+      setIsPaymentNotifying(false);
+    }
+  }, [invoicePreview, isInvoicePaid, roomToken, session]);
+
   const moveNext = () => setActiveIndex(index => Math.min(index + 1, (session?.meters?.length || 1) - 1));
 
   const handlePrimaryAction = () => {
@@ -654,113 +886,46 @@ const MeterReadingPublicView = () => {
   return (
     <div className="min-h-screen bg-slate-200 text-slate-900">
       <div className="mx-auto flex h-screen w-full max-w-lg flex-col overflow-hidden bg-[#f6f8fb] shadow-2xl">
-        <header className="relative z-30 shrink-0 bg-[#f6f8fb] px-4 pt-4 pb-3">
-          <div className="relative overflow-hidden rounded-[24px] bg-gradient-to-br from-blue-800 via-blue-600 to-sky-400 px-5 py-6 text-white shadow-xl shadow-blue-900/20">
+        <header className="relative z-30 shrink-0 bg-[#f6f8fb] px-4 pt-3 pb-1.5">
+          <div className="relative overflow-hidden rounded-[20px] bg-gradient-to-br from-blue-800 via-blue-600 to-sky-400 px-4 py-4 text-white shadow-xl shadow-blue-900/20">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(255,255,255,0.24),transparent_26%),radial-gradient(circle_at_85%_15%,rgba(14,165,233,0.28),transparent_30%)]" />
-            <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-r from-cyan-400/30 via-sky-300/20 to-blue-300/30 [clip-path:ellipse(75%_45%_at_50%_100%)]" />
-            <div className="absolute bottom-8 left-5 grid grid-cols-5 gap-2 opacity-20">
-              {Array.from({ length: 25 }).map((_, index) => (
-                <span key={index} className="h-1 w-1 rounded-full bg-white" />
-              ))}
-            </div>
-
-            <div className="relative flex min-h-[92px] items-center gap-4">
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[20px] bg-white/18 text-white ring-1 ring-white/25 shadow-lg shadow-blue-950/20 backdrop-blur">
-                <Home className="h-8 w-8" />
-              </div>
-              <div className="min-w-0 flex-1">
+            <div className="relative flex min-h-[76px] items-center">
+              <div className="min-w-0 flex-1 text-center">
                 {session.room.houseName ? (
-                  <p className="truncate text-[11px] font-black uppercase tracking-widest text-blue-100">
+                  <p className="truncate text-[10px] font-black uppercase tracking-widest text-blue-100">
                     {session.room.houseName}
                   </p>
                 ) : null}
-                <h1 className="mt-1.5 truncate text-[32px] font-black leading-none tracking-tight text-white drop-shadow-sm">
+                <h1 className="mt-1 truncate text-[28px] font-black leading-none tracking-tight text-white drop-shadow-sm">
                   {roomDisplayName}
                 </h1>
                 {session.room.tenantName ? (
-                  <p className="mt-3 truncate text-xs font-semibold text-blue-100/90">
+                  <p className="mt-2 truncate text-xs font-semibold text-blue-100/90">
                     {session.room.tenantName}
                   </p>
                 ) : null}
+                <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+                  <span className="rounded-full bg-white px-3 py-1.5 text-[11px] font-black uppercase tracking-wide text-blue-700 shadow-sm ring-1 ring-white/70">
+                    {session.period}
+                  </span>
+                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${invoicePreview || isSubmitted ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                    {statusLabel} - {statusPill}
+                  </span>
+                </div>
               </div>
-            </div>
-          </div>
-
-          <div className="mt-3 grid grid-cols-3 gap-2.5">
-            <div className="flex min-h-[116px] flex-col items-center rounded-2xl border border-slate-100 bg-white p-3 text-center shadow-lg shadow-slate-200/70">
-              <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-blue-50 text-blue-600">
-                <Calendar className="h-4.5 w-4.5" />
-              </div>
-              <p className="text-[8px] font-black uppercase tracking-widest text-slate-400 leading-tight">Kỳ ghi chỉ số</p>
-              <p className="mt-1.5 text-[15px] font-black leading-none text-slate-950">{session.period}</p>
-            </div>
-            <div className="flex min-h-[116px] flex-col items-center rounded-2xl border border-slate-100 bg-white p-3 text-center shadow-lg shadow-slate-200/70">
-              <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
-                <WalletCards className="h-4.5 w-4.5" />
-              </div>
-              <p className="text-[8px] font-black uppercase tracking-widest text-slate-400 leading-tight">Tiến độ</p>
-              <p className="mt-1.5 text-[15px] font-black leading-none text-slate-950">{completedCount}/{session.meters.length}</p>
-              <p className="mt-1 text-[9px] font-bold text-slate-500">công tơ</p>
-            </div>
-            <div className="flex min-h-[116px] flex-col items-center rounded-2xl border border-slate-100 bg-white p-3 text-center shadow-lg shadow-slate-200/70">
-              <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-violet-50 text-violet-600">
-                <CheckCircle2 className="h-4.5 w-4.5" />
-              </div>
-              <p className="text-[8px] font-black uppercase tracking-widest text-slate-400 leading-tight">Trạng thái</p>
-              <p className="mt-1.5 text-[15px] font-black leading-none text-blue-700">{statusLabel}</p>
-              <p className={`mt-2 inline-flex rounded-full px-2 py-0.5 text-[9px] font-black ${invoicePreview || isSubmitted ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                {statusPill}
-              </p>
             </div>
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto px-4 pb-32 pt-4 space-y-4 no-scrollbar">
-          {invoicePreview ? (
-            <section className="rounded-xl border border-emerald-100 bg-white p-4 shadow-sm">
-              <div className="flex items-center gap-3 text-emerald-700">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50">
-                  <CheckCircle2 className="h-5 w-5" />
-                </div>
-                <div>
-                  <h2 className="text-sm font-black">Đã nhận chỉ số công tơ</h2>
-                  <p className="mt-0.5 text-xs font-semibold text-emerald-700/80">Bạn có thể kiểm tra hóa đơn bên dưới.</p>
-                </div>
-              </div>
-            </section>
-          ) : null}
-
-          {!invoicePreview ? (
-            <section className="rounded-xl border border-blue-100 bg-white p-4 shadow-sm">
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
-                  <Zap className="h-5 w-5" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-black text-slate-950">Kỳ ghi chỉ số: {session.period}</p>
-                  <p className="mt-1 text-xs font-semibold leading-relaxed text-slate-500">
-                    Chụp rõ vùng số trên công tơ, kiểm tra lại chỉ số rồi gửi. Hóa đơn sẽ được tạo sau khi gửi đủ dữ liệu.
-                  </p>
-                </div>
-              </div>
-            </section>
-          ) : null}
-
+        <main className="flex-1 overflow-y-auto px-4 pb-32 pt-1.5 space-y-2 no-scrollbar">
           {!invoicePreview && (
-            <section className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">Danh sách công tơ</p>
-                  <p className="mt-0.5 text-sm font-black text-slate-900">Hoàn tất từng mục bên dưới</p>
+            <section className="rounded-xl border border-slate-200/80 bg-white px-3 py-2 shadow-sm">
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+                <div className="shrink-0 rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-black text-blue-700">
+                  {completedCount}/{session.meters.length}
                 </div>
-                <div className="rounded-full bg-blue-50 px-3 py-1 text-[11px] font-black text-blue-700">
-                  {Math.round((completedCount / Math.max(session.meters.length, 1)) * 100)}%
-                </div>
-              </div>
-
-              <div className="mt-3 space-y-2">
                 {session.meters.map((meter, index) => {
-                  const done = meter.newVal !== '' && meter.newVal !== null;
+                  const done = meter.hasFreshImage && meter.newVal !== '' && meter.newVal !== null;
                   const selected = index === activeIndex;
 
                   return (
@@ -768,22 +933,15 @@ const MeterReadingPublicView = () => {
                       key={meter.id}
                       type="button"
                       onClick={() => setActiveIndex(index)}
-                      className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-all ${selected ? 'border-blue-500 bg-blue-50 shadow-sm ring-2 ring-blue-100' : 'border-slate-100 bg-slate-50/70 hover:bg-white'
+                      className={`flex shrink-0 items-center gap-2 rounded-full border px-2.5 py-1.5 text-left transition-all ${selected ? 'border-blue-500 bg-blue-50 shadow-sm ring-2 ring-blue-100' : 'border-slate-100 bg-slate-50/70 hover:bg-white'
                         }`}
                     >
-                      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${done ? 'bg-emerald-100 text-emerald-700' : selected ? 'bg-blue-600 text-white' : 'bg-white text-slate-400 ring-1 ring-slate-200'}`}>
-                        {done ? <CheckCircle2 className="h-5 w-5" /> : <Zap className="h-5 w-5" />}
+                      <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${done ? 'bg-emerald-100 text-emerald-700' : selected ? 'bg-blue-600 text-white' : 'bg-white text-slate-400 ring-1 ring-slate-200'}`}>
+                        {done ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Zap className="h-3.5 w-3.5" />}
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-black text-slate-900">{meter.name}</p>
-                        <p className="mt-0.5 text-xs font-semibold text-slate-500">Cũ {formatN(meter.oldVal)} kWh</p>
-                      </div>
-                      <div className="text-right">
-                        <p className={`text-xs font-black ${done ? 'text-emerald-600' : 'text-slate-400'}`}>
-                          {done ? formatN(meter.newVal) : 'Chưa ghi'}
-                        </p>
-                        {selected ? <p className="mt-0.5 text-[9px] font-black uppercase text-blue-600">Đang chọn</p> : null}
-                      </div>
+                      <span className={`max-w-[136px] truncate text-xs font-black ${selected ? 'text-blue-700' : 'text-slate-700'}`}>
+                        {meter.name}
+                      </span>
                     </button>
                   );
                 })}
@@ -793,56 +951,56 @@ const MeterReadingPublicView = () => {
 
           {!invoicePreview && activeMeter ? (
             <section className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
-              <div className="bg-gradient-to-r from-blue-50 to-sky-50 p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">Bước {activeIndex + 1} / {session.meters.length}</p>
-                    <h2 className="mt-1 text-lg font-black text-slate-950">{activeMeter.name}</h2>
+              <div className="bg-gradient-to-r from-blue-50 to-sky-50 px-2.5 py-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-blue-600">Bước {activeIndex + 1} / {session.meters.length}</p>
+                    <h2 className="mt-0.5 truncate text-sm font-black text-slate-950">{activeMeter.name}</h2>
                   </div>
-                  <div className="rounded-xl bg-white px-3 py-2 text-right shadow-sm ring-1 ring-blue-100">
-                    <p className="text-[9px] font-black uppercase tracking-widest text-blue-400">Tiêu thụ</p>
-                    <p className="mt-0.5 text-lg font-black text-blue-700">{formatN(activeUsage)}</p>
+                  <div className="w-[112px] shrink-0 rounded-lg bg-white px-2 py-1.5 text-right shadow-sm ring-1 ring-blue-100">
+                    <p className="text-[8px] font-black uppercase tracking-wider text-blue-400">Tiêu thụ</p>
+                    <p className="text-base font-black leading-tight text-blue-700">{formatN(activeUsage)}</p>
                   </div>
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-2">
-                  <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Chỉ số cũ</p>
-                    <p className="mt-1 text-xl font-black text-slate-700">{formatN(activeMeter.oldVal)}</p>
+                <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+                  <div className="rounded-lg border border-slate-200 bg-white px-2 py-1 shadow-sm">
+                    <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">Chỉ số cũ</p>
+                    <p className="text-sm font-black text-slate-700">{formatN(activeMeter.oldVal)}</p>
                   </div>
-                  <div className="rounded-xl border border-blue-200 bg-white p-3 shadow-sm">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-blue-500">Chỉ số mới</p>
-                    <p className="mt-1 text-xl font-black text-blue-700">{activeMeter.newVal ? formatN(activeMeter.newVal) : '...'}</p>
+                  <div className="rounded-lg border border-blue-200 bg-white px-2 py-1 shadow-sm">
+                    <p className="text-[8px] font-black uppercase tracking-widest text-blue-500">Chỉ số mới</p>
+                    <p className="text-sm font-black text-blue-700">{activeMeter.newVal ? formatN(activeMeter.newVal) : '...'}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="p-4">
-                <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-950 shadow-sm">
+              <div className="p-2">
+                <div className="overflow-hidden rounded-xl border-2 border-blue-200 bg-slate-950 shadow-lg shadow-blue-100">
                   {isCameraOn ? (
-                    <div className="relative aspect-[3/4]">
+                    <div className="relative aspect-video">
                       <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
                       <div className="absolute inset-0 bg-slate-950/35" />
                       <div
                         ref={overlayRef}
-                        className="absolute left-1/2 top-1/2 h-24 w-[82%] -translate-x-1/2 -translate-y-1/2 rounded-xl border-2 border-white shadow-[0_0_0_999px_rgba(2,6,23,0.58)]"
+                        className="absolute left-1/2 top-1/2 h-16 w-[82%] -translate-x-1/2 -translate-y-1/2 rounded-xl border-2 border-white shadow-[0_0_0_999px_rgba(2,6,23,0.58)]"
                       >
-                        <div className="absolute -top-9 left-0 right-0 text-center text-xs font-black uppercase tracking-wider text-white">
+                        <div className="absolute -top-7 left-0 right-0 text-center text-[10px] font-black uppercase tracking-wider text-white">
                           Căn dãy số vào khung
                         </div>
-                        <div className="absolute -bottom-8 left-0 right-0 text-center text-[11px] font-semibold text-white/90">
+                        <div className="absolute -bottom-6 left-0 right-0 text-center text-[10px] font-semibold text-white/90">
                           Chụp rõ vùng số, tránh lóa sáng
                         </div>
                       </div>
-                      <div className="absolute bottom-5 left-0 right-0 flex items-center justify-center gap-4">
-                        <button type="button" onClick={toggleTorch} className="flex h-12 w-12 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur">
-                          <Flashlight className="h-5 w-5" />
+                      <div className="absolute bottom-3 left-0 right-0 flex items-center justify-center gap-3">
+                        <button type="button" onClick={toggleTorch} className="flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur">
+                          <Flashlight className="h-4 w-4" />
                         </button>
-                        <button type="button" onClick={captureFrame} className="flex h-16 w-16 items-center justify-center rounded-full bg-white text-slate-950 shadow-xl">
-                          <Camera className="h-7 w-7" />
+                        <button type="button" onClick={captureFrame} className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-slate-950 shadow-xl">
+                          <Camera className="h-6 w-6" />
                         </button>
-                        <button type="button" onClick={stopCamera} className="flex h-12 w-12 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur">
-                          <RotateCcw className="h-5 w-5" />
+                        <button type="button" onClick={stopCamera} className="flex h-10 w-10 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur">
+                          <RotateCcw className="h-4 w-4" />
                         </button>
                       </div>
                     </div>
@@ -854,13 +1012,13 @@ const MeterReadingPublicView = () => {
                       </div>
                     </div>
                   ) : (
-                    <div className="flex aspect-video flex-col items-center justify-center gap-3 bg-slate-900 text-slate-300">
-                      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10">
-                        <Camera className="h-7 w-7" />
+                    <div className="flex aspect-video flex-col items-center justify-center gap-2 bg-slate-900 text-slate-300">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-500/20 text-blue-100 ring-1 ring-blue-300/25">
+                        <Camera className="h-6 w-6" />
                       </div>
                       <div className="text-center">
-                        <p className="text-sm font-black text-white">Chụp vùng chỉ số công tơ</p>
-                        <p className="mt-1 text-xs font-semibold text-slate-400">Ảnh sẽ được crop theo khung để nhận diện chính xác hơn.</p>
+                        <p className="text-xs font-black text-white">Chụp vùng chỉ số công tơ</p>
+                        <p className="mt-0.5 text-[11px] font-semibold text-slate-400">Canh rõ dãy số trong khung.</p>
                       </div>
                     </div>
                   )}
@@ -873,7 +1031,7 @@ const MeterReadingPublicView = () => {
                   </div>
                 ) : null}
 
-                <div className="mt-3 grid grid-cols-2 gap-2">
+                <div className="mt-2 grid grid-cols-2 gap-2">
                   <button type="button" onClick={startCamera} className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 py-3 text-xs font-black uppercase text-white shadow-sm active:scale-95">
                     <Camera className="h-4 w-4" /> Mở camera
                   </button>
@@ -921,51 +1079,80 @@ const MeterReadingPublicView = () => {
           ) : null}
 
           {invoicePreview ? (
-            <PublicInvoiceReceipt session={session} invoice={invoicePreview} />
+            <PublicInvoiceReceipt
+              session={session}
+              invoice={invoicePreview}
+              isPaymentNotifying={isPaymentNotifying}
+              paymentNoticeMessage={paymentNoticeMessage}
+              isTransferOpen={isTransferOpen}
+              transferCopyMessage={transferCopyMessage}
+              onTransferClick={handleTransferClick}
+              onTransferClose={() => setIsTransferOpen(false)}
+              onCopyTransfer={handleCopyTransfer}
+              onDownloadQr={handleDownloadQr}
+              onPaymentNotice={notifyPaymentCompleted}
+            />
           ) : null}
 
           {invoicePreview ? (
-            <section className="rounded-xl border border-amber-100 bg-white p-4 shadow-sm">
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-700">
-                  <AlertTriangle className="h-5 w-5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-sm font-black text-slate-950">Phát hiện chỉ số bị sai ?</h2>
+            <section className="rounded-xl border border-amber-100 bg-amber-50/40 p-3 shadow-sm">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">Cần kiểm tra lại?</p>
+                  <h2 className="mt-0.5 text-sm font-black text-slate-950">Báo sai chỉ số công tơ</h2>
                   <p className="mt-1 text-xs font-semibold leading-relaxed text-slate-500">
-                    Gửi yêu cầu kiểm tra lại để chủ nhà xác nhận trước khi điều chỉnh hóa đơn.
+                    Gửi ghi chú để chủ nhà đối soát trước khi điều chỉnh hóa đơn.
                   </p>
-                  {isInvoicePaid ? (
-                    <p className="mt-3 rounded-xl bg-slate-50 p-3 text-xs font-bold text-slate-600">
-                      Hóa đơn đã thanh toán. Vui lòng liên hệ chủ nhà để được hỗ trợ điều chỉnh thủ công.
-                    </p>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setError('');
-                        setCorrectionMessage('');
-                        setIsCorrectionOpen(true);
-                      }}
-                      className="mt-3 w-full rounded-xl border border-amber-200 bg-amber-50 py-3 text-xs font-black uppercase text-amber-800 active:scale-95"
-                    >
-                      Báo sai chỉ số
-                    </button>
-                  )}
+                </div>
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-amber-700 shadow-sm ring-1 ring-amber-100">
+                  <AlertTriangle className="h-4.5 w-4.5" />
                 </div>
               </div>
+              {isInvoicePaid ? (
+                <p className="mt-3 rounded-xl bg-white p-3 text-xs font-bold leading-relaxed text-slate-600 ring-1 ring-slate-100">
+                  Hóa đơn đã thanh toán. Vui lòng liên hệ chủ nhà để được hỗ trợ điều chỉnh thủ công.
+                </p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError('');
+                    setCorrectionMessage('');
+                    setIsCorrectionOpen(true);
+                  }}
+                  className="mt-3 w-full rounded-xl bg-amber-600 py-3 text-xs font-black uppercase text-white shadow-sm active:scale-95"
+                >
+                  Báo sai chỉ số
+                </button>
+              )}
             </section>
           ) : null}
 
           {correctionMessage ? (
-            <div className="rounded-xl bg-emerald-50 p-3 text-center text-xs font-bold text-emerald-700">
-              {correctionMessage}
+            <div className="flex items-start gap-3 rounded-xl border border-emerald-100 bg-emerald-50/80 p-3 shadow-sm">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-emerald-600 ring-1 ring-emerald-100">
+                <CheckCircle2 className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700">Đã gửi yêu cầu</p>
+                <p className="mt-0.5 text-xs font-bold leading-relaxed text-emerald-800">
+                  {correctionMessage}
+                </p>
+              </div>
             </div>
           ) : null}
 
           {error ? (
-            <div className="rounded-xl bg-red-50 p-3 text-center text-xs font-bold text-red-700">
-              {error}
+            <div className="flex items-start gap-3 rounded-xl border border-red-100 bg-red-50/80 p-3 shadow-sm">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-red-600 ring-1 ring-red-100">
+                <AlertTriangle className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-widest text-red-700">Cần kiểm tra</p>
+                <p className="mt-0.5 text-xs font-bold leading-relaxed text-red-800">
+                  {error}
+                </p>
+              </div>
             </div>
           ) : null}
         </main>

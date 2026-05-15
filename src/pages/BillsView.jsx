@@ -17,6 +17,8 @@ const BillsView = ({
             const hId = String(highlightedItemId);
             const targetBill = currentBills.find(b => String(b.id) === hId || String(b.roomId) === hId);
             if (targetBill) {
+                setBottomSheet({ type: 'bill', data: targetBill });
+                if (setHighlightedItemId) setHighlightedItemId(null);
                 let attempts = 0;
                 const scrollInterval = setInterval(() => {
                     const element = document.getElementById(`bill-card-${targetBill.id}`);
