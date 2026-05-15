@@ -583,7 +583,7 @@ const drawFooter = (ctx, width, height) => {
 
 };
 
-const buildQrCardDataUrl = async ({
+export const buildQrCardDataUrl = async ({
   qrDataUrl,
   label,
   houseLabel,
@@ -655,6 +655,32 @@ const buildQrCardDataUrl = async ({
   return canvas.toDataURL('image/png');
 };
 
+export const buildMeterReadingQrCardDataUrl = async ({
+  link,
+  label,
+  houseLabel,
+  roomLabel
+}) => {
+  const qrDataUrl = await QRCode.toDataURL(link, {
+    errorCorrectionLevel: 'M',
+    margin: 2,
+    width: 320,
+    color: {
+      dark: '#dc2626',
+      light: '#ffffff',
+    },
+  });
+
+  const cardDataUrl = await buildQrCardDataUrl({
+    qrDataUrl,
+    label,
+    houseLabel,
+    roomLabel,
+  });
+
+  return { qrDataUrl, cardDataUrl };
+};
+
 const MeterReadingLinkQrModal = ({ linkInfo, onClose, onCopy }) => {
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [qrCardDataUrl, setQrCardDataUrl] = useState('');
@@ -674,16 +700,12 @@ const MeterReadingLinkQrModal = ({ linkInfo, onClose, onCopy }) => {
 
       try {
         setIsRendering(true);
-        const dataUrl = await QRCode.toDataURL(link, {
-          errorCorrectionLevel: 'M',
-          margin: 2,
-          width: 320,
-          color: {
-            dark: '#dc2626',
-            light: '#ffffff',
-          },
+        const { qrDataUrl: dataUrl, cardDataUrl } = await buildMeterReadingQrCardDataUrl({
+          link,
+          label,
+          houseLabel,
+          roomLabel,
         });
-        const cardDataUrl = await buildQrCardDataUrl({ qrDataUrl: dataUrl, label, houseLabel, roomLabel });
         if (!cancelled) {
           setQrDataUrl(dataUrl);
           setQrCardDataUrl(cardDataUrl);

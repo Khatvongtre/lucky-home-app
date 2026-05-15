@@ -61,6 +61,8 @@ const BillReceipt = ({
     if (!bottomSheet || bottomSheet.type !== 'bill') return null;
 
     const bill = bottomSheet.data;
+    const isBillPaid = ['paid', 'completed', 'done'].includes(String(bill.status || '').toLowerCase());
+    const canEditPendingBill = !isBillPaid;
     const meterImages = buildMeterImages(bill, API_URL)
         .filter(item => item.src && !failedMeterImages[item.src]);
     const bankBin = config.bankBin || '970422';
@@ -169,7 +171,7 @@ const BillReceipt = ({
 
                                 <div className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200 last:border-0">
                                     <span className="text-[11px] font-bold text-red-500 uppercase tracking-tight">Giảm giá</span>
-                                    {bottomSheet.data.status === 'pending' && isManagerOrAbove && !isGeneratingImage ? (
+                                    {canEditPendingBill && isManagerOrAbove && !isGeneratingImage ? (
                                         <div className="flex items-center space-x-1 border-b border-dashed border-red-200 pb-0.5">
                                             <span className="text-red-500 font-bold">-</span>
                                             <input
@@ -262,12 +264,12 @@ const BillReceipt = ({
                         <div className="flex gap-2">
                             <button
                                 onClick={() => handleDeleteBill(bottomSheet.data.id)}
-                                className={`bg-red-500 text-white py-3.5 rounded-xl font-black text-[10px] uppercase active:scale-95 border-b-2 border-red-700 flex items-center justify-center gap-1.5 transition-all shadow-sm ${bottomSheet.data.status === 'pending' ? 'w-1/3' : 'w-full'}`}
+                                className={`bg-red-500 text-white py-3.5 rounded-xl font-black text-[10px] uppercase active:scale-95 border-b-2 border-red-700 flex items-center justify-center gap-1.5 transition-all shadow-sm ${canEditPendingBill ? 'w-1/3' : 'w-full'}`}
                             >
                                 <Trash2 className="w-4 h-4" /> Xóa
                             </button>
 
-                            {bottomSheet.data.status === 'pending' && (
+                            {canEditPendingBill && (
                                 <button
                                     onClick={() => handlePayBill(bottomSheet.data.id)}
                                     className="flex-1 bg-emerald-600 text-white py-3.5 rounded-xl font-black text-[10px] uppercase active:scale-95 border-b-2 border-emerald-800 flex items-center justify-center gap-1.5 transition-all shadow-sm"

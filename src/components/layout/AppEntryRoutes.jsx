@@ -1,6 +1,7 @@
 import React, { Suspense, lazy } from 'react';
 import ToastNotification from '../common/Toast';
 import PageLoading from '../common/PageLoading';
+import ConfirmDialog from '../common/ConfirmDialog';
 
 const AuthView = lazy(() => import('../../pages/AuthView'));
 const HubView = lazy(() => import('../../pages/HubView'));
@@ -31,26 +32,36 @@ const AppEntryRoutes = ({
   if (hubState.isHubMode) {
     return (
       <Suspense fallback={<PageLoading />}>
-        <HubView
-          user={hubState.user}
-          houses={hubState.houses}
-          setIsHubMode={hubState.setIsHubMode}
-          setActiveTab={hubState.setActiveTab}
-          setSelectedHouse={hubState.setSelectedHouse}
-          setConfig={hubState.setConfig}
-          setSearchQuery={hubState.setSearchQuery}
-          setEditingHouse={hubState.setEditingHouse}
-          setIsAiCreateHouseOpen={hubState.setIsAiCreateHouseOpen}
-          setIsAiPromptModalOpen={hubState.setIsAiPromptModalOpen}
-          setAiPrompt={hubState.setAiPrompt}
-          setIsListening={hubState.setIsListening}
-          showToast={showToast}
-          handleLogout={hubState.handleLogout}
-          toast={toast}
-          dashboardWarnings={hubState.dashboardWarnings}
-          setHighlightedItemId={hubState.setHighlightedItemId}
-          setViewDate={hubState.setViewDate}
-        />
+        <>
+          <HubView
+            user={hubState.user}
+            houses={hubState.houses}
+            setIsHubMode={hubState.setIsHubMode}
+            setActiveTab={hubState.setActiveTab}
+            setSelectedHouse={hubState.setSelectedHouse}
+            setConfig={hubState.setConfig}
+            setSearchQuery={hubState.setSearchQuery}
+            setEditingHouse={hubState.setEditingHouse}
+            setIsAiCreateHouseOpen={hubState.setIsAiCreateHouseOpen}
+            setIsAiPromptModalOpen={hubState.setIsAiPromptModalOpen}
+            setAiPrompt={hubState.setAiPrompt}
+            setIsListening={hubState.setIsListening}
+            showToast={showToast}
+            handleLogout={hubState.handleLogout}
+            toast={toast}
+            dashboardWarnings={hubState.dashboardWarnings}
+            setHighlightedItemId={hubState.setHighlightedItemId}
+            setViewDate={hubState.setViewDate}
+            viewDate={hubState.viewDate}
+            isManagerOrAbove={hubState.isManagerOrAbove}
+            requestConfirm={hubState.requestConfirm}
+          />
+          <ConfirmDialog
+            dialog={hubState.confirmDialog}
+            onCancel={() => hubState.closeConfirmDialog(false)}
+            onConfirm={() => hubState.closeConfirmDialog(true)}
+          />
+        </>
       </Suspense>
     );
   }

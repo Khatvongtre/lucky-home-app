@@ -419,6 +419,11 @@ const MainApp = () => {
         dashboardWarnings,
         setHighlightedItemId,
         setViewDate,
+        viewDate,
+        isManagerOrAbove,
+        requestConfirm,
+        confirmDialog,
+        closeConfirmDialog,
       }}
       houseSelectionState={{
         selectedHouse,
