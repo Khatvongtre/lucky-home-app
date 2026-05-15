@@ -17,6 +17,7 @@ const BillReceipt = ({
 }) => {
     // Local state quản lý riêng input giảm giá khi người dùng đang gõ
     const [discountDraftByBill, setDiscountDraftByBill] = useState({});
+    const [failedMeterImages, setFailedMeterImages] = useState({});
     const billKey = bottomSheet?.data?.id || 'none';
     const localDiscount = discountDraftByBill[billKey] ?? formatN(bottomSheet?.data?.details?.discount || 0);
     const setLocalDiscount = (value) => {
@@ -40,7 +41,7 @@ const BillReceipt = ({
             label: meter.name || `Công tơ ${index + 1}`,
             src: meter.imageUrl || meter.imageDataUrl,
         })) : []),
-    ].filter(item => item.src);
+    ].filter(item => item.src && !failedMeterImages[item.src]);
     const bankBin = config.bankBin || '970422';
     const bankAcc = config.bankAcc || '0';
     const qrAddInfo = `P${bill.roomId} ${bill.currentMonthFull}`;
@@ -188,7 +189,12 @@ const BillReceipt = ({
                                                 rel="noreferrer"
                                                 className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
                                             >
-                                                <img src={item.src} alt={item.label} className="aspect-video w-full object-cover" />
+                                                <img
+                                                    src={item.src}
+                                                    alt={item.label}
+                                                    className="aspect-video w-full object-cover"
+                                                    onError={() => setFailedMeterImages(prev => ({ ...prev, [item.src]: true }))}
+                                                />
                                                 <p className="truncate px-2 py-1.5 text-[10px] font-black text-slate-600">{item.label}</p>
                                             </a>
                                         ))}

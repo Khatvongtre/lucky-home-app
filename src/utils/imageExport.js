@@ -61,6 +61,14 @@ const fetchImageAsDataUrl = async (src, exportToken) => {
     });
 };
 
+const hideBrokenImage = (img) => {
+    const linkedTile = img.closest('a');
+    const target = linkedTile || img;
+
+    target.style.display = 'none';
+    target.setAttribute('data-export-hidden-image', 'true');
+};
+
 const inlineRenderedImages = async (sourceRoot, cloneRoot, exportToken) => {
     const sourceImages = Array.from(sourceRoot.querySelectorAll('img'));
     const cloneImages = Array.from(cloneRoot.querySelectorAll('img'));
@@ -76,7 +84,11 @@ const inlineRenderedImages = async (sourceRoot, cloneRoot, exportToken) => {
         try {
             cloneImg.src = await imageElementToDataUrl(sourceImg);
         } catch {
-            cloneImg.src = await fetchImageAsDataUrl(src, exportToken);
+            try {
+                cloneImg.src = await fetchImageAsDataUrl(src, exportToken);
+            } catch {
+                hideBrokenImage(cloneImg);
+            }
         }
     }));
 };
