@@ -27,6 +27,20 @@ const BillReceipt = ({
     if (!bottomSheet || bottomSheet.type !== 'bill') return null;
 
     const bill = bottomSheet.data;
+    const meterImages = [
+        {
+            label: 'Công tơ phòng',
+            src: bill.meter?.imageUrl || bill.meter?.imageDataUrl || bill.meterImageUrl,
+        },
+        {
+            label: 'Công tơ BNL',
+            src: bill.heaterMeter?.imageUrl || bill.heaterMeter?.imageDataUrl || bill.heaterImageUrl,
+        },
+        ...(Array.isArray(bill.meters) ? bill.meters.map((meter, index) => ({
+            label: meter.name || `Công tơ ${index + 1}`,
+            src: meter.imageUrl || meter.imageDataUrl,
+        })) : []),
+    ].filter(item => item.src);
     const bankBin = config.bankBin || '970422';
     const bankAcc = config.bankAcc || '0';
     const qrAddInfo = `P${bill.roomId} ${bill.currentMonthFull}`;
@@ -159,6 +173,29 @@ const BillReceipt = ({
                                 </div>
                             </div>
                             {/* 3. Tổng tiền & Chuyển khoản (Cân bằng & Sát viền) */}
+                            {meterImages.length > 0 && (
+                                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                    <div className="mb-2 flex items-center gap-2">
+                                        <ImageIcon className="h-4 w-4 text-blue-600" />
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Ảnh công tơ đã gửi</p>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {meterImages.map((item, index) => (
+                                            <a
+                                                key={`${item.label}-${index}`}
+                                                href={item.src}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
+                                            >
+                                                <img src={item.src} alt={item.label} className="aspect-video w-full object-cover" />
+                                                <p className="truncate px-2 py-1.5 text-[10px] font-black text-slate-600">{item.label}</p>
+                                            </a>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl flex items-stretch gap-3">
                                 <div className="flex-1 flex flex-col justify-between">
 

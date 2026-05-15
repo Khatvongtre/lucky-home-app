@@ -293,6 +293,11 @@ const NotificationBell = ({
                           {metadata.total && <span className="rounded-md bg-white px-2 py-1 text-[9px] font-black uppercase text-emerald-700 ring-1 ring-emerald-100">{Number(metadata.total).toLocaleString('vi-VN')} đ</span>}
                         </div>
                       )}
+                      {metadata.imageUrl ? (
+                        <div className="mt-2 overflow-hidden rounded-lg border border-slate-200 bg-white">
+                          <img src={metadata.imageUrl} alt="Ảnh minh chứng" className="max-h-32 w-full object-cover" />
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 </button>
