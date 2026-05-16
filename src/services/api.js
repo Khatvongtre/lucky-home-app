@@ -57,6 +57,7 @@ const request = async (url, options = {}) => {
     try {
         const res = await fetch(`${API_URL}${url}`, {
             ...options,
+            cache: "no-store",
             headers: {
                 ...getHeaders(),
                 ...options.headers,

@@ -1,4 +1,5 @@
-import React, { Suspense, lazy, useState, useCallback } from 'react';
+import React, { Suspense, lazy, useState, useCallback, useRef } from 'react';
+import { Home, X } from 'lucide-react';
 
 // --- Tách Component & Utils (Giai đoạn 1 & 2) ---
 
@@ -53,6 +54,8 @@ const MainApp = () => {
   const [isHubMode, setIsHubMode] = useState(true); // NEW: Manage global HUB screen visibility
   const [selectedHouse, setSelectedHouse] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [hubShortcutHidden, setHubShortcutHidden] = useState(false);
+  const [hubShortcutPosition, setHubShortcutPosition] = useState(null);
   const [bottomSheet, setBottomSheet] = useState(null);
   const [config, setConfig] = useState({});
   const [isOverwriteModalOpen, setIsOverwriteModalOpen] = useState(false);
@@ -281,6 +284,7 @@ const MainApp = () => {
     setEditingMeter,
     mappingMeter,
     setMappingMeter,
+    isSavingMeterReadings,
     handleUpdateOldMeterUI,
     handleUpdateMeterUI,
     handleSaveMeter,
@@ -289,6 +293,7 @@ const MainApp = () => {
     handleSaveMetersAndGenerateBills,
   } = useMeters({
     meters,
+    rooms,
     setMeters,
     houseId: selectedHouse?.id,
     viewDate,
@@ -333,6 +338,63 @@ const MainApp = () => {
     setActiveTab,
     setHighlightedItemId,
   });
+
+  const appShellRef = useRef(null);
+  const hubDragRef = useRef(null);
+  const hubWasDraggedRef = useRef(false);
+
+  const handleGoToHub = useCallback(() => {
+    setIsHubMode(true);
+    setSelectedHouse(null);
+    setActiveTab('dashboard');
+    setSearchQuery('');
+    setShowQuickMenu(false);
+  }, []);
+
+  const handleHubShortcutPointerDown = useCallback((event) => {
+    if (event.button !== 0) return;
+    const targetRect = event.currentTarget.getBoundingClientRect();
+    hubDragRef.current = {
+      pointerId: event.pointerId,
+      offsetX: event.clientX - targetRect.left,
+      offsetY: event.clientY - targetRect.top,
+      startX: event.clientX,
+      startY: event.clientY,
+      didDrag: false,
+    };
+    hubWasDraggedRef.current = false;
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  }, []);
+
+  const handleHubShortcutPointerMove = useCallback((event) => {
+    const drag = hubDragRef.current;
+    const shell = appShellRef.current;
+    if (!drag || !shell || drag.pointerId !== event.pointerId) return;
+
+    const moved = Math.abs(event.clientX - drag.startX) + Math.abs(event.clientY - drag.startY);
+    if (moved > 6) drag.didDrag = true;
+
+    const shellRect = shell.getBoundingClientRect();
+    const x = Math.min(Math.max(event.clientX - shellRect.left - drag.offsetX, 8), shellRect.width - 60);
+    const y = Math.min(Math.max(event.clientY - shellRect.top - drag.offsetY, 64), shellRect.height - 64);
+    setHubShortcutPosition({ x, y });
+  }, []);
+
+  const handleHubShortcutPointerUp = useCallback((event) => {
+    const drag = hubDragRef.current;
+    const shell = appShellRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    hubWasDraggedRef.current = drag.didDrag;
+    hubDragRef.current = null;
+
+    if (shell && drag.didDrag) {
+      const shellRect = shell.getBoundingClientRect();
+      if (event.clientY - shellRect.top > shellRect.height - 72) {
+        setHubShortcutHidden(true);
+      }
+    }
+  }, []);
 
   const resetAppAfterLogout = useCallback(() => {
     setSelectedHouse(null);
@@ -400,6 +462,7 @@ const MainApp = () => {
       }}
       fastInputState={{
         setActiveTab,
+        setIsHubMode,
       }}
       hubState={{
         isHubMode,
@@ -476,7 +539,7 @@ const MainApp = () => {
 
   // 4. MAIN APP (Khi đã chọn cơ sở, hoặc truy cập Tab có tính Global như Tiết Kiệm)
   return (
-    <div className="h-screen bg-slate-50 text-slate-900 font-sans flex flex-col max-w-lg mx-auto w-full relative border-x border-slate-100 shadow-2xl overflow-hidden">
+    <div ref={appShellRef} className="h-screen bg-slate-50 text-slate-900 font-sans flex flex-col max-w-lg mx-auto w-full relative border-x border-slate-100 shadow-2xl overflow-hidden">
       <ToastNotification toast={toast} />
       <ConfirmDialog
         dialog={confirmDialog}
@@ -515,6 +578,7 @@ const MainApp = () => {
       <AppMainContent
         activeTab={activeTab}
         setActiveTab={setActiveTab}
+        setIsHubMode={setIsHubMode}
         aiState={{
           aiMessages,
           isAiLoading,
@@ -559,6 +623,7 @@ const MainApp = () => {
           setEditingMeter,
           setIsAddMeterModalOpen,
           setMappingMeter,
+          isSavingMeterReadings,
           handleSaveMetersAndGenerateBills,
           showToast,
           viewDate,
@@ -640,6 +705,42 @@ const MainApp = () => {
         user={user}
         handleLogout={handleLogout}
       />
+
+      {!hubShortcutHidden && (
+        <div
+          className={`absolute left-4 z-[68] h-12 w-12 ${hubShortcutPosition ? '' : ['savings', 'profile', 'fund', 'ai'].includes(activeTab) ? 'bottom-4' : 'bottom-16'}`}
+          style={hubShortcutPosition ? { left: hubShortcutPosition.x, top: hubShortcutPosition.y } : undefined}
+        >
+          <button
+            type="button"
+            onClick={(event) => {
+              if (hubWasDraggedRef.current) {
+                event.preventDefault();
+                hubWasDraggedRef.current = false;
+                return;
+              }
+              handleGoToHub();
+            }}
+            onPointerDown={handleHubShortcutPointerDown}
+            onPointerMove={handleHubShortcutPointerMove}
+            onPointerUp={handleHubShortcutPointerUp}
+            onPointerCancel={handleHubShortcutPointerUp}
+            className="flex h-12 w-12 touch-none select-none items-center justify-center rounded-full bg-white text-blue-700 shadow-lg shadow-slate-900/15 ring-1 ring-slate-200 transition active:scale-95 [-webkit-tap-highlight-color:transparent]"
+            aria-label="Về trang chính"
+            title="Kéo để di chuyển, kéo xuống đáy để ẩn"
+          >
+            <Home className="h-5 w-5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setHubShortcutHidden(true)}
+            className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-slate-900 text-white shadow-sm ring-2 ring-white active:scale-95 [-webkit-tap-highlight-color:transparent]"
+            aria-label="Ẩn nút trang chính"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </div>
+      )}
 
 
       <AppOverlays

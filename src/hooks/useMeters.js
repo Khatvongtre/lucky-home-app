@@ -2,8 +2,13 @@ import { useCallback, useState } from 'react';
 import { api } from '../services/api';
 import { parseN } from '../utils/formatters';
 
+const isPaidStatus = (status) => ['paid', 'completed', 'done'].includes(String(status || '').toLowerCase());
+
+const getBillRoomKey = (bill) => String(bill?.roomCode || bill?.roomId || '');
+
 export const useMeters = ({
   meters,
+  rooms = [],
   setMeters,
   houseId,
   viewDate,
@@ -14,13 +19,17 @@ export const useMeters = ({
   const [isAddMeterModalOpen, setIsAddMeterModalOpen] = useState(false);
   const [editingMeter, setEditingMeter] = useState(null);
   const [mappingMeter, setMappingMeter] = useState(null);
+  const [isSavingMeterReadings, setIsSavingMeterReadings] = useState(false);
+  const [dirtyMeterIds, setDirtyMeterIds] = useState(() => new Set());
 
   const handleUpdateOldMeterUI = useCallback((id, val) => {
     setMeters(prev => prev.map(meter => meter.id === id ? { ...meter, oldVal: val } : meter));
+    setDirtyMeterIds(prev => new Set(prev).add(id));
   }, [setMeters]);
 
   const handleUpdateMeterUI = useCallback((id, val) => {
     setMeters(prev => prev.map(meter => meter.id === id ? { ...meter, newVal: val } : meter));
+    setDirtyMeterIds(prev => new Set(prev).add(id));
   }, [setMeters]);
 
   const handleSaveMeter = useCallback(async (e) => {
@@ -76,12 +85,19 @@ export const useMeters = ({
   }, [mappingMeter, showToast]);
 
   const handleSaveMetersAndGenerateBills = useCallback(async () => {
+    if (isSavingMeterReadings) return;
+
     try {
+      setIsSavingMeterReadings(true);
       const monthSelected = viewDate.getMonth() + 1;
       const yearSelected = viewDate.getFullYear();
 
-      const updates = meters
-        .filter(meter => meter.newVal !== null && meter.newVal !== '' && meter.newVal !== undefined)
+      const changedMeterIds = dirtyMeterIds.size > 0 ? dirtyMeterIds : new Set();
+      const updatedMeters = meters
+        .filter(meter => changedMeterIds.size === 0 || changedMeterIds.has(meter.id))
+        .filter(meter => meter.newVal !== null && meter.newVal !== '' && meter.newVal !== undefined);
+
+      const updates = updatedMeters
         .map(meter => ({
           id: meter.id,
           houseId: meter.houseId,
@@ -99,20 +115,69 @@ export const useMeters = ({
         return;
       }
 
-      await api.post('/meter/update', updates);
-      const res = await api.post('/bill/generate', {
-        houseId,
-        month: monthSelected,
-        year: yearSelected,
-        overwrite: true,
-      });
+      const invalidMeter = updatedMeters.find(meter => (
+        meter.newVal !== null
+        && meter.newVal !== ''
+        && meter.newVal !== undefined
+        && parseN(String(meter.newVal)) < parseN(String(meter.oldVal))
+      ));
 
-      showToast(`Đã lưu chỉ số & tự động lập ${res.generatedCount} hóa đơn!`, 'success');
-      await loadHouseData(houseId);
+      if (invalidMeter) {
+        showToast('Có chỉ số mới nhỏ hơn chỉ số cũ!', 'error');
+        return;
+      }
+
+      const touchedRoomIds = new Set(updatedMeters.flatMap(meter => (meter.roomIds || []).map(String)));
+      const touchedRoomKeys = new Set();
+      rooms.forEach(room => {
+        if (!touchedRoomIds.has(String(room.id))) return;
+        [room.id, room.roomCode, room.code, room.name].filter(Boolean).forEach(value => touchedRoomKeys.add(String(value)));
+      });
+      touchedRoomIds.forEach(value => touchedRoomKeys.add(String(value)));
+
+      const touchedRooms = rooms.filter(room => touchedRoomIds.has(String(room.id)));
+      if (touchedRooms.length === 0) {
+        showToast('Các công tơ vừa sửa chưa được gắn với phòng nào, chưa thể lập hóa đơn.', 'error');
+        return;
+      }
+
+      const billsResult = await api.get(`/bill/${houseId}?year=${yearSelected}&month=${monthSelected}`);
+      const billsData = Array.isArray(billsResult) ? billsResult : (billsResult?.bills || []);
+      const paidBill = billsData.find(bill => isPaidStatus(bill.status) && touchedRoomKeys.has(getBillRoomKey(bill)));
+
+      if (paidBill) {
+        const roomLabel = getBillRoomKey(paidBill) || 'này';
+        showToast(`Hóa đơn phòng ${roomLabel} kỳ ${monthSelected}/${yearSelected} đã thanh toán, không thể cập nhật chỉ số trong kỳ này.`, 'error');
+        return;
+      }
+
+      await api.post('/meter/update', updates);
+
+      const billResults = [];
+
+      for (const room of touchedRooms) {
+        const result = await api.post('/bill/generate', {
+          houseId,
+          roomId: room.id,
+          month: monthSelected,
+          year: yearSelected,
+          overwrite: true,
+        });
+        billResults.push(result);
+      }
+
+      const generatedCount = billResults.reduce((sum, result) => sum + Number(result?.generatedCount ?? result?.count ?? 1), 0);
+      showToast(`Đã lưu chỉ số & lập hóa đơn cho ${touchedRooms.length || generatedCount || ''} phòng!`.replace('  ', ' '), 'success');
+      setDirtyMeterIds(new Set());
+      await loadHouseData(houseId, 'meters_list');
+      await loadHouseData(houseId, 'bills');
+      await loadHouseData(houseId, 'dashboard');
     } catch (error) {
-      showToast('Lỗi: ' + error.message, 'error');
+      showToast(error.message || 'Không lưu được chỉ số công tơ.', 'error');
+    } finally {
+      setIsSavingMeterReadings(false);
     }
-  }, [houseId, loadHouseData, meters, showToast, viewDate]);
+  }, [dirtyMeterIds, houseId, isSavingMeterReadings, loadHouseData, meters, rooms, showToast, viewDate]);
 
   return {
     isAddMeterModalOpen,
@@ -121,6 +186,7 @@ export const useMeters = ({
     setEditingMeter,
     mappingMeter,
     setMappingMeter,
+    isSavingMeterReadings,
     handleUpdateOldMeterUI,
     handleUpdateMeterUI,
     handleSaveMeter,

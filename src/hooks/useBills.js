@@ -41,7 +41,7 @@ export const useBills = ({
       await loadHouseData(selectedHouse?.id);
       showToast('Đã lập hóa đơn thành công!', 'success');
     } catch (error) {
-      showToast('Lỗi: ' + error.message, 'error');
+      showToast(error.message || 'Không lập được hóa đơn.', 'error');
     }
   }, [loadHouseData, selectedHouse?.id, setIsOverwriteModalOpen, showToast]);
 

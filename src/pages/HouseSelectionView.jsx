@@ -242,7 +242,7 @@ const HouseSelectionView = ({
                                                 <h3 className={`font-black text-[13px] uppercase tracking-tight leading-tight truncate ${isUrgentPay ? 'text-red-700' : isWarningPay ? 'text-amber-700' : 'text-blue-800'}`}>
                                                     {h.name}
                                                 </h3>
-                                                <span className={`text-[7px] font-black px-1.5 py-0.5 rounded uppercase shrink-0 ${roleInfo.class}`}>
+                                                <span className={`text-[6.5px] sm:text-[7px] font-black px-1.5 py-0.5 rounded uppercase leading-none whitespace-nowrap shrink-0 ${roleInfo.class}`}>
                                                     {roleInfo.text}
                                                 </span>
                                             </div>
@@ -270,14 +270,14 @@ const HouseSelectionView = ({
 
                                 <div className="pt-2 border-t border-black/5 flex items-center justify-between gap-2">
                                     <div className="flex items-center">
-                                        <div className={`flex items-center text-[10px] font-bold px-2 py-1 rounded-md ${isFull ? 'text-emerald-700 bg-emerald-100/50' : 'text-blue-700 bg-blue-50'}`}>
+                                        <div className={`flex items-center text-[8.5px] sm:text-[10px] font-bold px-2 py-1 rounded-md leading-none whitespace-nowrap ${isFull ? 'text-emerald-700 bg-emerald-100/50' : 'text-blue-700 bg-blue-50'}`}>
                                             <div className={`w-1.5 h-1.5 rounded-full mr-2 ${isFull ? '' : 'animate-pulse'} ${getRoomStatusColor(isFull, h.emptyRooms, h.totalRooms)}`} />
                                             {isFull ? `Đã lấp đầy (${h.totalRooms} phòng)` : `Trống ${h.emptyRooms} / ${h.totalRooms} phòng`}
                                         </div>
                                     </div>
 
                                     {shouldShowPayInfo && (
-                                        <div className={`flex items-center text-[10px] font-bold px-2 py-1 rounded-md ${isUrgentPay ? 'text-red-700 bg-red-100/50' :
+                                        <div className={`flex items-center text-[8.5px] sm:text-[10px] font-bold px-2 py-1 rounded-md leading-none whitespace-nowrap ${isUrgentPay ? 'text-red-700 bg-red-100/50' :
                                             isWarningPay ? 'text-amber-700 bg-amber-100/50' :
                                                 'text-emerald-700 bg-emerald-100/50'
                                             }`}>

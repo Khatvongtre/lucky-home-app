@@ -89,7 +89,7 @@ const BillsView = ({
                                             }`}>
                                             Phòng {bill.roomId}
                                         </p>
-                                        <div className={`text-[8px] font-black px-2 py-0.5 rounded uppercase tracking-wider inline-flex items-center ${bill.status === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                                        <div className={`text-[7px] sm:text-[8px] font-black px-2 py-0.5 rounded uppercase leading-none whitespace-nowrap inline-flex items-center ${bill.status === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
                                             }`}>
                                             {bill.status === 'paid' ? 'Đã thu tiền' : 'Chưa thu'}
                                         </div>

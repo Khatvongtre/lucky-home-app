@@ -18,6 +18,7 @@ const SettingsView = lazy(() => import('../../pages/SettingsView'));
 const AppMainContent = ({
   activeTab,
   setActiveTab,
+  setIsHubMode,
   aiState,
   billsState,
   dashboardState,
@@ -107,6 +108,7 @@ const AppMainContent = ({
             setEditingMeter={meterState.setEditingMeter}
             setIsAddMeterModalOpen={meterState.setIsAddMeterModalOpen}
             setMappingMeter={meterState.setMappingMeter}
+            isSavingMeterReadings={meterState.isSavingMeterReadings}
             handleSaveMetersAndGenerateBills={meterState.handleSaveMetersAndGenerateBills}
             showToast={meterState.showToast}
             viewDate={meterState.viewDate}
@@ -176,7 +178,7 @@ const AppMainContent = ({
         )}
 
         {activeTab === 'fast_input' && (
-          <FastInputView setActiveTab={setActiveTab} showToast={showToast} />
+          <FastInputView setActiveTab={setActiveTab} setIsHubMode={setIsHubMode} showToast={showToast} />
         )}
 
         {activeTab === 'profile' && (

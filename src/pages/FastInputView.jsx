@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, X, Loader2, Zap, Camera, CheckCircle2, Pencil, TrendingUp, TrendingDown, Wallet, Delete } from 'lucide-react';
+import { Mic, X, Loader2, Zap, Camera, CheckCircle2, Pencil, TrendingUp, TrendingDown, Wallet, Delete, Home } from 'lucide-react';
 import { formatN } from '../utils/formatters';
 import { api } from '../services/api';
 
@@ -12,7 +12,7 @@ const COMMON_SUGGESTIONS = {
     'Cho đi': ['Từ thiện', 'Quà tặng', 'Đám cưới', 'Thăm hỏi']
 };
 
-const FastInputView = ({ setActiveTab, showToast }) => {
+const FastInputView = ({ setActiveTab, setIsHubMode, showToast }) => {
     const [inputText, setInputText] = useState('');
     const [isListening, setIsListening] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -28,6 +28,14 @@ const FastInputView = ({ setActiveTab, showToast }) => {
             window.history.pushState({}, document.title, "/");
         }
         setActiveTab('fund');
+    };
+
+    const handleGoHub = () => {
+        if (window.location.pathname.includes('/chitieu')) {
+            window.history.pushState({}, document.title, "/");
+        }
+        setActiveTab('dashboard');
+        setIsHubMode?.(true);
     };
 
     useEffect(() => {
@@ -208,11 +216,9 @@ const FastInputView = ({ setActiveTab, showToast }) => {
                     </div>
                     <h1 className="text-sm font-black uppercase tracking-widest">AI Nhập Nhanh</h1>
                 </div>
-                <div className="flex items-center gap-2">
-                    <button onClick={handleClose} className="p-2 bg-white/10 rounded-xl active:scale-95 text-white">
-                        <X className="w-4 h-4" />
-                    </button>
-                </div>
+                <button onClick={handleClose} className="p-2 bg-white/10 rounded-xl active:scale-95 text-white">
+                    <X className="w-4 h-4" />
+                </button>
             </div>
 
             {!parsedResult ? (
@@ -265,13 +271,20 @@ const FastInputView = ({ setActiveTab, showToast }) => {
                     </div>
 
                     {/* BOTTOM MANUAL ACTION BAR */}
-                    <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-max max-w-[90%] bg-slate-800/90 backdrop-blur-xl border border-slate-700 p-2 rounded-2xl flex items-center gap-3 shadow-2xl z-40">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-3">Thủ công:</span>
-                        <div className="flex gap-2">
-                            <button onClick={() => setParsedResult({ type: 'in', amount: '', note: '', fundId: funds.length > 0 ? funds[0].id : 1, isManual: true })} className="px-4 py-2.5 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 rounded-xl active:scale-95 flex items-center gap-1.5 text-xs font-black uppercase tracking-widest transition-colors">
+                    <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-md bg-slate-800/90 backdrop-blur-xl border border-slate-700 p-2 rounded-2xl flex items-center gap-2 shadow-2xl z-40">
+                        <button
+                            onClick={handleGoHub}
+                            className="h-10 w-10 bg-white text-blue-700 rounded-full active:scale-95 flex items-center justify-center shrink-0 [-webkit-tap-highlight-color:transparent]"
+                            aria-label="Về trang chính"
+                            title="Về trang chính"
+                        >
+                            <Home className="w-4 h-4" />
+                        </button>
+                        <div className="flex flex-1 gap-2 min-w-0">
+                            <button onClick={() => setParsedResult({ type: 'in', amount: '', note: '', fundId: funds.length > 0 ? funds[0].id : 1, isManual: true })} className="flex-1 px-2 py-2.5 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 rounded-xl active:scale-95 flex items-center justify-center gap-1.5 text-xs font-black uppercase tracking-widest transition-colors">
                                 + Thu
                             </button>
-                            <button onClick={() => setParsedResult({ type: 'out', amount: '', note: '', fundId: funds.length > 0 ? funds[0].id : 1, isManual: true })} className="px-4 py-2.5 bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 rounded-xl active:scale-95 flex items-center gap-1.5 text-xs font-black uppercase tracking-widest transition-colors">
+                            <button onClick={() => setParsedResult({ type: 'out', amount: '', note: '', fundId: funds.length > 0 ? funds[0].id : 1, isManual: true })} className="flex-1 px-2 py-2.5 bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 rounded-xl active:scale-95 flex items-center justify-center gap-1.5 text-xs font-black uppercase tracking-widest transition-colors">
                                 - Chi
                             </button>
                         </div>
@@ -435,12 +448,21 @@ const FastInputView = ({ setActiveTab, showToast }) => {
                             >
                                 <CheckCircle2 className="w-5 h-5" /> Lưu giao dịch
                             </button>
-                            <button
-                                onClick={() => setParsedResult(null)}
-                                className="w-full h-14 bg-slate-100 text-slate-600 rounded-2xl font-black uppercase text-sm tracking-widest active:scale-95 flex items-center justify-center gap-2 transition-all border border-slate-200 shadow-sm"
-                            >
-                                Đóng
-                            </button>
+                            <div className="grid grid-cols-2 gap-2">
+                                <button
+                                    onClick={handleGoHub}
+                                    className="h-14 bg-blue-50 text-blue-700 rounded-2xl font-black uppercase text-sm tracking-widest active:scale-95 flex items-center justify-center gap-2 transition-all border border-blue-100 shadow-sm [-webkit-tap-highlight-color:transparent]"
+                                    aria-label="Về trang chính"
+                                >
+                                    <Home className="w-5 h-5" />
+                                </button>
+                                <button
+                                    onClick={() => setParsedResult(null)}
+                                    className="h-14 bg-slate-100 text-slate-600 rounded-2xl font-black uppercase text-sm tracking-widest active:scale-95 flex items-center justify-center gap-2 transition-all border border-slate-200 shadow-sm"
+                                >
+                                    Đóng
+                                </button>
+                            </div>
                         </div>
                     )}
                 </div>
@@ -450,3 +472,5 @@ const FastInputView = ({ setActiveTab, showToast }) => {
 };
 
 export default FastInputView;
+
+

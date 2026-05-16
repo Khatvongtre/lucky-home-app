@@ -11,14 +11,62 @@ const emptyBillStats = {
 const parseMeters = (metersData = []) =>
     metersData.map(m => ({ ...m, roomIds: JSON.parse(m.roomIdsJson || "[]") }));
 
+const parseJsonField = (value, fallback) => {
+    if (!value) return fallback;
+    if (typeof value === "object") return value;
+
+    try {
+        return JSON.parse(value);
+    } catch {
+        return fallback;
+    }
+};
+
 const parseBills = (billsData = []) =>
     billsData.map(b => ({
         ...b,
-        roomId: b.roomCode,
-        details: JSON.parse(b.detailsJson || "{}"),
-        meter: JSON.parse(b.meterInfoJson || "{}"),
-        heaterMeter: b.heaterInfoJson ? JSON.parse(b.heaterInfoJson) : null,
+        roomId: b.roomCode || b.roomId,
+        details: parseJsonField(b.detailsJson, b.details || {}),
+        meter: parseJsonField(b.meterInfoJson, b.meter || {}),
+        heaterMeter: b.heaterInfoJson ? parseJsonField(b.heaterInfoJson, b.heaterMeter || null) : (b.heaterMeter || null),
     }));
+
+const isPaidStatus = (status) => ["paid", "completed", "done"].includes(String(status || "").toLowerCase());
+
+const billTimestamp = (bill = {}) => {
+    const candidates = [bill.updatedAt, bill.createdAt, bill.paidAt, bill.date, bill.generatedAt];
+    const timestamp = candidates
+        .map(value => (value ? new Date(value).getTime() : 0))
+        .find(value => Number.isFinite(value) && value > 0);
+    return timestamp || 0;
+};
+
+const shouldReplaceBill = (current, candidate) => {
+    if (!current) return true;
+    const currentPaid = isPaidStatus(current.status);
+    const candidatePaid = isPaidStatus(candidate.status);
+    if (currentPaid !== candidatePaid) return candidatePaid;
+
+    const currentTime = billTimestamp(current);
+    const candidateTime = billTimestamp(candidate);
+    if (candidateTime !== currentTime) return candidateTime >= currentTime;
+
+    return String(candidate.id || "") >= String(current.id || "");
+};
+
+const dedupeBills = (billsData = []) => {
+    const billMap = new Map();
+
+    billsData.forEach(bill => {
+        const roomKey = String(bill.roomCode || bill.roomId || "");
+        const periodKey = String(bill.currentMonthFull || bill.period || "");
+        const key = `${roomKey}|${periodKey}`;
+        if (!roomKey) return;
+        if (shouldReplaceBill(billMap.get(key), bill)) billMap.set(key, bill);
+    });
+
+    return Array.from(billMap.values());
+};
 
 export const useHouseData = ({ viewDate, selectedMonth }) => {
     const [houses, setHouses] = useState([]);
@@ -69,14 +117,15 @@ export const useHouseData = ({ viewDate, selectedMonth }) => {
         const year = viewDate.getFullYear();
         const billsResult = await api.get(`/bill/${houseId}?year=${year}&month=${month}`);
         const billsData = Array.isArray(billsResult) ? billsResult : (billsResult?.bills || []);
+        const parsedBills = dedupeBills(parseBills(billsData));
 
         setBillStats({
             totalRooms: billsResult?.totalRooms ?? 0,
-            totalBillPaids: billsResult?.totalBillPaids ?? billsData.filter(b => b.status === "paid").length,
-            totalBillNotPaids: billsResult?.totalBillNotPaids ?? billsData.filter(b => b.status !== "paid").length,
-            totalAmountPaids: billsResult?.totalAmountPaids ?? billsData.filter(b => b.status === "paid").reduce((sum, b) => sum + (b.total || 0), 0),
+            totalBillPaids: parsedBills.filter(b => isPaidStatus(b.status)).length,
+            totalBillNotPaids: parsedBills.filter(b => !isPaidStatus(b.status)).length,
+            totalAmountPaids: parsedBills.filter(b => isPaidStatus(b.status)).reduce((sum, b) => sum + (b.total || 0), 0),
         });
-        setBills(parseBills(billsData));
+        setBills(parsedBills);
     }, [viewDate]);
 
     const loadTransactions = useCallback(async (houseId) => {

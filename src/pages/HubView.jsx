@@ -36,6 +36,8 @@ const getRoomCode = (room) => (
   room?.roomCode || room?.code || room?.name || room?.id || ''
 );
 
+const isPaidStatus = (status) => ['paid', 'completed', 'done'].includes(String(status || '').toLowerCase());
+
 const getRoomLinkLabel = (room, house) => {
   const houseLabel = room.houseName || room.house?.name || getHouseLabel(house);
   return `${houseLabel ? `${houseLabel} - ` : ''}Phòng ${getRoomCode(room)}`;
@@ -101,6 +103,41 @@ const billBaseTotal = (details = {}) => (
   + (details.service || 0)
   + (details.ebikes || 0)
 );
+
+const billTimestamp = (bill = {}) => {
+  const candidates = [bill.updatedAt, bill.createdAt, bill.paidAt, bill.date, bill.generatedAt];
+  const timestamp = candidates
+    .map(value => (value ? new Date(value).getTime() : 0))
+    .find(value => Number.isFinite(value) && value > 0);
+  return timestamp || 0;
+};
+
+const shouldReplaceBill = (current, candidate) => {
+  if (!current) return true;
+  const currentPaid = isPaidStatus(current.status);
+  const candidatePaid = isPaidStatus(candidate.status);
+  if (currentPaid !== candidatePaid) return candidatePaid;
+
+  const currentTime = billTimestamp(current);
+  const candidateTime = billTimestamp(candidate);
+  if (candidateTime !== currentTime) return candidateTime >= currentTime;
+
+  return String(candidate.id || '') >= String(current.id || '');
+};
+
+const dedupeBills = (billList = []) => {
+  const billMap = new Map();
+
+  billList.forEach(bill => {
+    const roomKey = String(bill.roomCode || bill.roomId || '');
+    const periodKey = String(bill.currentMonthFull || bill.period || '');
+    const key = `${roomKey}|${periodKey}`;
+    if (!roomKey) return;
+    if (shouldReplaceBill(billMap.get(key), bill)) billMap.set(key, bill);
+  });
+
+  return Array.from(billMap.values());
+};
 
 const HubView = ({
   user, houses, setIsHubMode, setActiveTab, setSelectedHouse,
@@ -173,7 +210,7 @@ const HubView = ({
 
   const getQuickBillButtonClass = (bill) => {
     if (!bill) return 'border-slate-200 bg-slate-50 text-slate-400';
-    return ['paid', 'completed', 'done'].includes(String(bill.status || '').toLowerCase())
+    return isPaidStatus(bill.status)
       ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
       : 'border-rose-100 bg-rose-50 text-rose-700';
   };
@@ -191,40 +228,11 @@ const HubView = ({
       : 'border-emerald-100 bg-emerald-50 text-emerald-700';
   };
 
-  const getQuickMeterStatus = (roomMeters) => {
-    if (metersLoadingHouseId === selectedQuickHouse?.id) return 'Đang tải công tơ';
-    if (!roomMeters.length) return 'Chưa gắn công tơ';
-    return roomMeters.some(meter => meter.newVal === null || meter.newVal === '' || meter.newVal === undefined)
-      ? 'Chưa chốt điện'
-      : 'Đã chốt điện';
-  };
-
-  const getQuickMeterStatusClass = (roomMeters) => {
-    if (metersLoadingHouseId === selectedQuickHouse?.id || !roomMeters.length) return 'bg-slate-100 text-slate-500';
-    return roomMeters.some(meter => meter.newVal === null || meter.newVal === '' || meter.newVal === undefined)
-      ? 'bg-amber-100 text-amber-700'
-      : 'bg-emerald-100 text-emerald-700';
-  };
-
-  const getQuickBillStatus = (bill) => {
-    if (!bill) return 'Chưa tạo hóa đơn';
-    return ['paid', 'completed', 'done'].includes(String(bill.status || '').toLowerCase())
-      ? 'Đã thanh toán'
-      : 'Chưa thanh toán';
-  };
-
-  const getQuickBillStatusClass = (bill) => {
-    if (!bill) return 'bg-slate-100 text-slate-500';
-    return ['paid', 'completed', 'done'].includes(String(bill.status || '').toLowerCase())
-      ? 'bg-emerald-100 text-emerald-700'
-      : 'bg-rose-100 text-rose-700';
-  };
-
   const getQuickMissingStatusBadges = ({ roomMeters, bill }) => {
     const badges = [];
     const hasNoMeters = !roomMeters.length;
     const hasMissingMeter = hasNoMeters || roomMeters.some(meter => meter.newVal === null || meter.newVal === '' || meter.newVal === undefined);
-    const isPaid = bill && ['paid', 'completed', 'done'].includes(String(bill.status || '').toLowerCase());
+    const isPaid = bill && isPaidStatus(bill.status);
 
     if (metersLoadingHouseId === selectedQuickHouse?.id) {
       badges.push({ label: 'Đang tải công tơ', className: 'bg-slate-100 text-slate-500' });
@@ -250,7 +258,7 @@ const HubView = ({
     const bill = getQuickRoomBill(room);
     const hasMissingMeter = !roomMeters.length
       || roomMeters.some(meter => meter.newVal === null || meter.newVal === '' || meter.newVal === undefined);
-    const hasUnpaidBill = bill && !['paid', 'completed', 'done'].includes(String(bill.status || '').toLowerCase());
+    const hasUnpaidBill = bill && !isPaidStatus(bill.status);
     return hasMissingMeter || hasUnpaidBill;
   };
 
@@ -260,7 +268,7 @@ const HubView = ({
 
   const getQuickRoomStatusStyle = ({ roomMeters, bill }) => {
     const hasMissingMeter = !roomMeters.length || roomMeters.some(meter => meter.newVal === null || meter.newVal === '' || meter.newVal === undefined);
-    const isPaid = bill && ['paid', 'completed', 'done'].includes(String(bill.status || '').toLowerCase());
+    const isPaid = bill && isPaidStatus(bill.status);
 
     if (hasMissingMeter) return {
       row: 'bg-amber-50/60 border-l-4 border-l-amber-400',
@@ -355,7 +363,7 @@ const HubView = ({
     try {
       const result = await api.get(`/bill/${houseId}?year=${year}&month=${month}`);
       const billsData = Array.isArray(result) ? result : (result?.bills || []);
-      const parsedBills = parseBills(billsData);
+      const parsedBills = dedupeBills(parseBills(billsData));
       setBillsByHouse(prev => ({ ...prev, [houseId]: parsedBills }));
       return parsedBills;
     } catch (error) {
@@ -422,6 +430,18 @@ const HubView = ({
   const handleOpenMeterReading = async (room) => {
     try {
       setReadingLoadingRoomId(room.id);
+      const bills = await loadQuickBills(room.houseId || selectedQuickHouse?.id, true);
+      const roomCode = String(getRoomCode(room));
+      const paidBill = bills.find(item => (
+        isPaidStatus(item.status)
+        && (String(item.roomCode || item.roomId) === roomCode || String(item.roomId) === String(room.id))
+      ));
+
+      if (paidBill) {
+        showToast?.(`Hóa đơn phòng ${roomCode} kỳ này đã thanh toán, không thể cập nhật chỉ số trong kỳ này.`, 'error');
+        return;
+      }
+
       const meters = await loadQuickMeters(room.houseId || selectedQuickHouse?.id);
       const roomMeters = meters.filter(meter => (meter.roomIds || []).map(String).includes(String(room.id)));
 
@@ -441,6 +461,7 @@ const HubView = ({
   };
 
   const handleSaveQuickMeterReading = async () => {
+    if (isQuickMeterSaving) return;
     if (!quickMeterRoom || !selectedQuickHouse) return;
 
     const meterDate = viewDate || new Date();
@@ -479,9 +500,31 @@ const HubView = ({
 
     try {
       setIsQuickMeterSaving(true);
+      const houseId = quickMeterRoom.houseId || selectedQuickHouse.id;
+      const bills = await loadQuickBills(houseId, true);
+      const roomCode = String(getRoomCode(quickMeterRoom));
+      const paidBill = bills.find(item => (
+        isPaidStatus(item.status)
+        && (String(item.roomCode || item.roomId) === roomCode || String(item.roomId) === String(quickMeterRoom.id))
+      ));
+
+      if (paidBill) {
+        showToast?.(`Hóa đơn phòng ${roomCode} kỳ này đã thanh toán, không thể cập nhật chỉ số trong kỳ này.`, 'error');
+        return;
+      }
+
       await api.post('/meter/update', updates);
-      showToast?.(`Đã lưu chỉ số phòng ${getRoomCode(quickMeterRoom)}.`, 'success');
-      await loadQuickMeters(selectedQuickHouse.id, true);
+      const result = await api.post('/bill/generate', {
+        houseId,
+        roomId: quickMeterRoom.id,
+        month: monthSelected,
+        year: yearSelected,
+        overwrite: true,
+      });
+      const generatedCount = Number(result?.generatedCount ?? result?.count ?? 0);
+      showToast?.(`Đã lưu chỉ số & lập ${generatedCount || ''} hóa đơn phòng ${getRoomCode(quickMeterRoom)}.`.replace('  ', ' '), 'success');
+      await loadQuickMeters(houseId, true);
+      await loadQuickBills(houseId, true);
       setQuickMeterRoom(null);
       setQuickMeterDrafts({});
     } catch (error) {
@@ -706,14 +749,14 @@ const HubView = ({
     <div className="h-screen bg-slate-100 text-slate-900 font-sans flex flex-col max-w-lg mx-auto w-full relative border-x border-slate-200 shadow-2xl overflow-hidden">
       <ToastNotification toast={toast} />
 
-      <div className="shrink-0 bg-white border-b border-slate-200 px-5 pt-8 pb-4">
+      <div className="shrink-0 bg-white border-b border-slate-200 px-4 pt-3 pb-3">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Lucky Home</p>
-            <h1 className="text-xl font-black text-indigo-700 tracking-tight truncate mt-1">
+            <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest leading-none">Lucky Home</p>
+            <h1 className="text-base font-black text-indigo-700 tracking-tight truncate mt-1">
               {user?.fullName || 'Tài khoản quản lý'}
             </h1>
-            <p className="text-[12px] font-semibold text-slate-500 mt-1">
+            <p className="text-[10px] font-semibold text-slate-500 mt-0.5 leading-tight">
               Tổng quan vận hành và lối vào nhanh
             </p>
           </div>
@@ -726,31 +769,31 @@ const HubView = ({
               setActiveTab={setActiveTab}
               setHighlightedItemId={setHighlightedItemId}
               setViewDate={setViewDate}
-              buttonClassName="w-10 h-10 rounded-full bg-slate-50 border border-slate-200 text-slate-600 flex items-center justify-center active:scale-95 transition-all"
+              buttonClassName="w-9 h-9 rounded-full bg-slate-50 border border-slate-200 text-slate-600 flex items-center justify-center active:scale-95 transition-all"
               panelAlign="right-0"
             />
-            <button type="button" onClick={() => { setIsHubMode(false); setActiveTab('profile'); setSelectedHouse(null); }} className="w-10 h-10 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-sm active:scale-95 transition-all" aria-label="Tài khoản">
-              <User className="w-5 h-5" />
+            <button type="button" onClick={() => { setIsHubMode(false); setActiveTab('profile'); setSelectedHouse(null); }} className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-sm active:scale-95 transition-all" aria-label="Tài khoản">
+              <User className="w-4.5 h-4.5" />
             </button>
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-4 gap-2">
+        <div className="mt-3 grid grid-cols-4 gap-1.5">
           {[
             { label: 'Cơ sở', value: hubStats.totalHouses, tone: 'text-blue-700 bg-blue-50' },
             { label: 'Phòng', value: hubStats.totalRooms, tone: 'text-slate-700 bg-slate-50' },
             { label: 'Trống', value: Math.max(0, hubStats.emptyRooms), tone: 'text-amber-700 bg-amber-50' },
             { label: 'Lấp đầy', value: `${occupancyRate}%`, tone: 'text-emerald-700 bg-emerald-50' }
           ].map(item => (
-            <div key={item.label} className={`rounded-xl border border-slate-200 p-2.5 text-center ${item.tone}`}>
-              <p className="text-[15px] font-black tabular-nums leading-none">{item.value}</p>
-              <p className="text-[7px] font-black uppercase tracking-widest mt-1.5 opacity-70">{item.label}</p>
+            <div key={item.label} className={`rounded-lg border border-slate-200 px-1.5 py-2 text-center ${item.tone}`}>
+              <p className="text-[13px] font-black tabular-nums leading-none">{item.value}</p>
+              <p className="mt-1 text-[6.5px] font-black uppercase leading-none opacity-70 whitespace-nowrap">{item.label}</p>
             </div>
           ))}
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 pt-4 pb-24 space-y-4 no-scrollbar">
+      <div className="flex-1 overflow-y-auto px-4 pt-3 pb-24 space-y-4 no-scrollbar">
         <section className="bg-slate-900 text-white rounded-xl p-4 shadow-lg">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -856,7 +899,7 @@ const HubView = ({
                   className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${showOnlyIncompleteRooms ? 'bg-rose-600' : 'bg-slate-300'}`}
                   aria-pressed={showOnlyIncompleteRooms}
                 >
-                  <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${showOnlyIncompleteRooms ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                  <span className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${showOnlyIncompleteRooms ? 'translate-x-5' : 'translate-x-0'}`} />
                 </button>
               </div>
 
@@ -964,9 +1007,9 @@ const HubView = ({
                           <p className="truncate text-[12px] font-black uppercase text-slate-800">
                             {room.roomType === 'mbkd' ? 'MBKD ' : 'Phòng '}{roomCode}
                           </p>
-                          <div className="mt-1 flex flex-wrap gap-1">
+                          <div className="mt-1 flex flex-nowrap gap-1 overflow-x-auto no-scrollbar">
                             {missingBadges.map(badge => (
-                              <span key={badge.label} className={`rounded-md px-1.5 py-0.5 text-[8px] font-black uppercase ${badge.className}`}>
+                              <span key={badge.label} className={`shrink-0 rounded-md px-1.5 py-0.5 text-[7px] sm:text-[8px] font-black uppercase leading-none whitespace-nowrap ${badge.className}`}>
                                 {badge.label}
                               </span>
                             ))}
@@ -989,7 +1032,7 @@ const HubView = ({
                         disabled={isLoading || isOpeningReading || isOpeningBill || isDownloadingHouseQr}
                         className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border active:scale-95 disabled:opacity-60 ${getQuickBillButtonClass(roomBill)}`}
                         aria-label={`Xem hóa đơn phòng ${roomCode}`}
-                        title={!roomBill ? 'Chưa tạo hóa đơn' : ['paid', 'completed', 'done'].includes(String(roomBill.status || '').toLowerCase()) ? 'Đã thanh toán' : 'Đã tạo, chưa thanh toán'}
+                        title={!roomBill ? 'Chưa tạo hóa đơn' : isPaidStatus(roomBill.status) ? 'Đã thanh toán' : 'Đã tạo, chưa thanh toán'}
                       >
                         {isOpeningBill ? <Loader2 className="h-4 w-4 animate-spin" /> : <Receipt className="h-4 w-4" />}
                       </button>

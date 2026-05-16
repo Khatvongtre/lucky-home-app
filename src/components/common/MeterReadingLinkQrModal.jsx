@@ -1,6 +1,7 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
-import { Copy, Download, Loader2, X } from 'lucide-react';
+import { Copy, Download, ExternalLink, Loader2, X } from 'lucide-react';
 const CANVAS_FONT = '"Segoe UI", Arial, Helvetica, sans-serif';
 
 const COLORS = {
@@ -77,40 +78,6 @@ const drawCenteredText = (
   });
 
   return y + Math.max(lines.length, 1) * lineHeight;
-};
-
-const drawStar = (
-  ctx,
-  cx,
-  cy,
-  spikes,
-  outerRadius,
-  innerRadius
-) => {
-  let rot = Math.PI / 2 * 3;
-  const step = Math.PI / spikes;
-
-  ctx.beginPath();
-  ctx.moveTo(cx, cy - outerRadius);
-
-  for (let i = 0; i < spikes; i++) {
-    ctx.lineTo(
-      cx + Math.cos(rot) * outerRadius,
-      cy + Math.sin(rot) * outerRadius
-    );
-
-    rot += step;
-
-    ctx.lineTo(
-      cx + Math.cos(rot) * innerRadius,
-      cy + Math.sin(rot) * innerRadius
-    );
-
-    rot += step;
-  }
-
-  ctx.closePath();
-  ctx.fill();
 };
 
 const drawDecorations = (ctx, width, height) => {
@@ -231,7 +198,7 @@ const drawTitleSection = (
   ctx.font = `900 37px ${CANVAS_FONT}`;
 
   ctx.fillText(
-    'QR NHẬP CÔNG TƠ HÀNG THÁNG',
+    'QR NH\u1eacP C\u00d4NG T\u01a0 H\u00c0NG TH\u00c1NG',
     width / 2,
     52
   );
@@ -500,7 +467,7 @@ const drawInstruction = (ctx, width, y) => {
   ctx.font = `800 18px ${CANVAS_FONT}`;
 
   ctx.fillText(
-    'Quét mã để nhập chỉ số công tơ điện / nước',
+    'Qu\u00e9t m\u00e3 \u0111\u1ec3 nh\u1eadp ch\u1ec9 s\u1ed1 c\u00f4ng t\u01a1 \u0111i\u1ec7n / n\u01b0\u1edbc',
     iconX + 38,
     y + 20
   );
@@ -567,7 +534,7 @@ const drawFooter = (ctx, width, height) => {
   ctx.font = `900 25px ${CANVAS_FONT}`;
 
   ctx.fillText(
-    'Cảm ơn quý khách đã tin tưởng',
+    'C\u1ea3m \u01a1n qu\u00fd kh\u00e1ch \u0111\u00e3 tin t\u01b0\u1edfng',
     width / 2,
     footerY + 12
   );
@@ -611,8 +578,8 @@ export const buildQrCardDataUrl = async ({
   const headerEndY = drawTitleSection(
     ctx,
     width,
-    houseLabel || '79 Thanh Đàm - Căn 1',
-    roomLabel || label || 'Phòng 203',
+    houseLabel || '79 Thanh \u0110\u00e0m - C\u0103n 1',
+    roomLabel || label || 'Ph\u00f2ng 203',
     label
   );
 
@@ -688,9 +655,9 @@ const MeterReadingLinkQrModal = ({ linkInfo, onClose, onCopy }) => {
   const [message, setMessage] = useState('');
 
   const link = linkInfo?.url || '';
-  const label = linkInfo?.label || 'Link ghi điện';
+  const label = linkInfo?.label || 'Link ghi \u0111i\u1ec7n';
   const houseLabel = linkInfo?.houseLabel || '';
-  const roomLabel = linkInfo?.roomLabel ? `Phòng ${linkInfo.roomLabel}` : label;
+  const roomLabel = linkInfo?.roomLabel ? `Ph\u00f2ng ${linkInfo.roomLabel}` : label;
 
   useEffect(() => {
     let cancelled = false;
@@ -726,9 +693,9 @@ const MeterReadingLinkQrModal = ({ linkInfo, onClose, onCopy }) => {
   const handleCopy = async () => {
     try {
       await onCopy?.();
-      setMessage('Đã copy tên phòng và link.');
+      setMessage('\u0110\u00e3 copy t\u00ean ph\u00f2ng v\u00e0 link.');
     } catch {
-      setMessage('Không copy được link. Vui lòng thử lại.');
+      setMessage('Kh\u00f4ng copy \u0111\u01b0\u1ee3c link. Vui l\u00f2ng th\u1eed l\u1ea1i.');
     }
   };
 
@@ -743,7 +710,7 @@ const MeterReadingLinkQrModal = ({ linkInfo, onClose, onCopy }) => {
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
-    setMessage('Đã lưu ảnh QR.');
+    setMessage('\u0110\u00e3 l\u01b0u \u1ea3nh QR.');
   };
 
   const handleCopyQr = async () => {
@@ -759,10 +726,15 @@ const MeterReadingLinkQrModal = ({ linkInfo, onClose, onCopy }) => {
       await navigator.clipboard.write([
         new window.ClipboardItem({ 'image/png': blob })
       ]);
-      setMessage('Đã copy ảnh QR vào clipboard.');
+      setMessage('\u0110\u00e3 copy \u1ea3nh QR v\u00e0o clipboard.');
     } catch {
-      setMessage('Thiết bị không hỗ trợ copy ảnh QR. Vui lòng lưu QR.');
+      setMessage('Thi\u1ebft b\u1ecb kh\u00f4ng h\u1ed7 tr\u1ee3 copy \u1ea3nh QR. Vui l\u00f2ng l\u01b0u QR.');
     }
+  };
+
+  const handlePreview = () => {
+    if (!link) return;
+    window.open(link, '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -797,32 +769,40 @@ const MeterReadingLinkQrModal = ({ linkInfo, onClose, onCopy }) => {
             </p>
           ) : null}
 
-          <div className="mt-3 grid grid-cols-3 gap-2">
+          <div className="mt-3 grid grid-cols-4 gap-1.5">
+            <button
+              type="button"
+              onClick={handlePreview}
+              className="flex h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl bg-slate-900 px-1 text-[8px] font-black uppercase leading-none text-white shadow-sm active:scale-95 [-webkit-tap-highlight-color:transparent]"
+            >
+              <ExternalLink className="h-4 w-4" />
+              <span className="whitespace-nowrap">{"M\u1edf"}</span>
+            </button>
             <button
               type="button"
               onClick={handleCopy}
-              className="flex items-center justify-center gap-1.5 rounded-xl bg-blue-700 py-3 text-[10px] font-black uppercase text-white shadow-sm active:scale-95"
+              className="flex h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl bg-blue-700 px-1 text-[8px] font-black uppercase leading-none text-white shadow-sm active:scale-95 [-webkit-tap-highlight-color:transparent]"
             >
               <Copy className="h-4 w-4" />
-              Link
+              <span className="whitespace-nowrap">Link</span>
             </button>
             <button
               type="button"
               onClick={handleCopyQr}
               disabled={!qrCardDataUrl && !qrDataUrl}
-              className="flex items-center justify-center gap-1.5 rounded-xl bg-rose-600 py-3 text-[10px] font-black uppercase text-white shadow-sm active:scale-95 disabled:bg-slate-300"
+              className="flex h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl bg-rose-600 px-1 text-[8px] font-black uppercase leading-none text-white shadow-sm active:scale-95 disabled:bg-slate-300 [-webkit-tap-highlight-color:transparent]"
             >
               <Copy className="h-4 w-4" />
-              QR
+              <span className="whitespace-nowrap">{"\u1ea2nh"}</span>
             </button>
             <button
               type="button"
               onClick={handleDownload}
               disabled={!qrCardDataUrl && !qrDataUrl}
-              className="flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 py-3 text-[10px] font-black uppercase text-white shadow-sm active:scale-95 disabled:bg-slate-300"
+              className="flex h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl bg-emerald-600 px-1 text-[8px] font-black uppercase leading-none text-white shadow-sm active:scale-95 disabled:bg-slate-300 [-webkit-tap-highlight-color:transparent]"
             >
               <Download className="h-4 w-4" />
-              Lưu QR
+              <span className="whitespace-nowrap">{"L\u01b0u"}</span>
             </button>
           </div>
         </div>
@@ -832,3 +812,5 @@ const MeterReadingLinkQrModal = ({ linkInfo, onClose, onCopy }) => {
 };
 
 export default MeterReadingLinkQrModal;
+
+

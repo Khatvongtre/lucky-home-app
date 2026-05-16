@@ -120,7 +120,11 @@ const AppEntryRoutes = ({
       <div className="h-screen bg-slate-900 font-sans flex flex-col max-w-lg mx-auto w-full relative border-x border-slate-800 shadow-2xl overflow-hidden">
         <ToastNotification toast={toast} />
         <Suspense fallback={<PageLoading />}>
-          <FastInputView setActiveTab={fastInputState.setActiveTab} showToast={showToast} />
+          <FastInputView
+            setActiveTab={fastInputState.setActiveTab}
+            setIsHubMode={fastInputState.setIsHubMode}
+            showToast={showToast}
+          />
         </Suspense>
       </div>
     );

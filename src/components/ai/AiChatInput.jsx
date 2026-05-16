@@ -11,7 +11,7 @@ const AiChatInput = ({ isAiLoading, onSubmit, showToast }) => {
     const handleMicClick = () => {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SpeechRecognition) {
-            if (showToast) showToast("Trình duyệt không hỗ trợ nhận diện giọng nói", "error");
+            if (showToast) showToast('Tr\u00ecnh duy\u1ec7t kh\u00f4ng h\u1ed7 tr\u1ee3 nh\u1eadn di\u1ec7n gi\u1ecdng n\u00f3i', 'error');
             return;
         }
         const recognition = new SpeechRecognition();
@@ -26,11 +26,11 @@ const AiChatInput = ({ isAiLoading, onSubmit, showToast }) => {
 
         recognition.onstart = () => {
             setIsListening(true);
-            if (showToast) showToast("Đang nghe... Hãy nói yêu cầu của bạn", "success");
+            if (showToast) showToast('\u0110ang nghe... H\u00e3y n\u00f3i y\u00eau c\u1ea7u c\u1ee7a b\u1ea1n', 'success');
         };
         recognition.onresult = (event) => {
             const transcript = event.results[0][0].transcript;
-            setInputText(prev => prev ? prev + " " + transcript : transcript);
+            setInputText(prev => prev ? prev + ' ' + transcript : transcript);
             setIsListening(false);
         };
         recognition.onerror = () => setIsListening(false);
@@ -94,14 +94,14 @@ const AiChatInput = ({ isAiLoading, onSubmit, showToast }) => {
                     </div>
                 )}
 
-                <div className="flex items-end gap-2">
-                    <div className="flex items-center gap-1 mb-0.5 ml-0.5">
-                        <button type="button" onClick={() => fileInputRef.current?.click()} disabled={isAiLoading} className="w-10 h-10 bg-white border border-slate-200 text-slate-500 hover:text-blue-600 rounded-xl flex items-center justify-center shrink-0 transition-colors shadow-sm active:scale-95 disabled:opacity-50"><ImageIcon className="w-5 h-5" /></button>
-                        <button type="button" onClick={handleMicClick} disabled={isAiLoading} className={`w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center shrink-0 transition-all shadow-sm active:scale-95 disabled:opacity-50 ${isListening ? 'text-red-500 border-red-200 bg-red-50 animate-pulse' : 'text-slate-500 hover:text-blue-600'}`}><Mic className="w-5 h-5" /></button>
+                <div className="flex items-end gap-1.5">
+                    <div className="flex items-center gap-1 mb-0.5 ml-0.5 shrink-0">
+                        <button type="button" onClick={() => fileInputRef.current?.click()} disabled={isAiLoading} className="w-9 h-9 bg-white border border-slate-200 text-slate-500 hover:text-blue-600 rounded-xl flex items-center justify-center shrink-0 transition-colors shadow-sm active:scale-95 disabled:opacity-50 [-webkit-tap-highlight-color:transparent]" aria-label="Dinh kem anh"><ImageIcon className="w-4.5 h-4.5" /></button>
+                        <button type="button" onClick={handleMicClick} disabled={isAiLoading} className={`w-9 h-9 bg-white border border-slate-200 rounded-xl flex items-center justify-center shrink-0 transition-all shadow-sm active:scale-95 disabled:opacity-50 [-webkit-tap-highlight-color:transparent] ${isListening ? 'text-red-500 border-red-200 bg-red-50 animate-pulse' : 'text-slate-500 hover:text-blue-600'}`} aria-label="Nhap bang giong noi"><Mic className="w-4.5 h-4.5" /></button>
                     </div>
                     <input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageUpload} className="hidden" />
-                    <textarea ref={textareaRef} value={inputText || ''} rows={1} placeholder={isListening ? "Đang nghe..." : "Nhập yêu cầu, dán ảnh (Ctrl+V)..."} disabled={isAiLoading} className="flex-1 bg-transparent border-none px-2 py-2.5 text-[13px] font-semibold outline-none resize-none max-h-32 min-h-[40px] text-slate-800 placeholder:text-slate-400 no-scrollbar disabled:opacity-50" onKeyDown={onEnterPress} onPaste={handlePaste} onChange={(e) => { setInputText(e.target.value); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }} />
-                    <button type="button" onClick={() => handleSubmit()} disabled={isAiLoading || (!inputText?.trim() && !imagePreview)} className="w-10 h-10 mb-0.5 mr-0.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl flex items-center justify-center shrink-0 transition-colors shadow-sm active:scale-95 disabled:opacity-50 disabled:bg-slate-300"><Send className="w-4 h-4 ml-0.5" /></button>
+                    <textarea ref={textareaRef} value={inputText || ''} rows={1} placeholder={isListening ? '\u0110ang nghe...' : 'Nh\u1eadp y\u00eau c\u1ea7u...'} disabled={isAiLoading} className="min-w-0 flex-1 bg-transparent border-none px-1.5 py-2.5 text-[13px] font-semibold outline-none resize-none max-h-32 min-h-[40px] text-slate-800 placeholder:text-slate-400 no-scrollbar disabled:opacity-50" onKeyDown={onEnterPress} onPaste={handlePaste} onChange={(e) => { setInputText(e.target.value); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }} />
+                    <button type="button" onClick={() => handleSubmit()} disabled={isAiLoading || (!inputText?.trim() && !imagePreview)} className="w-9 h-9 mb-0.5 mr-0.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl flex items-center justify-center shrink-0 transition-colors shadow-sm active:scale-95 disabled:opacity-50 disabled:bg-slate-300 [-webkit-tap-highlight-color:transparent]" aria-label="Gui"><Send className="w-4 h-4 ml-0.5" /></button>
                 </div>
             </div>
         </div>

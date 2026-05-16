@@ -37,6 +37,8 @@ const looksLikeTechnicalId = (value = '') =>
   || /^[0-9a-f]{24}$/i.test(value)
   || value.length > 18;
 
+const isPaidStatus = (status) => ['paid', 'completed', 'done'].includes(String(status || '').toLowerCase());
+
 const getFriendlyRoomCode = (room = {}) => {
   const roomCode = room.roomCode || room.code || room.name || '';
   return roomCode && !looksLikeTechnicalId(String(roomCode)) ? roomCode : '';
@@ -85,6 +87,7 @@ const requestPublicJson = async (url, options = {}) => {
   const token = authStorage.getToken();
   const res = await fetch(`${API_URL}${url}`, {
     ...options,
+    cache: 'no-store',
     headers: {
       ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
       ...(token && { Authorization: `Bearer ${token}` }),
@@ -126,7 +129,13 @@ const normalizeBill = (bill) => {
 };
 
 const extractBillFromResponse = (result) => {
-  const directBill = result?.bill || result?.invoice || result?.data?.bill || result?.data?.invoice;
+  const directBill = result?.bill
+    || result?.invoice
+    || result?.data?.bill
+    || result?.data?.invoice
+    || result?.generatedBill
+    || result?.createdBill
+    || result?.billData;
   if (directBill) return normalizeBill(directBill);
 
   return null;
@@ -487,7 +496,7 @@ const MeterReadingPublicView = () => {
   const statusLabel = invoicePreview || isSubmitted ? 'Đã gửi' : 'Đang ghi';
   const statusPill = invoicePreview || isSubmitted ? 'Hoàn tất' : 'Chưa hoàn tất';
 
-  const isInvoicePaid = ['paid', 'completed', 'done'].includes(String(invoicePreview?.status || '').toLowerCase());
+  const isInvoicePaid = isPaidStatus(invoicePreview?.status);
 
   const handleTransferClick = useCallback(() => {
     setTransferCopyMessage('');
@@ -727,6 +736,12 @@ const MeterReadingPublicView = () => {
   const submitReading = useCallback(async () => {
     if (!session || !allDone) return;
 
+    if (isInvoicePaid) {
+      setIsConfirmOpen(false);
+      setError('Hóa đơn kỳ này đã được thanh toán, không thể cập nhật chỉ số trong kỳ này nữa.');
+      return;
+    }
+
     const missingImageMeter = session.meters.find(meter => !meter.hasFreshImage);
     if (missingImageMeter) {
       setError(`${missingImageMeter.name}: vui lòng chụp hoặc chọn ảnh công tơ mới trước khi gửi.`);
@@ -763,18 +778,20 @@ const MeterReadingPublicView = () => {
         body: JSON.stringify(payload),
       });
 
-      const returnedBill = extractBillFromResponse(result);
+      const refreshed = await requestPublicJson(`/meter-reading/session/${encodeURIComponent(roomToken)}?t=${Date.now()}`);
+      const refreshedSession = normalizeSession(refreshed, roomToken);
+      const returnedBill = refreshedSession.invoice || extractBillFromResponse(result);
       if (!returnedBill) {
         throw new Error('Đã lưu chỉ số nhưng chưa nhận được hóa đơn từ máy chủ.');
       }
 
-      setSession(prev => ({ ...prev, invoice: returnedBill, status: 'submitted' }));
+      setSession({ ...refreshedSession, invoice: returnedBill, status: 'submitted' });
     } catch (submitError) {
       setError(submitError.message || 'Không lấy được hóa đơn. Vui lòng thử lại.');
     } finally {
       setIsSubmitting(false);
     }
-  }, [allDone, roomToken, session]);
+  }, [allDone, isInvoicePaid, roomToken, session]);
 
   const submitCorrectionRequest = useCallback(async () => {
     if (!session || !invoicePreview || isInvoicePaid) return;
@@ -840,6 +857,10 @@ const MeterReadingPublicView = () => {
   const moveNext = () => setActiveIndex(index => Math.min(index + 1, (session?.meters?.length || 1) - 1));
 
   const handlePrimaryAction = () => {
+    if (isInvoicePaid) {
+      setError('Hóa đơn kỳ này đã được thanh toán, không thể cập nhật chỉ số trong kỳ này nữa.');
+      return;
+    }
     if (isSubmitted) return;
     if (allDone) {
       setIsConfirmOpen(true);
@@ -891,6 +912,10 @@ const MeterReadingPublicView = () => {
 
   return (
     <div className="min-h-screen bg-slate-200 text-slate-900">
+      <style>{`
+        button, input, textarea { -webkit-tap-highlight-color: transparent; }
+        button { -webkit-appearance: none; appearance: none; }
+      `}</style>
       <div className="mx-auto flex h-screen w-full max-w-lg flex-col overflow-hidden bg-[#f6f8fb] shadow-2xl">
         <header className="relative z-30 shrink-0 bg-[#f6f8fb] px-4 pt-3 pb-1.5">
           <div className="relative overflow-hidden rounded-[20px] bg-gradient-to-br from-blue-800 via-blue-600 to-sky-400 px-4 py-4 text-white shadow-xl shadow-blue-900/20">
@@ -1047,14 +1072,14 @@ const MeterReadingPublicView = () => {
                   </div>
                 ) : null}
 
-                <div className="mt-2 grid grid-cols-3 gap-2">
-                  <button type="button" onClick={startCamera} className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-3 py-3 text-xs font-black uppercase text-white shadow-sm active:scale-95">
+                <div className="mt-2 grid grid-cols-3 gap-1.5">
+                  <button type="button" onClick={startCamera} className="flex min-w-0 appearance-none items-center justify-center gap-1 rounded-xl bg-blue-600 px-1.5 py-3 text-[10px] font-black uppercase leading-none text-white shadow-sm active:scale-95 whitespace-nowrap [-webkit-tap-highlight-color:transparent]">
                     <Camera className="h-4 w-4" /> Canh dòng
                   </button>
-                  <button type="button" onClick={() => cameraFileRef.current?.click()} className="flex items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-3 text-xs font-black uppercase text-blue-700 active:scale-95">
+                  <button type="button" onClick={() => cameraFileRef.current?.click()} className="flex min-w-0 appearance-none items-center justify-center gap-1 rounded-xl border border-blue-200 bg-blue-50 px-1.5 py-3 text-[10px] font-black uppercase leading-none text-blue-700 active:scale-95 whitespace-nowrap [-webkit-tap-highlight-color:transparent]">
                     <Camera className="h-4 w-4" /> Chụp ảnh
                   </button>
-                  <button type="button" onClick={() => fileRef.current?.click()} className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs font-black uppercase text-slate-700 active:scale-95">
+                  <button type="button" onClick={() => fileRef.current?.click()} className="flex min-w-0 appearance-none items-center justify-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-1.5 py-3 text-[10px] font-black uppercase leading-none text-slate-700 active:scale-95 whitespace-nowrap [-webkit-tap-highlight-color:transparent]">
                     <ImageIcon className="h-4 w-4" /> Chọn ảnh
                   </button>
                 </div>

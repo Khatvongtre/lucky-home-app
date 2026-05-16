@@ -31,6 +31,7 @@ const MetersView = ({
     setEditingMeter,
     setIsAddMeterModalOpen,
     setMappingMeter,
+    isSavingMeterReadings = false,
     handleSaveMetersAndGenerateBills,
     showToast,
     viewDate,
@@ -203,7 +204,7 @@ const MetersView = ({
                                         <div className="flex items-center gap-2 mb-1">
                                             <p className={`text-[11px] font-black uppercase leading-none ${hasWarning || isHighlighted ? 'text-red-700' : 'text-rose-800'}`}>{m.name}</p>
                                             {hasWarning && (
-                                                <span className="text-[8px] font-black text-white bg-red-500 px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap">
+                                                <span className="text-[7px] sm:text-[8px] font-black text-white bg-red-500 px-1.5 py-0.5 rounded shadow-sm leading-none whitespace-nowrap">
                                                     Quá {daysPastDue} ngày
                                                 </span>
                                             )}
@@ -258,9 +259,11 @@ const MetersView = ({
                 <div className="fixed bottom-[4.5rem] left-1/2 -translate-x-1/2 w-full max-w-lg px-4 z-40">
                     <button
                         onClick={handleSaveMetersAndGenerateBills}
-                        className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-[11px] border-b-1 border-blue-800 active:translate-y-1 transition-all flex items-center justify-center gap-2"
+                        disabled={isSavingMeterReadings}
+                        className="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase text-[11px] border-b-1 border-blue-800 active:translate-y-1 transition-all flex items-center justify-center gap-2 disabled:bg-slate-300 disabled:border-slate-400 disabled:active:translate-y-0"
                     >
-                        <Receipt className="w-4 h-4" /> Xác nhận lưu & Lập hóa đơn {monthDisplay}
+                        {isSavingMeterReadings ? <Loader2 className="w-4 h-4 animate-spin" /> : <Receipt className="w-4 h-4" />}
+                        {isSavingMeterReadings ? 'Đang lưu & lập hóa đơn...' : `Xác nhận lưu & Lập hóa đơn ${monthDisplay}`}
                     </button>
                 </div>
             )}

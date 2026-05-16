@@ -9,6 +9,43 @@ export const monthLabels = {
 
 const matches = (value, query) => value?.toLowerCase().includes(query);
 
+const isPaidStatus = (status) => ['paid', 'completed', 'done'].includes(String(status || '').toLowerCase());
+
+const billTimestamp = (bill = {}) => {
+  const candidates = [bill.updatedAt, bill.createdAt, bill.paidAt, bill.date, bill.generatedAt];
+  const timestamp = candidates
+    .map(value => (value ? new Date(value).getTime() : 0))
+    .find(value => Number.isFinite(value) && value > 0);
+  return timestamp || 0;
+};
+
+const shouldReplaceBill = (current, candidate) => {
+  if (!current) return true;
+  const currentPaid = isPaidStatus(current.status);
+  const candidatePaid = isPaidStatus(candidate.status);
+  if (currentPaid !== candidatePaid) return candidatePaid;
+
+  const currentTime = billTimestamp(current);
+  const candidateTime = billTimestamp(candidate);
+  if (candidateTime !== currentTime) return candidateTime >= currentTime;
+
+  return String(candidate.id || '') >= String(current.id || '');
+};
+
+const dedupeBills = (billList = []) => {
+  const billMap = new Map();
+
+  billList.forEach(bill => {
+    const roomKey = String(bill.roomCode || bill.roomId || '');
+    const periodKey = String(bill.currentMonthFull || bill.period || '');
+    const key = `${roomKey}|${periodKey}`;
+    if (!roomKey) return;
+    if (shouldReplaceBill(billMap.get(key), bill)) billMap.set(key, bill);
+  });
+
+  return Array.from(billMap.values());
+};
+
 export const useAppDerivedData = ({
   rooms,
   meters,
@@ -39,7 +76,7 @@ export const useAppDerivedData = ({
   );
 
   const currentBills = useMemo(
-    () => bills.filter(bill => matches(bill.roomId, normalizedQuery)),
+    () => dedupeBills(bills).filter(bill => matches(bill.roomId, normalizedQuery)),
     [bills, normalizedQuery],
   );
 
