@@ -2,7 +2,7 @@ import React from 'react';
 import {
   Building2, User, TrendingUp, Sparkles, ChevronRight,
   CircleDollarSign, PiggyBank, PlusCircle, LogOut,
-  AlertTriangle, Zap, Receipt, FileText, QrCode, Loader2, Download, ChevronDown, X, Hexagon, CheckCircle2
+  AlertTriangle, Zap, Receipt, FileText, QrCode, Loader2, Download, ChevronDown, X, Hexagon, CheckCircle2, Share2, Users2, Bike, CreditCard
 } from 'lucide-react';
 import { formatN, parseN } from '../utils/formatters';
 import ToastNotification from '../components/common/Toast';
@@ -10,7 +10,7 @@ import NotificationBell from '../components/notifications/NotificationBell';
 import MeterReadingLinkQrModal, { buildMeterReadingQrCardDataUrl } from '../components/common/MeterReadingLinkQrModal';
 import BillReceipt from '../components/bills/BillReceipt';
 import { api } from '../services/api';
-import { shareElementImage } from '../utils/imageExport';
+import { shareDataUrlImage, shareElementImage } from '../utils/imageExport';
 
 const API_URL = import.meta.env.VITE_API_URL;
 const FE_BASE_URL = (import.meta.env.VITE_FE_URL || window.location.origin).replace(/\/+$/g, '');
@@ -180,30 +180,48 @@ const HubView = ({
   const [isRecentHousesExpanded, setIsRecentHousesExpanded] = React.useState(false);
   const [isQuickHousePickerOpen, setIsQuickHousePickerOpen] = React.useState(false);
   const [showAllQuickRooms, setShowAllQuickRooms] = React.useState(false);
+  const [hasManualQuickHouse, setHasManualQuickHouse] = React.useState(false);
   const [quickMeterRoom, setQuickMeterRoom] = React.useState(null);
   const [quickMeterDrafts, setQuickMeterDrafts] = React.useState({});
   const [isQuickMeterSaving, setIsQuickMeterSaving] = React.useState(false);
   const [quickBillSheet, setQuickBillSheet] = React.useState(null);
   const [qrLinkInfo, setQrLinkInfo] = React.useState(null);
+  const [hubFunds, setHubFunds] = React.useState([]);
+  const [hubSavings, setHubSavings] = React.useState([]);
+  const [hubMonthlyStats, setHubMonthlyStats] = React.useState(null);
 
   const hubStats = houses.reduce((acc, h) => {
+    const revenue = Number(h.revenue) || 0;
+    const expense = Number(h.expense) || 0;
+    const fixedCosts = (Number(h.rentPrice) || 0) + (Number(h.internetFee) || 0) + (Number(h.otherFees) || 0);
     acc.totalHouses += 1;
     acc.totalRooms += Number(h.totalRooms) || 0;
     acc.emptyRooms += Number(h.emptyRooms) || 0;
-    acc.revenue += Number(h.revenue) || 0;
-    acc.profit += Number(h.profit ?? ((Number(h.revenue) || 0) - (Number(h.expense) || 0)));
+    acc.revenue += revenue;
+    acc.expense += expense;
+    acc.fixedCosts += fixedCosts;
+    acc.txExp += Math.max(0, expense - fixedCosts);
+    acc.profit += Number(h.profit ?? (revenue - expense));
     return acc;
-  }, { totalHouses: 0, totalRooms: 0, emptyRooms: 0, revenue: 0, profit: 0 });
+  }, { totalHouses: 0, totalRooms: 0, emptyRooms: 0, revenue: 0, expense: 0, fixedCosts: 0, txExp: 0, profit: 0 });
 
   const rentedRooms = Math.max(0, hubStats.totalRooms - hubStats.emptyRooms);
   const occupancyRate = hubStats.totalRooms > 0
     ? Math.round((rentedRooms / hubStats.totalRooms) * 100)
     : 0;
+  const operationPeriod = (viewDate || new Date()).toLocaleDateString('vi-VN', {
+    month: '2-digit',
+    year: 'numeric',
+  });
+  const hubFundTotal = hubFunds.reduce((total, fund) => total + (Number(fund.balance) || 0), 0);
+  const hubSavingTotal = hubSavings.reduce((total, saving) => total + (Number(saving.amount) || 0), 0);
+  const operationStats = hubMonthlyStats || hubStats;
   const canManageHouseQr = (house) => (
     ['SuperAdmin', 'Owner', 'Manager'].includes(house?.userRole || user?.role)
     || ['SuperAdmin', 'Owner'].includes(user?.role)
   );
   const quickQrHouses = houses.filter(canManageHouseQr);
+  const quickQrHouseIdsKey = quickQrHouses.map(house => house.id).join('|');
   const selectedQuickHouse = quickQrHouses.find(h => String(h.id) === String(quickHouseId)) || quickQrHouses[0] || null;
   const quickRooms = selectedQuickHouse ? roomsByHouse[selectedQuickHouse.id] || [] : [];
   const quickMeters = selectedQuickHouse ? metersByHouse[selectedQuickHouse.id] || [] : [];
@@ -216,9 +234,95 @@ const HubView = ({
   const quickBillCanEdit = ['SuperAdmin', 'Owner', 'Manager'].includes(selectedQuickHouse?.userRole || user?.role)
     || ['SuperAdmin', 'Owner'].includes(user?.role);
 
-  const getQuickRoomBill = (room) => {
+  const getQuickHouseRoomStats = (house) => {
+    const houseRooms = roomsByHouse[house?.id] || [];
+    const totalRooms = Number(house?.totalRooms ?? houseRooms.length) || 0;
+    const emptyRooms = houseRooms.length
+      ? houseRooms.filter(room => room.status !== 'full').length
+      : (Number(house?.emptyRooms) || 0);
+    const totalPeople = houseRooms.length
+      ? houseRooms.reduce((total, room) => total + (Number(room.peopleCount ?? room.people) || 0), 0)
+      : (Number(house?.totalPeople ?? house?.peopleCount ?? house?.people) || 0);
+    const totalEbikes = houseRooms.length
+      ? houseRooms.reduce((total, room) => total + (Number(room.eBikeCount ?? room.eBikes ?? room.ebikes) || 0), 0)
+      : (Number(house?.totalEbikes ?? house?.eBikeCount ?? house?.eBikes ?? house?.ebikes) || 0);
+
+    return {
+      totalRooms,
+      emptyRooms: Math.max(0, emptyRooms),
+      totalPeople,
+      totalEbikes,
+    };
+  };
+
+  const getQuickHouseRentDueInfo = (house) => {
+    const paymentDay = Number(house?.paymentDay);
+    if (!Number.isFinite(paymentDay) || paymentDay < 1 || paymentDay > 31) return null;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const period = Math.max(1, Number(house?.paymentPeriod) || 1);
+    let start = new Date(today.getFullYear(), today.getMonth(), 1);
+
+    if (house?.startDate) {
+      const startDate = new Date(house.startDate);
+      if (!Number.isNaN(startDate.getTime())) start = startDate;
+    }
+
+    let monthsDiff = (today.getFullYear() - start.getFullYear()) * 12 + (today.getMonth() - start.getMonth());
+    if (monthsDiff < 0) monthsDiff = 0;
+
+    const periodsPassed = Math.floor(monthsDiff / period);
+    let dueDate = new Date(start.getFullYear(), start.getMonth() + (periodsPassed * period), paymentDay);
+    dueDate.setHours(0, 0, 0, 0);
+
+    if (today > dueDate) {
+      dueDate = new Date(start.getFullYear(), start.getMonth() + ((periodsPassed + 1) * period), paymentDay);
+      dueDate.setHours(0, 0, 0, 0);
+    }
+
+    const daysLeft = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
+    return { daysLeft, dueDate };
+  };
+
+  const getQuickHouseComboboxChips = (house) => {
+    const dueInfo = getQuickHouseRentDueInfo(house);
+    if (dueInfo && dueInfo.daysLeft >= 0 && dueInfo.daysLeft <= 5) {
+      return [{
+        label: dueInfo.daysLeft === 0 ? 'Hôm nay đóng tiền' : `Còn ${dueInfo.daysLeft} ngày đóng tiền`,
+        icon: CreditCard,
+        iconClassName: 'text-rose-600',
+        className: 'border-slate-200 bg-white/70 text-slate-600',
+      }];
+    }
+
+    const stats = getQuickHouseRoomStats(house);
+    return [
+      stats.emptyRooms > 0 ? { label: `${stats.emptyRooms} trống`, icon: Building2, iconClassName: 'text-emerald-600', className: 'border-slate-200 bg-white/70 text-slate-600' } : null,
+      stats.totalEbikes > 0 ? { label: `${stats.totalEbikes} xe điện`, icon: Bike, iconClassName: 'text-amber-600', className: 'border-slate-200 bg-white/70 text-slate-600' } : null,
+      stats.totalPeople > 0 ? { label: `${stats.totalPeople} người`, icon: Users2, iconClassName: 'text-blue-600', className: 'border-slate-200 bg-white/70 text-slate-600' } : null,
+    ].filter(Boolean);
+  };
+
+  const renderQuickHouseComboboxChips = (house, className = '') => {
+    const chips = getQuickHouseComboboxChips(house);
+    if (!chips.length) return null;
+
+    return (
+      <div className={`mt-1 flex min-w-0 flex-wrap gap-1 ${className}`}>
+        {chips.map(chip => (
+          <span key={chip.label} className={`flex shrink-0 items-center rounded-md border px-1.5 py-0.5 text-[8px] font-bold uppercase leading-none ${chip.className}`}>
+            {chip.icon ? <chip.icon className={`mr-1 h-3 w-3 ${chip.iconClassName || ''}`} /> : null}
+            {chip.label}
+          </span>
+        ))}
+      </div>
+    );
+  };
+
+  const getQuickRoomBill = (room, bills = quickBills) => {
     const roomCode = String(getRoomCode(room));
-    return quickBills.find(item => String(item.roomCode || item.roomId) === roomCode || String(item.roomId) === String(room.id));
+    return bills.find(item => String(item.roomCode || item.roomId) === roomCode || String(item.roomId) === String(room.id));
   };
 
   const getQuickBillButtonClass = (bill) => {
@@ -228,9 +332,32 @@ const HubView = ({
       : 'border-rose-100 bg-rose-50 text-rose-700';
   };
 
-  const getQuickRoomMeters = (room) => (
-    quickMeters.filter(meter => (meter.roomIds || []).map(String).includes(String(room.id)))
+  const getQuickRoomMeters = (room, meters = quickMeters) => (
+    meters.filter(meter => (meter.roomIds || []).map(String).includes(String(room.id)))
   );
+
+  const getQuickRoomPaymentDay = (room, house = selectedQuickHouse) => {
+    const rawDay = room?.paymentDate || room?.paymentDay || house?.paymentDay;
+    const day = Number(rawDay);
+    return Number.isFinite(day) && day >= 1 && day <= 31 ? day : null;
+  };
+
+  const getQuickRoomMeterDueState = (room, house = selectedQuickHouse) => {
+    const paymentDay = getQuickRoomPaymentDay(room, house);
+    if (!paymentDay) return { isInWindow: true, daysFromDue: 0 };
+
+    const targetDate = viewDate || new Date();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dueDate = new Date(targetDate.getFullYear(), targetDate.getMonth(), paymentDay);
+    dueDate.setHours(0, 0, 0, 0);
+    const daysFromDue = Math.floor((today - dueDate) / (1000 * 60 * 60 * 24));
+
+    return {
+      daysFromDue,
+      isInWindow: daysFromDue >= -3 && daysFromDue <= 3,
+    };
+  };
 
   const getQuickMeterButtonClass = (roomMeters) => {
     if (metersLoadingHouseId === selectedQuickHouse?.id) return 'border-slate-200 bg-slate-50 text-slate-400';
@@ -241,22 +368,29 @@ const HubView = ({
       : 'border-emerald-100 bg-emerald-50 text-emerald-700';
   };
 
-  const getQuickMissingStatusBadges = ({ roomMeters, bill }) => {
+  const getQuickMissingStatusBadges = ({ room, roomMeters, bill, house = selectedQuickHouse }) => {
     const badges = [];
     const hasNoMeters = !roomMeters.length;
     const hasMissingMeter = hasNoMeters || roomMeters.some(meter => meter.newVal === null || meter.newVal === '' || meter.newVal === undefined);
+    const meterDueState = getQuickRoomMeterDueState(room, house);
     const isPaid = bill && isPaidStatus(bill.status);
 
     if (metersLoadingHouseId === selectedQuickHouse?.id) {
       badges.push({ label: 'Đang tải công tơ', className: 'bg-slate-100 text-slate-500' });
     } else if (hasNoMeters) {
       badges.push({ label: 'Chưa gắn công tơ', className: 'bg-slate-100 text-slate-500' });
-    } else if (hasMissingMeter) {
+    } else if (hasMissingMeter && meterDueState.isInWindow) {
       badges.push({ label: 'Chưa chốt điện', className: 'bg-amber-100 text-amber-700' });
+    } else if (hasMissingMeter) {
+      const daysUntilDue = Math.max(0, Math.abs(meterDueState.daysFromDue));
+      badges.push({
+        label: meterDueState.daysFromDue < -3 ? `Còn ${daysUntilDue} ngày chốt` : `Quá hạn ${daysUntilDue} ngày`,
+        className: meterDueState.daysFromDue < -3 ? 'bg-slate-100 text-slate-500' : 'bg-rose-100 text-rose-700',
+      });
     }
 
     if (bill && !isPaid) {
-      badges.push({ label: 'Chưa thanh toán', className: 'bg-rose-100 text-rose-700' });
+      badges.push({ label: `Cần thanh toán: ${formatN(bill.total || 0)} đ`, className: 'bg-rose-100 text-rose-700' });
     }
 
     if (badges.length === 0) {
@@ -266,18 +400,38 @@ const HubView = ({
     return badges;
   };
 
-  const isQuickRoomIncomplete = (room) => {
-    const roomMeters = getQuickRoomMeters(room);
-    const bill = getQuickRoomBill(room);
+  const isQuickRoomIncomplete = (room, house = selectedQuickHouse) => {
+    const houseId = room.houseId || house?.id;
+    const roomMeters = getQuickRoomMeters(room, metersByHouse[houseId] || quickMeters);
+    const bill = getQuickRoomBill(room, billsByHouse[houseId] || quickBills);
+    const meterDueState = getQuickRoomMeterDueState(room, house);
     const hasMissingMeter = !roomMeters.length
       || roomMeters.some(meter => meter.newVal === null || meter.newVal === '' || meter.newVal === undefined);
     const hasUnpaidBill = bill && !isPaidStatus(bill.status);
-    return hasMissingMeter || hasUnpaidBill;
+    return (hasMissingMeter && meterDueState.isInWindow) || hasUnpaidBill;
   };
 
   const incompleteQuickRooms = quickRooms.filter(isQuickRoomIncomplete);
   const visibleQuickRooms = showAllQuickRooms ? quickRooms : incompleteQuickRooms;
   const hasQuickRoomsToProcess = incompleteQuickRooms.length > 0;
+  const getQuickHouseIncompleteCount = (house) => {
+    const houseRooms = roomsByHouse[house.id] || [];
+    return houseRooms.filter(room => isQuickRoomIncomplete(room, house)).length;
+  };
+  const getQuickHouseUnpaidAmount = (house) => {
+    const houseRooms = roomsByHouse[house.id] || [];
+    const houseBills = billsByHouse[house.id] || [];
+    return houseRooms.reduce((total, room) => {
+      const bill = getQuickRoomBill(room, houseBills);
+      return bill && !isPaidStatus(bill.status) ? total + (Number(bill.total) || 0) : total;
+    }, 0);
+  };
+  const totalIncompleteQuickRooms = quickQrHouses.reduce((total, house) => total + getQuickHouseIncompleteCount(house), 0);
+  const totalQuickUnpaidAmount = quickQrHouses.reduce((total, house) => total + getQuickHouseUnpaidAmount(house), 0);
+  const selectedQuickHouseUnpaidAmount = selectedQuickHouse ? getQuickHouseUnpaidAmount(selectedQuickHouse) : 0;
+  const visibleQuickQrHouses = showAllQuickRooms
+    ? quickQrHouses
+    : quickQrHouses.filter(house => getQuickHouseIncompleteCount(house) > 0);
 
   const getQuickRoomStatusStyle = ({ roomMeters, bill }) => {
     const hasMissingMeter = !roomMeters.length || roomMeters.some(meter => meter.newVal === null || meter.newVal === '' || meter.newVal === undefined);
@@ -306,41 +460,53 @@ const HubView = ({
     if (!quickQrHouses.length) return;
     if (!quickQrHouses.some(house => String(house.id) === String(quickHouseId))) {
       setQuickHouseId(quickQrHouses[0].id);
+      setHasManualQuickHouse(false);
+      return;
     }
-  }, [quickHouseId, quickQrHouses]);
+
+    if (hasManualQuickHouse) return;
+
+    const selectedHasWork = selectedQuickHouse && getQuickHouseIncompleteCount(selectedQuickHouse) > 0;
+    if (selectedHasWork) return;
+
+    const houseNeedingWork = quickQrHouses.find(house => getQuickHouseIncompleteCount(house) > 0);
+    if (houseNeedingWork && String(houseNeedingWork.id) !== String(quickHouseId)) {
+      setQuickHouseId(houseNeedingWork.id);
+    }
+  }, [quickHouseId, quickQrHouses, selectedQuickHouse, hasManualQuickHouse, roomsByHouse, metersByHouse, billsByHouse]);
+
+  React.useEffect(() => {
+    setHasManualQuickHouse(false);
+  }, [quickQrHouseIdsKey, viewDate]);
+
+  const loadQuickRooms = async (house, { silent = false } = {}) => {
+    if (!house?.id) return [];
+    if (roomsByHouse[house.id]) return roomsByHouse[house.id];
+
+    try {
+      if (!silent) setRoomsLoadingHouseId(house.id);
+      const data = await api.get(`/room/${house.id}`);
+      const parsedRooms = (data || []).map(room => ({
+        ...room,
+        houseId: room.houseId || house.id,
+        houseName: room.houseName || getHouseLabel(house),
+      }));
+      setRoomsByHouse(prev => ({ ...prev, [house.id]: parsedRooms }));
+      return parsedRooms;
+    } catch (error) {
+      if (!silent) showToast?.(error.message || 'Không tải được danh sách phòng.', 'error');
+      return [];
+    } finally {
+      if (!silent) setRoomsLoadingHouseId(null);
+    }
+  };
 
   React.useEffect(() => {
     if (!selectedQuickHouse?.id || roomsByHouse[selectedQuickHouse.id]) return;
+    loadQuickRooms(selectedQuickHouse);
+  }, [roomsByHouse, selectedQuickHouse]);
 
-    let cancelled = false;
-    const loadRooms = async () => {
-      try {
-        setRoomsLoadingHouseId(selectedQuickHouse.id);
-        const data = await api.get(`/room/${selectedQuickHouse.id}`);
-        if (!cancelled) {
-          setRoomsByHouse(prev => ({
-            ...prev,
-            [selectedQuickHouse.id]: (data || []).map(room => ({
-              ...room,
-              houseId: room.houseId || selectedQuickHouse.id,
-              houseName: room.houseName || getHouseLabel(selectedQuickHouse),
-            })),
-          }));
-        }
-      } catch (error) {
-        if (!cancelled) showToast?.(error.message || 'Không tải được danh sách phòng.', 'error');
-      } finally {
-        if (!cancelled) setRoomsLoadingHouseId(null);
-      }
-    };
-
-    loadRooms();
-    return () => {
-      cancelled = true;
-    };
-  }, [roomsByHouse, selectedQuickHouse, showToast]);
-
-  const loadQuickMeters = async (houseId = selectedQuickHouse?.id, force = false) => {
+  const loadQuickMeters = async (houseId = selectedQuickHouse?.id, force = false, { silent = false } = {}) => {
     if (!houseId) return [];
     if (!force && metersByHouse[houseId]) return metersByHouse[houseId];
 
@@ -349,7 +515,7 @@ const HubView = ({
     const year = meterDate.getFullYear();
 
     try {
-      setMetersLoadingHouseId(houseId);
+      if (!silent) setMetersLoadingHouseId(houseId);
       const data = await api.get(`/meter/${houseId}?year=${year}&month=${month}`);
       const parsedMeters = (data || []).map(meter => ({
         ...meter,
@@ -358,10 +524,10 @@ const HubView = ({
       setMetersByHouse(prev => ({ ...prev, [houseId]: parsedMeters }));
       return parsedMeters;
     } catch (error) {
-      showToast?.(error.message || 'Không tải được danh sách công tơ.', 'error');
+      if (!silent) showToast?.(error.message || 'Không tải được danh sách công tơ.', 'error');
       return [];
     } finally {
-      setMetersLoadingHouseId(null);
+      if (!silent) setMetersLoadingHouseId(null);
     }
   };
 
@@ -394,6 +560,94 @@ const HubView = ({
     if (!selectedQuickHouse?.id || !quickRooms.length || metersByHouse[selectedQuickHouse.id]) return;
     loadQuickMeters(selectedQuickHouse.id);
   }, [metersByHouse, quickRooms.length, selectedQuickHouse]);
+
+  React.useEffect(() => {
+    if (!quickQrHouses.length) return;
+
+    let cancelled = false;
+    const loadAllQuickStatuses = async () => {
+      for (const house of quickQrHouses) {
+        if (cancelled) return;
+        const houseRooms = roomsByHouse[house.id] || await loadQuickRooms(house, { silent: true });
+        if (cancelled || !houseRooms.length) continue;
+        if (!metersByHouse[house.id]) loadQuickMeters(house.id, false, { silent: true });
+        if (!billsByHouse[house.id]) loadQuickBills(house.id);
+      }
+    };
+
+    loadAllQuickStatuses();
+    return () => {
+      cancelled = true;
+    };
+  }, [quickQrHouseIdsKey, viewDate, roomsByHouse, metersByHouse, billsByHouse]);
+
+  React.useEffect(() => {
+    if (!houses.length) {
+      setHubMonthlyStats(null);
+      return;
+    }
+
+    let cancelled = false;
+    const targetDate = viewDate || new Date();
+    const month = targetDate.getMonth() + 1;
+    const year = targetDate.getFullYear();
+
+    const loadMonthlyStats = async () => {
+      const summaries = await Promise.all(houses.map(house => (
+        api.get(`/management/dashboard/summary/${house.id}?year=${year}&month=${month}`).catch(() => null)
+      )));
+
+      if (cancelled) return;
+
+      const nextStats = summaries.reduce((acc, summary, index) => {
+        const house = houses[index];
+        const fixedCosts = (Number(house?.rentPrice) || 0) + (Number(house?.internetFee) || 0) + (Number(house?.otherFees) || 0);
+        acc.fixedCosts += fixedCosts;
+
+        if (!summary) return acc;
+        const revenue = Number(summary.revenue) || 0;
+        const expense = Number(summary.expense) || 0;
+        acc.revenue += revenue;
+        acc.expense += expense;
+        acc.txExp += Math.max(0, expense - fixedCosts);
+        acc.profit += Number(summary.profit ?? (revenue - expense)) || 0;
+        return acc;
+      }, { revenue: 0, expense: 0, fixedCosts: 0, txExp: 0, profit: 0 });
+
+      setHubMonthlyStats(nextStats);
+    };
+
+    loadMonthlyStats();
+    return () => {
+      cancelled = true;
+    };
+  }, [houses, viewDate]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    const loadHubMoneyBooks = async () => {
+      try {
+        const [fundsData, savingsData] = await Promise.all([
+          api.get('/funds').catch(() => []),
+          api.get('/saving').catch(() => []),
+        ]);
+        if (cancelled) return;
+        setHubFunds(Array.isArray(fundsData) ? fundsData : []);
+        setHubSavings(Array.isArray(savingsData) ? savingsData : []);
+      } catch {
+        if (!cancelled) {
+          setHubFunds([]);
+          setHubSavings([]);
+        }
+      }
+    };
+
+    loadHubMoneyBooks();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const saveMeterLink = (roomId, result) => {
     const fullUrl = resolvePublicLink(result);
@@ -651,7 +905,7 @@ const HubView = ({
     }
   };
 
-  const downloadRoomQr = async (room) => {
+  const shareRoomQr = async (room) => {
     try {
       setDownloadLoadingRoomId(room.id);
       const link = await getMeterReadingLink(room);
@@ -663,10 +917,18 @@ const HubView = ({
         houseLabel,
         roomLabel: `Phòng ${roomLabel}`,
       });
-      downloadDataUrl(cardDataUrl, `${getSafeFileName(houseLabel, `Phòng ${roomLabel}`)}-QR.png`);
-      showToast?.(`Đã tải QR phòng ${roomLabel}.`, 'success');
+      const shareMode = await shareDataUrlImage({
+        dataUrl: cardDataUrl,
+        fileName: `${getSafeFileName(houseLabel, `Phòng ${roomLabel}`)}-QR.png`,
+        title: `QR phòng ${roomLabel}`,
+        dialogTitle: 'Chia sẻ QR qua Zalo',
+      });
+      showToast?.(
+        shareMode === 'clipboard' ? 'Đã copy ảnh QR vào clipboard.' : 'Đã mở chia sẻ. Chọn Zalo để gửi QR.',
+        'success'
+      );
     } catch (error) {
-      showToast?.(error.message || 'Không tải được QR phòng này.', 'error');
+      showToast?.(error.message || 'Không chia sẻ được QR phòng này.', 'error');
     } finally {
       setDownloadLoadingRoomId(null);
     }
@@ -798,13 +1060,19 @@ const HubView = ({
       <div className="shrink-0 bg-white border-b border-slate-200 px-4 pt-3 pb-3">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest leading-none">Lucky Home</p>
-            <h1 className="text-base font-black text-indigo-700 tracking-tight truncate mt-1">
-              {user?.fullName || 'Tài khoản quản lý'}
+            <h1 className="text-base font-black text-indigo-700 tracking-tight truncate">
+              {user?.fullName || 'Lucky Home'}
             </h1>
-            <p className="text-[10px] font-semibold text-slate-500 mt-0.5 leading-tight">
-              Tổng quan vận hành và lối vào nhanh
-            </p>
+            <div className="mt-1 flex min-w-0 items-center gap-1.5 overflow-hidden">
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[8px] font-black uppercase text-emerald-700 ring-1 ring-emerald-100">
+                <Building2 className="h-3 w-3" />
+                {hubStats.totalHouses} cơ sở
+              </span>
+              <span className="inline-flex min-w-0 items-center gap-1 rounded-md bg-blue-50 px-1.5 py-0.5 text-[8px] font-black uppercase text-blue-700 ring-1 ring-blue-100">
+                <Users2 className="h-3 w-3 shrink-0" />
+                <span className="truncate">{rentedRooms}/{hubStats.totalRooms} phòng thuê</span>
+              </span>
+            </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <NotificationBell
@@ -823,44 +1091,75 @@ const HubView = ({
             </button>
           </div>
         </div>
-
-        <div className="mt-3 grid grid-cols-4 gap-1.5">
-          {[
-            { label: 'Cơ sở', value: hubStats.totalHouses, tone: 'text-blue-700 bg-blue-50' },
-            { label: 'Phòng', value: hubStats.totalRooms, tone: 'text-slate-700 bg-slate-50' },
-            { label: 'Trống', value: Math.max(0, hubStats.emptyRooms), tone: 'text-amber-700 bg-amber-50' },
-            { label: 'Lấp đầy', value: `${occupancyRate}%`, tone: 'text-emerald-700 bg-emerald-50' }
-          ].map(item => (
-            <div key={item.label} className={`rounded-lg border border-slate-200 px-1.5 py-2 text-center ${item.tone}`}>
-              <p className="text-[13px] font-black tabular-nums leading-none">{item.value}</p>
-              <p className="mt-1 text-[6.5px] font-black uppercase leading-none opacity-70 whitespace-nowrap">{item.label}</p>
-            </div>
-          ))}
-        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pt-3 pb-24 space-y-4 no-scrollbar">
-        <section className="bg-slate-900 text-white rounded-xl p-4 shadow-lg">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Vận hành tháng này</p>
-              <h2 className="text-2xl font-black text-emerald-400 mt-2 tabular-nums">
-                {formatN(hubStats.revenue)}
-              </h2>
-              <p className="text-[11px] font-bold text-slate-400 mt-1">Doanh thu ghi nhận từ các cơ sở</p>
+        <section className="overflow-hidden rounded-xl border border-emerald-100 bg-white shadow-lg shadow-emerald-100/70">
+          <div className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-emerald-950 to-blue-950 px-3.5 py-3 text-white">
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-emerald-300/70 to-transparent" />
+            <div className="pointer-events-none absolute -right-10 -top-12 h-28 w-28 rounded-full bg-emerald-400/20 blur-2xl" />
+            <div className="pointer-events-none absolute -bottom-14 left-8 h-24 w-24 rounded-full bg-blue-400/15 blur-2xl" />
+            <div className="relative flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/12 text-emerald-200 shadow-sm shadow-emerald-950/30 ring-1 ring-white/15">
+                  <TrendingUp className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-emerald-200">Vận hành tháng này</p>
+                  <h2 className="mt-0.5 truncate text-[13px] font-black uppercase tracking-wide text-white">Kỳ {operationPeriod}</h2>
+                </div>
+              </div>
+              <div className="shrink-0 rounded-lg bg-white/10 px-2.5 py-1.5 text-right ring-1 ring-white/15 backdrop-blur">
+                <p className="text-[8px] font-black uppercase text-slate-300">Lấp đầy</p>
+                <p className="text-[16px] font-black text-emerald-200 tabular-nums">{occupancyRate}%</p>
+              </div>
             </div>
-            <div className="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
-              <TrendingUp className="w-5 h-5 text-emerald-300" />
+
+            <div className="relative mt-3 rounded-xl bg-white/8 p-2.5 ring-1 ring-white/10 backdrop-blur">
+              <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Doanh thu ghi nhận</p>
+              <div className="mt-1 flex items-end justify-between gap-3">
+                <div className="flex min-w-0 items-end gap-1">
+                  <CircleDollarSign className="mb-0.5 h-5 w-5 shrink-0 text-emerald-300" />
+                  <p className="min-w-0 text-[26px] font-black leading-none tracking-tight text-white tabular-nums">{formatN(operationStats.revenue)}</p>
+                </div>
+                <span className="shrink-0 pb-0.5 text-[11px] font-black text-emerald-200">đ</span>
+              </div>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-white/10">
+
+          <div className="space-y-2.5 p-3">
             <div>
-              <p className="text-[8px] font-black uppercase tracking-widest text-slate-500">Lợi nhuận</p>
-              <p className="text-sm font-black text-blue-300 tabular-nums mt-1">{formatN(hubStats.profit)}</p>
+              <div className="flex items-center justify-between text-[9px] font-black uppercase text-slate-400">
+                <span>{rentedRooms}/{hubStats.totalRooms} phòng đang thuê</span>
+                <span>{hubStats.emptyRooms} trống</span>
+              </div>
+              <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100">
+                <div className="h-full rounded-full bg-emerald-500" style={{ width: `${occupancyRate}%` }} />
+              </div>
             </div>
-            <div className="text-right">
-              <p className="text-[8px] font-black uppercase tracking-widest text-slate-500">Phòng đang thuê</p>
-              <p className="text-sm font-black text-white tabular-nums mt-1">{rentedRooms}/{hubStats.totalRooms}</p>
+
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-lg border border-amber-300/60 bg-gradient-to-br from-amber-600 via-orange-500 to-orange-400 px-2 py-2 text-center shadow-sm shadow-amber-200/80">
+                <div className="flex items-center justify-center gap-1">
+                  <FileText className="h-3 w-3 shrink-0 text-amber-50" />
+                  <p className="text-[7px] font-black uppercase text-amber-50">Cố định</p>
+                </div>
+                <p className="mt-0.5 truncate text-[11px] font-black text-white tabular-nums">-{formatN(operationStats.fixedCosts || 0)}</p>
+              </div>
+              <div className="rounded-lg border border-rose-300/60 bg-gradient-to-br from-rose-600 via-red-500 to-pink-500 px-2 py-2 text-center shadow-sm shadow-rose-200/80">
+                <div className="flex items-center justify-center gap-1">
+                  <Receipt className="h-3 w-3 shrink-0 text-rose-50" />
+                  <p className="text-[7px] font-black uppercase text-rose-50">Phát sinh</p>
+                </div>
+                <p className="mt-0.5 truncate text-[11px] font-black text-white tabular-nums">-{formatN(operationStats.txExp || 0)}</p>
+              </div>
+              <div className="rounded-lg border border-blue-300/60 bg-gradient-to-br from-blue-700 via-indigo-600 to-cyan-500 px-2 py-2 text-center shadow-sm shadow-blue-200/80">
+                <div className="flex items-center justify-center gap-1">
+                  <TrendingUp className="h-3 w-3 shrink-0 text-blue-50" />
+                  <p className="text-[7px] font-black uppercase text-blue-50">Lợi nhuận</p>
+                </div>
+                <p className="mt-0.5 truncate text-[11px] font-black text-white tabular-nums">{formatN(operationStats.profit)}</p>
+              </div>
             </div>
           </div>
         </section>
@@ -889,76 +1188,88 @@ const HubView = ({
           </section>
         )}
 
-        <section className="grid grid-cols-2 gap-3">
+        <section className="grid grid-cols-2 gap-2">
           {[
-            { label: 'Quản lý cơ sở', desc: `${hubStats.totalHouses} cơ sở`, icon: Building2, tone: 'bg-blue-600 text-white', action: () => { setIsHubMode(false); setActiveTab('dashboard'); } },
-            { label: 'Sổ chi tiêu', desc: 'Quản lý sổ quỹ', icon: CircleDollarSign, tone: 'bg-white text-orange-600', action: () => { setIsHubMode(false); setActiveTab('fund'); setSelectedHouse(null); } },
-            { label: 'Sổ tiết kiệm', desc: 'Theo dõi tiền gửi', icon: PiggyBank, tone: 'bg-white text-emerald-600', action: () => { setIsHubMode(false); setActiveTab('savings'); setSelectedHouse(null); } },
-            { label: 'AI Chat', desc: 'Hỗ trợ thao tác', icon: Sparkles, tone: 'bg-white text-indigo-600', action: () => { setIsHubMode(false); setActiveTab('ai'); setSelectedHouse(null); } }
+            { label: 'Quản lý cơ sở', desc: `${hubStats.totalHouses} cơ sở`, icon: Building2, tone: 'border-blue-200 bg-blue-50 text-blue-800 shadow-blue-100/70', iconTone: 'bg-blue-600 text-white shadow-blue-200', action: () => { setIsHubMode(false); setActiveTab('dashboard'); } },
+            { label: 'Sổ chi tiêu', desc: hubFunds.length ? `${formatN(hubFundTotal)} đ` : 'Quản lý sổ quỹ', icon: CircleDollarSign, tone: 'border-amber-200 bg-amber-50 text-amber-900 shadow-amber-100/70', iconTone: 'bg-amber-500 text-white shadow-amber-200', action: () => { setIsHubMode(false); setActiveTab('fund'); setSelectedHouse(null); } },
+            { label: 'Sổ tiết kiệm', desc: hubSavings.length ? `${formatN(hubSavingTotal)} đ` : 'Theo dõi tiền gửi', icon: PiggyBank, tone: 'border-emerald-200 bg-emerald-50 text-emerald-800 shadow-emerald-100/70', iconTone: 'bg-emerald-500 text-white shadow-emerald-200', action: () => { setIsHubMode(false); setActiveTab('savings'); setSelectedHouse(null); } },
+            { label: 'AI Chat', desc: 'Hỗ trợ thao tác', icon: Sparkles, tone: 'border-indigo-200 bg-indigo-50 text-indigo-800 shadow-indigo-100/70', iconTone: 'bg-indigo-500 text-white shadow-indigo-200', action: () => { setIsHubMode(false); setActiveTab('ai'); setSelectedHouse(null); } }
           ].map(item => (
-            <button key={item.label} type="button" onClick={item.action} className={`${item.tone} min-h-[112px] rounded-xl border border-slate-200 p-4 text-left shadow-sm active:scale-[0.98] transition-all flex flex-col justify-between`}>
-              <div className="w-10 h-10 rounded-xl bg-black/5 flex items-center justify-center"><item.icon className="w-5 h-5" /></div>
-              <div><h3 className="text-[13px] font-black uppercase leading-tight">{item.label}</h3><p className="text-[10px] font-bold opacity-70 mt-1">{item.desc}</p></div>
+            <button key={item.label} type="button" onClick={item.action} className={`${item.tone} flex min-h-[66px] items-center gap-2 rounded-xl border p-2.5 text-left shadow-md transition-all active:scale-[0.98]`}>
+              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl shadow-sm ${item.iconTone}`}>
+                <item.icon className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="truncate text-[11px] font-black uppercase leading-tight">{item.label}</h3>
+                <p className="mt-0.5 truncate text-[9px] font-bold opacity-70">{item.desc}</p>
+              </div>
             </button>
           ))}
         </section>
 
         {(isManagerOrAbove || quickQrHouses.length > 0) && quickQrHouses.length > 0 && (
-          <section className="relative bg-white rounded-xl border border-slate-200 shadow-sm overflow-visible">
-            <div className="p-3 border-b border-slate-100">
+          <section className="relative overflow-visible rounded-xl border border-amber-200 bg-white shadow-md shadow-amber-100/70">
+            <div className="rounded-t-xl border-b border-amber-100 bg-gradient-to-br from-amber-50 via-orange-50 to-white p-2.5">
               <div
                 role="button"
                 tabIndex={0}
-                onClick={() => setIsQuickQrExpanded(prev => !prev)}
+                onClick={() => {
+                  setIsQuickHousePickerOpen(false);
+                  setIsQuickQrExpanded(prev => !prev);
+                }}
                 onKeyDown={event => {
                   if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
+                    setIsQuickHousePickerOpen(false);
                     setIsQuickQrExpanded(prev => !prev);
                   }
                 }}
-                className="flex cursor-pointer items-center justify-between gap-3 rounded-lg active:bg-slate-50"
+                className="flex cursor-pointer items-center justify-between gap-2 rounded-lg bg-white/70 px-2.5 py-2 text-amber-900 ring-1 ring-amber-100 active:bg-amber-50"
                 aria-expanded={isQuickQrExpanded}
               >
-                <div className="flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-green-800" />
-                  <h3 className="text-[13px] font-black text-green-700 uppercase tracking-wide">
-                    Thao tác nhanh
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-white shadow-sm shadow-amber-200">
+                    <Zap className="h-4 w-4" />
+                  </span>
+                  <h3 className="shrink-0 text-[13px] font-black uppercase tracking-wide text-amber-900">
+                    Xử lý nhanh
                   </h3>
+                  <span className={`inline-flex h-4 shrink-0 items-center justify-center rounded px-1.5 text-[8px] font-black leading-none shadow-sm ${totalIncompleteQuickRooms > 0 ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-white'}`}>
+                    {totalIncompleteQuickRooms} phòng
+                  </span>
+                  {totalQuickUnpaidAmount > 0 && (
+                    <span className="inline-flex h-4 min-w-0 shrink items-center justify-center rounded bg-rose-50 px-1.5 text-[8px] font-black leading-none text-rose-700 shadow-sm ring-1 ring-rose-100">
+                      {formatN(totalQuickUnpaidAmount)} đ
+                    </span>
+                  )}
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={event => {
-                      event.stopPropagation();
-                      setIsQuickQrExpanded(prev => !prev);
-                    }}
-                    className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 active:scale-95"
-                    aria-label={isQuickQrExpanded ? 'Thu gọn QR ghi điện nhanh' : 'Mở rộng QR ghi điện nhanh'}
-                  >
-                    <ChevronDown className={`h-4 w-4 transition-transform ${isQuickQrExpanded ? 'rotate-180' : ''}`} />
-                  </button>
-                </div>
+                <div className="shrink-0" />
               </div>
 
               <div className="mt-2 flex items-center gap-2">
-                <div className={`flex min-w-0 flex-1 items-center justify-between gap-2 rounded-xl border px-3 py-2 ${hasQuickRoomsToProcess ? 'border-rose-100 bg-rose-50' : 'border-emerald-100 bg-emerald-50'}`}>
-                  <div className="flex min-w-0 items-center gap-2">
+                <div className={`flex min-w-0 flex-1 items-center justify-between gap-1.5 rounded-lg border px-2.5 py-1.5 ${hasQuickRoomsToProcess ? 'border-rose-100 bg-rose-50' : 'border-emerald-100 bg-emerald-50'}`}>
+                  <div className="flex min-w-0 items-center gap-1.5">
                     {hasQuickRoomsToProcess ? (
                       <Hexagon className="h-3.5 w-3.5 shrink-0 fill-rose-500 text-rose-500" />
                     ) : (
                       <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
                     )}
-                    <p className={`truncate text-[10px] font-black uppercase ${hasQuickRoomsToProcess ? 'text-rose-700' : 'text-emerald-700'}`}>
+                    <p className={`shrink-0 text-[9px] font-black uppercase ${hasQuickRoomsToProcess ? 'text-rose-700' : 'text-emerald-700'}`}>
                       {hasQuickRoomsToProcess ? (showAllQuickRooms ? 'Hiển thị tất cả' : 'Cần xử lý') : 'Hoàn thành'}
                     </p>
                     {hasQuickRoomsToProcess && (
-                      <span className="shrink-0 rounded-md bg-rose-500 px-2 py-0.5 text-[10px] font-black leading-none text-white shadow-sm">
-                        {incompleteQuickRooms.length}
+                      <span className="inline-flex h-4 shrink-0 items-center justify-center rounded bg-rose-500 px-1.5 text-[8px] font-black leading-none text-white shadow-sm">
+                        {incompleteQuickRooms.length} phòng
+                      </span>
+                    )}
+                    {selectedQuickHouseUnpaidAmount > 0 && (
+                      <span className="inline-flex h-4 min-w-0 shrink items-center justify-center rounded bg-rose-100 px-1.5 text-[8px] font-black leading-none text-rose-700">
+                        {formatN(selectedQuickHouseUnpaidAmount)} đ
                       </span>
                     )}
                   </div>
                   {(hasQuickRoomsToProcess || showAllQuickRooms) && (
-                    <p className={`shrink-0 text-[9px] font-bold ${hasQuickRoomsToProcess ? 'text-rose-400' : 'text-emerald-500'}`}>{visibleQuickRooms.length}/{quickRooms.length}</p>
+                    <p className={`shrink-0 text-[8px] font-bold ${hasQuickRoomsToProcess ? 'text-rose-400' : 'text-emerald-500'}`}>{visibleQuickRooms.length}/{quickRooms.length}</p>
                   )}
                 </div>
                 <button
@@ -977,7 +1288,7 @@ const HubView = ({
                   <button
                     type="button"
                     onClick={() => setIsQuickHousePickerOpen(prev => !prev)}
-                    className={`flex h-12 w-full items-center gap-2 rounded-xl border px-2.5 text-left shadow-inner active:scale-[0.99] ${hasQuickRoomsToProcess ? 'border-rose-100 bg-rose-50/70' : 'border-emerald-100 bg-emerald-50/80'}`}
+                    className={`flex h-11 w-full items-center gap-2 rounded-xl border px-2.5 text-left shadow-inner active:scale-[0.99] ${hasQuickRoomsToProcess ? 'border-rose-100 bg-rose-50/70' : 'border-emerald-100 bg-emerald-50/80'}`}
                     aria-expanded={isQuickHousePickerOpen}
                     aria-haspopup="listbox"
                   >
@@ -985,41 +1296,40 @@ const HubView = ({
                       <Building2 className="h-4 w-4" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-black uppercase text-blue-800">
+                      <p className="truncate text-[11px] font-black uppercase text-blue-800">
                         {getHouseLabel(selectedQuickHouse) || 'Cơ sở'}
                       </p>
-                      <p className="mt-0.5 text-[10px] font-bold text-slate-500">
-                        {quickRooms.length} phòng trong cơ sở đang chọn
-                      </p>
+                      {renderQuickHouseComboboxChips(selectedQuickHouse)}
                     </div>
                     <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${hasQuickRoomsToProcess ? 'text-rose-500' : 'text-emerald-600'} ${isQuickHousePickerOpen ? 'rotate-180' : ''}`} />
                   </button>
                   ) : (
-                    <div className={`flex h-12 w-full items-center gap-2 rounded-xl border px-2.5 text-left ${hasQuickRoomsToProcess ? 'border-slate-100 bg-slate-50' : 'border-emerald-100 bg-emerald-50/80'}`}>
+                    <div className={`flex h-11 w-full items-center gap-2 rounded-xl border px-2.5 text-left ${hasQuickRoomsToProcess ? 'border-slate-100 bg-slate-50' : 'border-emerald-100 bg-emerald-50/80'}`}>
                       <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm ${hasQuickRoomsToProcess ? 'text-slate-500' : 'text-emerald-600'}`}>
                         <Building2 className="h-4 w-4" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-xs font-black uppercase text-blue-800">
+                        <p className="truncate text-[11px] font-black uppercase text-blue-800">
                           {getHouseLabel(selectedQuickHouse) || 'Cơ sở'}
                         </p>
-                        <p className="mt-0.5 text-[9px] font-bold text-slate-500">
-                          {quickRooms.length} phòng
-                        </p>
+                        {renderQuickHouseComboboxChips(selectedQuickHouse)}
                       </div>
                     </div>
                   )}
 
                   {isQuickHousePickerOpen && (
                     <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg no-scrollbar" role="listbox">
-                      {quickQrHouses.map(house => {
+                      {visibleQuickQrHouses.map(house => {
                         const isSelected = String(house.id) === String(selectedQuickHouse?.id);
+                        const incompleteCount = getQuickHouseIncompleteCount(house);
+                        const unpaidAmount = getQuickHouseUnpaidAmount(house);
                         return (
                           <button
                             key={house.id}
                             type="button"
                             onClick={() => {
                               setQuickHouseId(house.id);
+                              setHasManualQuickHouse(true);
                               setIsQuickHousePickerOpen(false);
                             }}
                             className={`flex w-full items-center gap-3 rounded-lg px-2.5 py-2.5 text-left active:scale-[0.99] ${isSelected ? 'bg-rose-50 text-rose-700' : 'text-slate-700 active:bg-slate-50'}`}
@@ -1033,13 +1343,22 @@ const HubView = ({
                               <p className="truncate text-[11px] font-black uppercase">
                                 {getHouseLabel(house) || 'Cơ sở'}
                               </p>
-                              <p className="mt-0.5 text-[9px] font-bold text-slate-400">
-                                {house.totalRooms || 0} phòng
-                              </p>
+                              {renderQuickHouseComboboxChips(house)}
                             </div>
-                            {isSelected && (
-                              <span className="rounded-md bg-rose-600 px-2 py-1 text-[8px] font-black uppercase text-white">
-                                Đang chọn
+                            {incompleteCount > 0 ? (
+                              <div className="flex shrink-0 flex-col items-end gap-1">
+                                <span className="rounded-md bg-rose-100 px-2 py-1 text-[8px] font-black uppercase text-rose-700">
+                                  {incompleteCount} cần xử lý
+                                </span>
+                                {unpaidAmount > 0 && (
+                                  <span className="rounded-md bg-rose-50 px-2 py-0.5 text-[8px] font-black text-rose-700 ring-1 ring-rose-100">
+                                    {formatN(unpaidAmount)} đ
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                                <CheckCircle2 className="h-4 w-4" />
                               </span>
                             )}
                           </button>
@@ -1052,7 +1371,7 @@ const HubView = ({
                   type="button"
                   onClick={downloadAllHouseQr}
                   disabled={!quickRooms.length || isDownloadingHouseQr || roomsLoadingHouseId === selectedQuickHouse?.id}
-                  className="flex h-12 w-11 shrink-0 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700 active:scale-95 disabled:opacity-50"
+                  className="flex h-11 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700 active:scale-95 disabled:opacity-50"
                   aria-label="Tải toàn bộ QR"
                   title="Tải toàn bộ QR"
                 >
@@ -1084,46 +1403,63 @@ const HubView = ({
                   const roomBill = getQuickRoomBill(room);
                   const roomMeters = getQuickRoomMeters(room);
                   const rowStatusStyle = getQuickRoomStatusStyle({ roomMeters, bill: roomBill });
-                  const missingBadges = getQuickMissingStatusBadges({ roomMeters, bill: roomBill });
+                  const missingBadges = getQuickMissingStatusBadges({ room, roomMeters, bill: roomBill });
+                  const hasUnpaidQuickBill = roomBill && !isPaidStatus(roomBill.status);
                   return (
-                    <div key={room.id} className={`flex w-full items-center gap-1.5 border-b border-slate-200/70 p-2.5 last:border-b-0 ${rowStatusStyle.row}`}>
+                    <div key={room.id} className={`flex w-full items-center gap-1.5 border-b border-slate-200/70 px-2.5 py-2 last:border-b-0 ${rowStatusStyle.row}`}>
                       <button
                         type="button"
                         onClick={() => handleShowMeterLinkQr(room)}
                         disabled={isLoading || isOpeningReading || isOpeningBill || isDownloadingHouseQr}
-                        className="flex min-w-0 flex-1 items-center gap-2 rounded-xl p-1 text-left active:bg-rose-50 disabled:opacity-60"
+                        className="flex min-w-0 flex-1 items-center gap-2 rounded-lg p-0.5 text-left active:bg-rose-50 disabled:opacity-60"
                       >
-                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${rowStatusStyle.icon}`}>
+                        <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${rowStatusStyle.icon}`}>
                           {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
                         </div>
                         <div className="min-w-0 flex-1">
-                            <p className="truncate text-[11px] font-black uppercase text-blue-800">
+                            <p className="truncate text-[10px] font-black uppercase text-blue-800">
                             {room.roomType === 'mbkd' ? 'MBKD ' : 'Phòng '}{roomCode}
                           </p>
                           <div className="mt-0.5 flex flex-nowrap gap-1 overflow-x-auto no-scrollbar">
                             {missingBadges.map(badge => (
-                              <span key={badge.label} className={`shrink-0 rounded-md px-1.5 py-0.5 text-[7px] sm:text-[8px] font-black uppercase leading-none whitespace-nowrap ${badge.className}`}>
+                              <span key={badge.label} className={`shrink-0 rounded px-1.5 py-0.5 text-[6px] font-black uppercase leading-none whitespace-nowrap ${badge.className}`}>
                                 {badge.label}
                               </span>
                             ))}
                           </div>
                         </div>
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => handleOpenMeterReading(room)}
-                        disabled={isLoading || isOpeningReading || isOpeningBill || isDownloadingHouseQr}
-                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border active:scale-95 disabled:opacity-60 ${getQuickMeterButtonClass(roomMeters)}`}
-                        aria-label={`Ghi số điện phòng ${roomCode}`}
-                        title={!roomMeters.length ? 'Chưa gắn công tơ' : roomMeters.some(meter => meter.newVal === null || meter.newVal === '' || meter.newVal === undefined) ? 'Chưa nhập đủ chỉ số' : 'Đã nhập chỉ số'}
-                      >
-                        {isOpeningReading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
-                      </button>
+                      {hasUnpaidQuickBill && quickBillCanManage ? (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleQuickPayBill(roomBill.id);
+                          }}
+                          disabled={isLoading || isOpeningReading || isOpeningBill || isDownloadingHouseQr}
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-rose-100 bg-rose-50 text-rose-700 active:scale-95 disabled:opacity-60"
+                          aria-label={`Xác nhận đã thanh toán phòng ${roomCode}`}
+                          title="Xác nhận đã thanh toán"
+                        >
+                          <CheckCircle2 className="h-4 w-4" />
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenMeterReading(room)}
+                          disabled={isLoading || isOpeningReading || isOpeningBill || isDownloadingHouseQr}
+                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border active:scale-95 disabled:opacity-60 ${getQuickMeterButtonClass(roomMeters)}`}
+                          aria-label={`Ghi số điện phòng ${roomCode}`}
+                          title={!roomMeters.length ? 'Chưa gắn công tơ' : roomMeters.some(meter => meter.newVal === null || meter.newVal === '' || meter.newVal === undefined) ? 'Chưa nhập đủ chỉ số' : 'Đã nhập chỉ số'}
+                        >
+                          {isOpeningReading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => handleOpenQuickBill(room)}
                         disabled={isLoading || isOpeningReading || isOpeningBill || isDownloadingHouseQr}
-                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border active:scale-95 disabled:opacity-60 ${getQuickBillButtonClass(roomBill)}`}
+                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border active:scale-95 disabled:opacity-60 ${getQuickBillButtonClass(roomBill)}`}
                         aria-label={`Xem hóa đơn phòng ${roomCode}`}
                         title={!roomBill ? 'Chưa tạo hóa đơn' : isPaidStatus(roomBill.status) ? 'Đã thanh toán' : 'Đã tạo, chưa thanh toán'}
                       >
@@ -1131,12 +1467,12 @@ const HubView = ({
                       </button>
                       <button
                         type="button"
-                        onClick={() => downloadRoomQr(room)}
+                        onClick={() => shareRoomQr(room)}
                         disabled={isLoading || isOpeningReading || isOpeningBill || isDownloading || isDownloadingHouseQr}
-                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700 active:scale-95 disabled:opacity-60"
-                        aria-label={`Tải QR phòng ${roomCode}`}
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-teal-100 bg-teal-50 text-teal-700 active:scale-95 disabled:opacity-60"
+                        aria-label={`Chia sẻ QR phòng ${roomCode} qua Zalo`}
                       >
-                        {isDownloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                        {isDownloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}
                       </button>
                     </div>
                   );
@@ -1147,7 +1483,7 @@ const HubView = ({
         )}
 
         {dashboardWarnings.length > 0 && (
-          <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden animate-in zoom-in-95 duration-300">
+          <section className="overflow-hidden rounded-xl border border-rose-200 bg-white shadow-md shadow-rose-100/70 animate-in zoom-in-95 duration-300">
             <div
               role="button"
               tabIndex={0}
@@ -1159,25 +1495,19 @@ const HubView = ({
                 }
               }}
               aria-expanded={isWarningsExpanded}
-              className="p-3.5 flex cursor-pointer items-center justify-between gap-3 border-b border-slate-100 bg-slate-50 active:bg-rose-50"
+              className="flex cursor-pointer items-center justify-between gap-3 border-b border-rose-100 bg-gradient-to-br from-rose-50 via-red-50 to-white p-2.5 text-rose-900 active:bg-rose-50"
             >
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-rose-500" />
-                <h3 className="text-[13px] font-black text-rose-800 uppercase tracking-tight">Cần chú ý</h3>
+              <div className="flex min-w-0 items-center gap-2 rounded-lg bg-white/70 px-2.5 py-2 ring-1 ring-rose-100">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-rose-500 text-white shadow-sm shadow-rose-200">
+                  <AlertTriangle className="h-4 w-4" />
+                </span>
+                <div className="min-w-0">
+                  <h3 className="truncate text-[13px] font-black uppercase tracking-tight text-rose-900">Cần chú ý</h3>
+                  <p className="mt-0.5 truncate text-[8px] font-bold uppercase text-rose-500">Ưu tiên xử lý các việc đến hạn</p>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-md shadow-sm">{dashboardWarnings.length} Cảnh báo</span>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setIsWarningsExpanded(prev => !prev);
-                  }}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-rose-100 bg-white text-rose-600 transition active:scale-95"
-                  aria-label={isWarningsExpanded ? 'Thu gọn cảnh báo' : 'Mở rộng cảnh báo'}
-                >
-                  <ChevronDown className={`h-4 w-4 transition-transform ${isWarningsExpanded ? 'rotate-180' : ''}`} />
-                </button>
+              <div className="flex shrink-0 items-center gap-2">
+                <span className="rounded-md bg-rose-500 px-2 py-0.5 text-[10px] font-black leading-none text-white shadow-sm">{dashboardWarnings.length} cảnh báo</span>
               </div>
             </div>
             {isWarningsExpanded && <div className="divide-y divide-rose-100/80 max-h-[300px] overflow-y-auto no-scrollbar">
@@ -1201,7 +1531,7 @@ const HubView = ({
           </section>
         )}
 
-        <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <section className="overflow-hidden rounded-xl border border-blue-200 bg-white shadow-md shadow-blue-100/70">
           <div
             role="button"
             tabIndex={0}
@@ -1213,21 +1543,19 @@ const HubView = ({
               }
             }}
             aria-expanded={isRecentHousesExpanded}
-            className="p-4 flex cursor-pointer items-center justify-between gap-3 border-b border-slate-100 active:bg-blue-50"
+            className="flex cursor-pointer items-center justify-between gap-3 border-b border-blue-100 bg-gradient-to-br from-blue-50 via-indigo-50 to-white p-2.5 text-blue-900 active:bg-blue-50"
           >
-            <div><h3 className="text-sm font-black text-blue-700 uppercase">Cơ sở của bạn</h3><p className="text-[11px] font-semibold text-slate-500 mt-0.5">Chọn nhanh để vào dashboard</p></div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setIsRecentHousesExpanded(prev => !prev);
-                }}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-blue-100 bg-blue-50 text-blue-600 transition active:scale-95"
-                aria-label={isRecentHousesExpanded ? 'Thu gọn cơ sở của bạn' : 'Mở rộng cơ sở của bạn'}
-              >
-                <ChevronDown className={`h-4 w-4 transition-transform ${isRecentHousesExpanded ? 'rotate-180' : ''}`} />
-              </button>
+            <div className="flex min-w-0 items-center gap-2 rounded-lg bg-white/70 px-2.5 py-2 ring-1 ring-blue-100">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm shadow-blue-200">
+                <Building2 className="h-4 w-4" />
+              </span>
+              <div className="min-w-0">
+                <h3 className="truncate text-[13px] font-black uppercase tracking-tight text-blue-900">Cơ sở của bạn</h3>
+                <p className="mt-0.5 truncate text-[8px] font-bold uppercase text-blue-500">Chọn nhanh để vào dashboard</p>
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <span className="rounded-md bg-blue-600 px-2 py-0.5 text-[10px] font-black leading-none text-white shadow-sm">{houses.length} cơ sở</span>
             </div>
           </div>
           {isRecentHousesExpanded && <div className="max-h-[340px] divide-y divide-slate-200 overflow-y-auto no-scrollbar">
@@ -1248,7 +1576,16 @@ const HubView = ({
           </div>}
         </section>
 
-        <section className="grid grid-cols-2 gap-3"><button type="button" onClick={() => { setActiveTab('dashboard'); setIsHubMode(false); setEditingHouse(null); setIsAiCreateHouseOpen(true); }} className="rounded-xl bg-white border border-slate-200 p-3.5 flex items-center gap-3 text-left active:scale-[0.98] transition-all"><div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center"><PlusCircle className="w-5 h-5" /></div><div><p className="text-[11px] font-black text-blue-700 uppercase">Thêm cơ sở</p><p className="text-[9px] font-bold text-slate-500 mt-0.5">Nhập thủ công</p></div></button><button type="button" onClick={() => { setActiveTab('dashboard'); setIsHubMode(false); setIsAiPromptModalOpen(true); setAiPrompt(""); setIsListening(false); }} className="rounded-xl bg-white border border-slate-200 p-3.5 flex items-center gap-3 text-left active:scale-[0.98] transition-all"><div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center"><Sparkles className="w-5 h-5" /></div><div><p className="text-[11px] font-black text-indigo-700 uppercase">Tạo bằng AI</p><p className="text-[9px] font-bold text-slate-500 mt-0.5">Từ mô tả nhà</p></div></button></section>
+        <section className="grid grid-cols-2 gap-3">
+          <button type="button" onClick={() => { setActiveTab('dashboard'); setIsHubMode(false); setEditingHouse(null); setIsAiCreateHouseOpen(true); }} className="rounded-xl border border-blue-200 bg-blue-50 p-3.5 flex items-center gap-3 text-left text-blue-800 shadow-md shadow-blue-100/70 active:scale-[0.98] transition-all">
+            <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-sm shadow-blue-200"><PlusCircle className="w-5 h-5" /></div>
+            <div className="min-w-0"><p className="truncate text-[11px] font-black uppercase">Thêm cơ sở</p><p className="mt-0.5 truncate text-[9px] font-bold opacity-70">Nhập thủ công</p></div>
+          </button>
+          <button type="button" onClick={() => { setActiveTab('dashboard'); setIsHubMode(false); setIsAiPromptModalOpen(true); setAiPrompt(""); setIsListening(false); }} className="rounded-xl border border-indigo-200 bg-indigo-50 p-3.5 flex items-center gap-3 text-left text-indigo-800 shadow-md shadow-indigo-100/70 active:scale-[0.98] transition-all">
+            <div className="w-9 h-9 rounded-xl bg-indigo-500 text-white flex items-center justify-center shadow-sm shadow-indigo-200"><Sparkles className="w-5 h-5" /></div>
+            <div className="min-w-0"><p className="truncate text-[11px] font-black uppercase">Tạo bằng AI</p><p className="mt-0.5 truncate text-[9px] font-bold opacity-70">Từ mô tả nhà</p></div>
+          </button>
+        </section>
         <button type="button" onClick={handleLogout} className="w-full bg-white border border-red-100 text-red-600 py-4 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 shadow-sm active:scale-[0.98] transition-all"><LogOut className="w-4 h-4" /> Đăng xuất</button>
       </div>
       <MeterReadingLinkQrModal

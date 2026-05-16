@@ -216,6 +216,43 @@ const blobToBase64 = (blob) => new Promise((resolve, reject) => {
     reader.readAsDataURL(blob);
 });
 
+export const shareDataUrlImage = async ({
+    dataUrl,
+    fileName = `anh-${Date.now()}.png`,
+    title = 'Ảnh',
+    dialogTitle = 'Chia sẻ qua Zalo',
+} = {}) => {
+    if (!dataUrl) throw new Error('Chưa có ảnh để chia sẻ.');
+
+    const blob = await (await fetch(dataUrl)).blob();
+
+    if (Capacitor.isNativePlatform()) {
+        const savedFile = await Filesystem.writeFile({
+            path: fileName,
+            data: await blobToBase64(blob),
+            directory: Directory.Cache,
+        });
+
+        await Share.share({
+            title,
+            files: [savedFile.uri],
+            dialogTitle,
+        });
+        return 'native-share';
+    }
+
+    const file = new File([blob], fileName, { type: 'image/png' });
+    if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
+        await navigator.share({ title, files: [file] });
+        return 'web-share';
+    }
+
+    await navigator.clipboard.write([
+        new window.ClipboardItem({ 'image/png': blob })
+    ]);
+    return 'clipboard';
+};
+
 export const shareElementImage = async ({
     elementId,
     fileName = `hoa-don-${Date.now()}.png`,

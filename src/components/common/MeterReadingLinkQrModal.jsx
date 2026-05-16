@@ -911,6 +911,15 @@ const MeterReadingLinkQrModal = ({ linkInfo, onClose, onCopy, onReset, onValidat
           <div className="mt-3 grid grid-cols-6 gap-1.5">
             <button
               type="button"
+              onClick={handleShareQr}
+              disabled={isSharing || isRendering || (!qrCardDataUrl && !qrDataUrl)}
+              className="flex h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-teal-100 bg-teal-50 px-1 text-[8px] font-black uppercase leading-none text-teal-700 shadow-sm active:scale-95 disabled:bg-slate-100 disabled:text-slate-300 [-webkit-tap-highlight-color:transparent]"
+            >
+              {isSharing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}
+              <span className="whitespace-nowrap">Zalo</span>
+            </button>
+            <button
+              type="button"
               onClick={handlePreview}
               disabled={isOpening}
               className="flex h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-blue-100 bg-blue-50 px-1 text-[8px] font-black uppercase leading-none text-blue-700 shadow-sm active:scale-95 disabled:bg-slate-100 disabled:text-slate-300 [-webkit-tap-highlight-color:transparent]"
@@ -943,15 +952,6 @@ const MeterReadingLinkQrModal = ({ linkInfo, onClose, onCopy, onReset, onValidat
             >
               <Download className="h-4 w-4" />
               <span className="whitespace-nowrap">{"L\u01b0u"}</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleShareQr}
-              disabled={isSharing || isRendering || (!qrCardDataUrl && !qrDataUrl)}
-              className="flex h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-teal-100 bg-teal-50 px-1 text-[8px] font-black uppercase leading-none text-teal-700 shadow-sm active:scale-95 disabled:bg-slate-100 disabled:text-slate-300 [-webkit-tap-highlight-color:transparent]"
-            >
-              {isSharing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}
-              <span className="whitespace-nowrap">Zalo</span>
             </button>
             <button
               type="button"
