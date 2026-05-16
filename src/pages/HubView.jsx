@@ -10,9 +10,10 @@ import NotificationBell from '../components/notifications/NotificationBell';
 import MeterReadingLinkQrModal, { buildMeterReadingQrCardDataUrl } from '../components/common/MeterReadingLinkQrModal';
 import BillReceipt from '../components/bills/BillReceipt';
 import { api } from '../services/api';
-import { exportToClipboard } from '../utils/imageExport';
+import { shareElementImage } from '../utils/imageExport';
 
 const API_URL = import.meta.env.VITE_API_URL;
+const FE_BASE_URL = (import.meta.env.VITE_FE_URL || window.location.origin).replace(/\/+$/g, '');
 
 const LINK_CACHE_KEY = 'lucky_home_meter_links';
 
@@ -47,14 +48,14 @@ const resolvePublicLink = (result) => {
   const rawUrl = result?.url || result?.link || result?.publicUrl;
   if (rawUrl) {
     if (rawUrl.startsWith('http')) return rawUrl;
-    if (rawUrl.startsWith('/')) return `${window.location.origin}${rawUrl}`;
-    if (rawUrl.startsWith('meter-reading/')) return `${window.location.origin}/${rawUrl}`;
-    if (!rawUrl.includes('/')) return `${window.location.origin}/meter-reading/${encodeURIComponent(rawUrl)}`;
-    return `${window.location.origin}/${rawUrl}`;
+    if (rawUrl.startsWith('/')) return `${FE_BASE_URL}${rawUrl}`;
+    if (rawUrl.startsWith('meter-reading/')) return `${FE_BASE_URL}/${rawUrl}`;
+    if (!rawUrl.includes('/')) return `${FE_BASE_URL}/meter-reading/${encodeURIComponent(rawUrl)}`;
+    return `${FE_BASE_URL}/${rawUrl}`;
   }
 
   const token = result?.token || result?.publicToken;
-  if (token) return `${window.location.origin}/meter-reading/${encodeURIComponent(token)}`;
+  if (token) return `${FE_BASE_URL}/meter-reading/${encodeURIComponent(token)}`;
 
   throw new Error('Máy chủ chưa trả về link công tơ.');
 };
@@ -65,7 +66,7 @@ const copyMeterReadingLink = async (room, house, link) => {
 
 const getMeterReadingTokenFromLink = (link) => {
   try {
-    const url = new URL(link, window.location.origin);
+    const url = new URL(link, FE_BASE_URL);
     const parts = url.pathname.split('/').filter(Boolean);
     const index = parts.indexOf('meter-reading');
     return index >= 0 ? decodeURIComponent(parts[index + 1] || '') : '';
@@ -603,8 +604,17 @@ const HubView = ({
     await new Promise(resolve => setTimeout(resolve, 600));
 
     try {
-      await exportToClipboard(`receipt-export-${billData.id}`);
-      showToast?.('Đã copy ảnh hóa đơn vào clipboard.', 'success');
+      const roomLabel = billData.roomId || billData.roomCode || billData.id;
+      const shareMode = await shareElementImage({
+        elementId: `receipt-export-${billData.id}`,
+        fileName: `hoa-don-phong-${roomLabel}.png`,
+        title: `Hóa đơn phòng ${roomLabel}`,
+        dialogTitle: 'Chia sẻ hóa đơn qua Zalo',
+      });
+      showToast?.(
+        shareMode === 'clipboard' ? 'Đã copy ảnh hóa đơn vào clipboard.' : 'Đã mở chia sẻ. Chọn Zalo để gửi hóa đơn.',
+        'success'
+      );
     } catch (error) {
       showToast?.(error.message || 'Lỗi khi xuất ảnh hóa đơn.', 'error');
     } finally {

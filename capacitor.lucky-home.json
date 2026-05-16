@@ -1,0 +1,8 @@
+{
+  "appId": "com.luckyhome.app",
+  "appName": "Lucky Home",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "http"
+  }
+}

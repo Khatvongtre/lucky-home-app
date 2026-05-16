@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { api } from '../services/api';
-import { exportToClipboard } from '../utils/imageExport';
+import { shareElementImage } from '../utils/imageExport';
 
 const billBaseTotal = (details = {}) => (
   (details.rent || 0)
@@ -110,11 +110,20 @@ export const useBills = ({
     await new Promise(resolve => setTimeout(resolve, 600));
 
     try {
-      await exportToClipboard(`receipt-export-${billData.id}`);
-      showToast('Đã copy ảnh vào clipboard!', 'success');
+      const roomLabel = billData.roomId || billData.roomCode || billData.id;
+      const shareMode = await shareElementImage({
+        elementId: `receipt-export-${billData.id}`,
+        fileName: `hoa-don-phong-${roomLabel}.png`,
+        title: `Hóa đơn phòng ${roomLabel}`,
+        dialogTitle: 'Chia sẻ hóa đơn qua Zalo',
+      });
+      showToast(
+        shareMode === 'clipboard' ? 'Đã copy ảnh hóa đơn vào clipboard.' : 'Đã mở chia sẻ. Chọn Zalo để gửi hóa đơn.',
+        'success'
+      );
     } catch (error) {
       console.error(error);
-      showToast(error.message || 'Lỗi khi xuất ảnh', 'error');
+      showToast(error.message || 'Lỗi khi xuất ảnh hóa đơn', 'error');
     } finally {
       setIsGeneratingImage(false);
     }

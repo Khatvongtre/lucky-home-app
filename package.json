@@ -6,10 +6,24 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:home": "vite build --mode home",
+    "build:hu-chi-tieu": "vite build --mode hu-chi-tieu",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "android:sync": "npm run build && cap sync android",
+    "android:sync:home": "powershell -ExecutionPolicy Bypass -File scripts/prepare-android-variant.ps1 -Variant home && npm run build:home && cap sync android",
+    "android:sync:hu-chi-tieu": "powershell -ExecutionPolicy Bypass -File scripts/prepare-android-variant.ps1 -Variant hu-chi-tieu && npm run build:hu-chi-tieu && cap sync android",
+    "android:apk:home": "npm run android:sync:home && cd android && java -jar gradle\\wrapper\\gradle-wrapper.jar assembleDebug",
+    "android:apk:hu-chi-tieu": "npm run android:sync:hu-chi-tieu && cd android && java -jar gradle\\wrapper\\gradle-wrapper.jar assembleDebug",
+    "android:open": "cap open android"
   },
   "dependencies": {
+    "@capacitor-community/speech-recognition": "^7.0.1",
+    "@capacitor/android": "^8.3.4",
+    "@capacitor/cli": "^8.3.4",
+    "@capacitor/core": "^8.3.4",
+    "@capacitor/filesystem": "^8.1.2",
+    "@capacitor/share": "^8.0.1",
     "html-to-image": "^1.11.13",
     "jsqr": "^1.4.0",
     "lucide-react": "^0.577.0",

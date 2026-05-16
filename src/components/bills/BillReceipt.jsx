@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Loader2, Image as ImageIcon, Trash2, CheckCircle2, X } from 'lucide-react';
 import { formatN, parseN } from '../../utils/formatters';
+import { useSwipeBack } from '../../hooks/useSwipeBack';
 
 const resolveBackendAssetUrl = (src, API_URL) => {
     if (!src || typeof src !== 'string') return src;
@@ -53,6 +54,10 @@ const BillReceipt = ({
     const [failedMeterImages, setFailedMeterImages] = useState({});
     const billKey = bottomSheet?.data?.id || 'none';
     const localDiscount = discountDraftByBill[billKey] ?? formatN(bottomSheet?.data?.details?.discount || 0);
+    const swipeBackHandlers = useSwipeBack({
+        onBack: () => setBottomSheet(null),
+        enabled: Boolean(bottomSheet && bottomSheet.type === 'bill'),
+    });
     const setLocalDiscount = (value) => {
         setDiscountDraftByBill(prev => ({ ...prev, [billKey]: value }));
     };
@@ -81,7 +86,7 @@ const BillReceipt = ({
     const qrSrc = `${API_URL}/vietqr/generate?bankBin=${bankBin}&bankAcc=${bankAcc}&amount=${bill.total}&addInfo=${encodeURIComponent(qrAddInfo)}&t=${encodeURIComponent(qrFingerprint)}`;
 
     return (
-        <div className="fixed inset-0 z-[600] flex items-center justify-center">
+        <div {...swipeBackHandlers} className="fixed inset-0 z-[600] flex items-center justify-center">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setBottomSheet(null)} />
             <div className="bg-white w-full max-w-lg h-full sm:p-6 shadow-2xl animate-in slide-in-from-bottom duration-500 relative flex flex-col no-scrollbar overflow-hidden">
                 <div className="flex-1 overflow-y-auto no-scrollbar">
@@ -257,7 +262,7 @@ const BillReceipt = ({
                 <div className="grid grid-cols-1 gap-3 shrink-0 mt-4 p-2 pt-4 border-t border-slate-100 w-full max-w-[420px] mx-auto">
                     <button disabled={isGeneratingImage} onClick={() => handleShareZaloImage(bottomSheet.data)} className="w-full bg-[#0068FF] text-white py-3.5 rounded-xl font-black text-[11px] uppercase active:scale-95 border-b-2 border-[#004BBF] flex items-center justify-center gap-2 transition-all disabled:opacity-70 shadow-sm">
                         {isGeneratingImage ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
-                        {isGeneratingImage ? 'ĐANG TẠO ẢNH...' : 'COPY ẢNH CHO ZALO'}
+                        {isGeneratingImage ? 'ĐANG TẠO ẢNH...' : 'CHIA SẺ ZALO'}
                     </button>
 
                     {isOwnerOrAdmin && (

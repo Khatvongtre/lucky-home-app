@@ -44,6 +44,8 @@ const ROLE_DISPLAY_MAP = {
     Staff: { text: 'Nhân viên', class: 'bg-slate-100 text-slate-500' }
 };
 
+const HOUSE_SCOPED_TABS = new Set(['dashboard', 'rooms', 'meters_list', 'bills', 'finance', 'settings']);
+
 const getRoomStatusColor = (isFull, emptyRooms, totalRooms) => {
     if (isFull) return 'bg-emerald-500';
     const emptyRatio = emptyRooms / totalRooms;
@@ -62,6 +64,7 @@ const HouseSelectionView = ({
     setSelectedHouse,
     setConfig,
     setActiveTab,
+    activeTab,
     setSearchQuery,
     handleOpenShare,
     setEditingHouse,
@@ -98,6 +101,14 @@ const HouseSelectionView = ({
 
     const visibleSelectedHouses = filteredHouses.filter(h => selectedStatsHouses.includes(h.id));
     const housesForStats = visibleSelectedHouses.length > 0 ? visibleSelectedHouses : filteredHouses;
+    const targetTabAfterHouseSelect = HOUSE_SCOPED_TABS.has(activeTab) ? activeTab : 'dashboard';
+
+    const handleSelectHouse = (house) => {
+        setSelectedHouse(house);
+        setConfig({ ...house });
+        setActiveTab(targetTabAfterHouseSelect);
+        setSearchQuery('');
+    };
 
     const houseStats = housesForStats.reduce((acc, h) => {
         acc.totalHouses += 1;
@@ -231,7 +242,7 @@ const HouseSelectionView = ({
                                         />
                                     </div>
                                     <button
-                                        onClick={() => { setSelectedHouse(h); setConfig({ ...h }); setActiveTab('dashboard'); setSearchQuery(''); }}
+                                        onClick={() => handleSelectHouse(h)}
                                         className="flex-1 flex items-center space-x-2 text-left overflow-hidden"
                                     >
                                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 shadow-inner ${isUrgentPay ? 'bg-red-100 text-red-600' : 'bg-blue-50 text-blue-600'}`}>

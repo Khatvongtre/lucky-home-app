@@ -39,8 +39,11 @@ const MeterReadingPublicView = lazy(() => import('./pages/MeterReadingPublicView
 // CẤU HÌNH API BACKEND (.NET 8)
 // ==========================================
 const API_URL = import.meta.env.VITE_API_URL;
+const APP_VARIANT = import.meta.env.VITE_APP_VARIANT || 'home';
+const isHuChiTieuVariant = APP_VARIANT === 'hu-chi-tieu';
 if (import.meta.env.DEV) {
   console.log("API URL:", API_URL);
+  console.log("App variant:", APP_VARIANT);
 }
 
 // ==========================================
@@ -51,9 +54,9 @@ const MainApp = () => {
   // 1. GLOBAL STATES
   // ==========================================
 
-  const [isHubMode, setIsHubMode] = useState(true); // NEW: Manage global HUB screen visibility
+  const [isHubMode, setIsHubMode] = useState(!isHuChiTieuVariant); // NEW: Manage global HUB screen visibility
   const [selectedHouse, setSelectedHouse] = useState(null);
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState(isHuChiTieuVariant ? 'fast_input' : 'dashboard');
   const [hubShortcutHidden, setHubShortcutHidden] = useState(false);
   const [hubShortcutPosition, setHubShortcutPosition] = useState(null);
   const [bottomSheet, setBottomSheet] = useState(null);
@@ -463,6 +466,7 @@ const MainApp = () => {
       fastInputState={{
         setActiveTab,
         setIsHubMode,
+        isStandalone: isHuChiTieuVariant,
       }}
       hubState={{
         isHubMode,

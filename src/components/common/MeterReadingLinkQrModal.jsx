@@ -1,7 +1,11 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
-import { Copy, Download, ExternalLink, Loader2, RotateCcw, X } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
+import { Directory, Filesystem } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
+import { Copy, Download, ExternalLink, Loader2, RotateCcw, Share2, X } from 'lucide-react';
+import { useSwipeBack } from '../../hooks/useSwipeBack';
 const CANVAS_FONT = '"Segoe UI", Arial, Helvetica, sans-serif';
 
 const COLORS = {
@@ -655,9 +659,11 @@ const MeterReadingLinkQrModal = ({ linkInfo, onClose, onCopy, onReset, onValidat
   const [isRendering, setIsRendering] = useState(false);
   const [isOpening, setIsOpening] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [isSharing, setIsSharing] = useState(false);
   const [message, setMessage] = useState('');
 
   const link = linkOverride || linkInfo?.url || '';
+  const swipeBackHandlers = useSwipeBack({ onBack: onClose });
   const currentLinkInfo = linkInfo ? { ...linkInfo, url: link } : null;
   const label = linkInfo?.label || 'Link ghi \u0111i\u1ec7n';
   const houseLabel = linkInfo?.houseLabel || '';
@@ -707,11 +713,17 @@ const MeterReadingLinkQrModal = ({ linkInfo, onClose, onCopy, onReset, onValidat
     }
   };
 
+  const getSafeFileName = () => (
+    label.replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '') || 'link-ghi-dien'
+  );
+
+  const getDataUrlBase64 = (dataUrl) => dataUrl.split(',')[1] || '';
+
   const handleDownload = () => {
     const downloadDataUrl = qrCardDataUrl || qrDataUrl;
     if (!downloadDataUrl) return;
 
-    const safeName = label.replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '') || 'link-ghi-dien';
+    const safeName = getSafeFileName();
     const anchor = document.createElement('a');
     anchor.href = downloadDataUrl;
     anchor.download = `${safeName}-QR.png`;
@@ -737,6 +749,61 @@ const MeterReadingLinkQrModal = ({ linkInfo, onClose, onCopy, onReset, onValidat
       setMessage('\u0110\u00e3 copy \u1ea3nh QR v\u00e0o clipboard.');
     } catch {
       setMessage('Thi\u1ebft b\u1ecb kh\u00f4ng h\u1ed7 tr\u1ee3 copy \u1ea3nh QR. Vui l\u00f2ng l\u01b0u QR.');
+    }
+  };
+
+  const handleShareQr = async () => {
+    const shareDataUrl = qrCardDataUrl || qrDataUrl;
+    if (!shareDataUrl) return;
+
+    try {
+      setIsSharing(true);
+      const safeName = getSafeFileName();
+      const fileName = `${safeName}-QR-${Date.now()}.png`;
+
+      if (Capacitor.isNativePlatform()) {
+        const savedFile = await Filesystem.writeFile({
+          path: fileName,
+          data: getDataUrlBase64(shareDataUrl),
+          directory: Directory.Cache,
+        });
+
+        await Share.share({
+          title: label,
+          files: [savedFile.uri],
+          dialogTitle: 'Chia sẻ QR qua Zalo',
+        });
+        setMessage('Đã mở chia sẻ. Chọn Zalo để gửi QR cho khách.');
+        return;
+      }
+
+      const blob = await (await fetch(shareDataUrl)).blob();
+      const file = new File([blob], fileName, { type: 'image/png' });
+      if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [file] }))) {
+        await navigator.share({
+          title: label,
+          files: [file],
+        });
+        setMessage('Đã mở chia sẻ QR.');
+        return;
+      }
+
+      if (false && navigator.share) {
+        await navigator.share({ title: label, url: link });
+        setMessage('Đã mở chia sẻ link QR.');
+        return;
+      }
+
+      await handleCopy();
+      setMessage('Thiết bị chưa hỗ trợ chia sẻ ảnh QR. Đã copy link để gửi thủ công.');
+    } catch (error) {
+      if (error?.message?.toLowerCase?.().includes('cancel')) {
+        setMessage('');
+      } else {
+        setMessage('Không chia sẻ được QR. Vui lòng thử lại hoặc dùng nút Lưu.');
+      }
+    } finally {
+      setIsSharing(false);
     }
   };
 
@@ -810,7 +877,7 @@ const MeterReadingLinkQrModal = ({ linkInfo, onClose, onCopy, onReset, onValidat
   };
 
   return (
-    <div className="fixed inset-0 z-[850] flex items-end justify-center bg-slate-950/55 px-4 pb-4 backdrop-blur-sm">
+    <div {...swipeBackHandlers} className="fixed inset-0 z-[850] flex items-end justify-center bg-slate-950/55 px-4 pb-4 backdrop-blur-sm">
       <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl animate-in slide-in-from-bottom-4 duration-200">
         <div className="flex items-center justify-between gap-3 border-b border-slate-100 p-4">
           <p className="text-[10px] font-black uppercase tracking-widest text-rose-600">QR link ghi {'\u0111i\u1ec7n'}</p>
@@ -841,7 +908,7 @@ const MeterReadingLinkQrModal = ({ linkInfo, onClose, onCopy, onReset, onValidat
             </p>
           ) : null}
 
-          <div className="mt-3 grid grid-cols-5 gap-1.5">
+          <div className="mt-3 grid grid-cols-6 gap-1.5">
             <button
               type="button"
               onClick={handlePreview}
@@ -876,6 +943,15 @@ const MeterReadingLinkQrModal = ({ linkInfo, onClose, onCopy, onReset, onValidat
             >
               <Download className="h-4 w-4" />
               <span className="whitespace-nowrap">{"L\u01b0u"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleShareQr}
+              disabled={isSharing || isRendering || (!qrCardDataUrl && !qrDataUrl)}
+              className="flex h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-teal-100 bg-teal-50 px-1 text-[8px] font-black uppercase leading-none text-teal-700 shadow-sm active:scale-95 disabled:bg-slate-100 disabled:text-slate-300 [-webkit-tap-highlight-color:transparent]"
+            >
+              {isSharing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}
+              <span className="whitespace-nowrap">Zalo</span>
             </button>
             <button
               type="button"

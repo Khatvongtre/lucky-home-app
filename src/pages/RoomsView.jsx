@@ -14,6 +14,7 @@ import { formatN } from '../utils/formatters';
 import { diffDays, endContract, getDueInfo } from '../utils/date';
 import MeterReadingLinkQrModal from '../components/common/MeterReadingLinkQrModal';
 
+const FE_BASE_URL = (import.meta.env.VITE_FE_URL || window.location.origin).replace(/\/+$/g, '');
 const LINK_CACHE_KEY = 'lucky_home_meter_links';
 
 const readLinkCache = () => {
@@ -41,7 +42,7 @@ const copyMeterReadingLink = async (room, link) => {
 
 const getMeterReadingTokenFromLink = (link) => {
     try {
-        const url = new URL(link, window.location.origin);
+        const url = new URL(link, FE_BASE_URL);
         const parts = url.pathname.split('/').filter(Boolean);
         const index = parts.indexOf('meter-reading');
         return index >= 0 ? decodeURIComponent(parts[index + 1] || '') : '';
@@ -58,10 +59,10 @@ const resolvePublicLink = (result) => {
     const rawUrl = result?.url || result?.link || result?.publicUrl;
     if (rawUrl) {
         if (rawUrl.startsWith('http')) return rawUrl;
-        if (rawUrl.startsWith('/')) return `${window.location.origin}${rawUrl}`;
-        if (rawUrl.startsWith('meter-reading/')) return `${window.location.origin}/${rawUrl}`;
-        if (!rawUrl.includes('/')) return `${window.location.origin}/meter-reading/${encodeURIComponent(rawUrl)}`;
-        return `${window.location.origin}/${rawUrl}`;
+        if (rawUrl.startsWith('/')) return `${FE_BASE_URL}${rawUrl}`;
+        if (rawUrl.startsWith('meter-reading/')) return `${FE_BASE_URL}/${rawUrl}`;
+        if (!rawUrl.includes('/')) return `${FE_BASE_URL}/meter-reading/${encodeURIComponent(rawUrl)}`;
+        return `${FE_BASE_URL}/${rawUrl}`;
     }
 
     if (result?.tokenHash || result?.hash) {
@@ -69,7 +70,7 @@ const resolvePublicLink = (result) => {
     }
 
     const token = result?.token || result?.publicToken;
-    if (token) return `${window.location.origin}/meter-reading/${encodeURIComponent(token)}`;
+    if (token) return `${FE_BASE_URL}/meter-reading/${encodeURIComponent(token)}`;
 
     throw new Error('Máy chủ chưa trả về link công tơ.');
 };

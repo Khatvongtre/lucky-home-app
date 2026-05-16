@@ -1,7 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Mic, X, Loader2, Zap, Camera, CheckCircle2, Pencil, TrendingUp, TrendingDown, Wallet, Delete, Home } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
+import { SpeechRecognition } from '@capacitor-community/speech-recognition';
 import { formatN } from '../utils/formatters';
 import { api } from '../services/api';
+import { useSwipeBack } from '../hooks/useSwipeBack';
 
 const COMMON_SUGGESTIONS = {
     'Thiết yếu': ['Ăn uống', 'Đi chợ', 'Siêu thị', 'Đổ xăng', 'Tiền điện', 'Tiền nước', 'Cà phê'],
@@ -12,7 +15,7 @@ const COMMON_SUGGESTIONS = {
     'Cho đi': ['Từ thiện', 'Quà tặng', 'Đám cưới', 'Thăm hỏi']
 };
 
-const FastInputView = ({ setActiveTab, setIsHubMode, showToast }) => {
+const FastInputView = ({ setActiveTab, setIsHubMode, showToast, isStandalone = false }) => {
     const [inputText, setInputText] = useState('');
     const [isListening, setIsListening] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
@@ -27,12 +30,23 @@ const FastInputView = ({ setActiveTab, setIsHubMode, showToast }) => {
         if (window.location.pathname.includes('/chitieu')) {
             window.history.pushState({}, document.title, "/");
         }
+        if (isStandalone) {
+            setParsedResult(null);
+            setInputText('');
+            setImagePreview(null);
+            return;
+        }
         setActiveTab('fund');
     };
 
     const handleGoHub = () => {
         if (window.location.pathname.includes('/chitieu')) {
             window.history.pushState({}, document.title, "/");
+        }
+        if (isStandalone) {
+            setActiveTab('fund');
+            setIsHubMode?.(false);
+            return;
         }
         setActiveTab('dashboard');
         setIsHubMode?.(true);
@@ -87,7 +101,48 @@ const FastInputView = ({ setActiveTab, setIsHubMode, showToast }) => {
     };
 
     // Xử lý Voice to Text
-    const handleMicClick = () => {
+    const handleMicClick = async () => {
+        if (Capacitor.isNativePlatform()) {
+            try {
+                if (isListening) {
+                    await SpeechRecognition.stop();
+                    setIsListening(false);
+                    return;
+                }
+
+                const availability = await SpeechRecognition.available();
+                if (!availability.available) {
+                    showToast("Thiết bị chưa hỗ trợ nhận diện giọng nói", "error");
+                    return;
+                }
+
+                const permission = await SpeechRecognition.requestPermissions();
+                if (!['granted', 'prompt'].includes(permission.speechRecognition)) {
+                    showToast("Ứng dụng chưa được cấp quyền micro", "error");
+                    return;
+                }
+
+                setIsListening(true);
+                showToast("Đang nghe... Hãy đọc chi tiêu của bạn", "success");
+                const result = await SpeechRecognition.start({
+                    language: "vi-VN",
+                    maxResults: 1,
+                    prompt: "Đọc chi tiêu của bạn",
+                    partialResults: false,
+                    popup: true,
+                });
+                const transcript = result.matches?.[0] || '';
+                if (transcript) {
+                    setInputText(prev => prev ? `${prev} ${transcript}` : transcript);
+                }
+            } catch (error) {
+                showToast(error?.message || "Không nhận diện được giọng nói", "error");
+            } finally {
+                setIsListening(false);
+            }
+            return;
+        }
+
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (!SpeechRecognition) {
             return showToast("Trình duyệt không hỗ trợ nhận diện giọng nói", "error");
@@ -206,9 +261,26 @@ const FastInputView = ({ setActiveTab, setIsHubMode, showToast }) => {
 
     const selectedFund = parsedResult ? funds.find(f => f.id === parsedResult.fundId) : null;
     const currentSuggestions = selectedFund?.suggestions || (selectedFund ? COMMON_SUGGESTIONS[selectedFund.name] : null) || ['Ăn uống', 'Mua sắm', 'Hóa đơn', 'Khác'];
+    const swipeBackHandlers = useSwipeBack({
+        onBack: () => {
+            if (activeField) {
+                setActiveField(null);
+                return;
+            }
+            if (imagePreview) {
+                setImagePreview(null);
+                return;
+            }
+            if (parsedResult) {
+                setParsedResult(null);
+                return;
+            }
+            handleClose();
+        }
+    });
 
     return (
-        <div className="flex-1 bg-slate-900 text-white flex flex-col relative">
+        <div {...swipeBackHandlers} className="flex-1 bg-slate-900 text-white flex flex-col relative">
             <div className="flex items-center justify-between p-4 border-b border-white/10 shrink-0">
                 <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400">

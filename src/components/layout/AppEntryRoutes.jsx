@@ -81,6 +81,7 @@ const AppEntryRoutes = ({
           setSelectedHouse={houseSelectionState.setSelectedHouse}
           setConfig={houseSelectionState.setConfig}
           setActiveTab={houseSelectionState.setActiveTab}
+          activeTab={activeTab}
           setSearchQuery={houseSelectionState.setSearchQuery}
           handleOpenShare={houseSelectionState.handleOpenShare}
           setEditingHouse={houseSelectionState.setEditingHouse}
@@ -123,6 +124,7 @@ const AppEntryRoutes = ({
           <FastInputView
             setActiveTab={fastInputState.setActiveTab}
             setIsHubMode={fastInputState.setIsHubMode}
+            isStandalone={fastInputState.isStandalone}
             showToast={showToast}
           />
         </Suspense>

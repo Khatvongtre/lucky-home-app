@@ -4,6 +4,8 @@ import { api } from '../services/api';
 import { formatN, parseN } from '../utils/formatters';
 import MeterReadingLinkQrModal from '../components/common/MeterReadingLinkQrModal';
 
+const FE_BASE_URL = (import.meta.env.VITE_FE_URL || window.location.origin).replace(/\/+$/g, '');
+
 const getRoomLinkLabel = (room, fallbackLabel) => {
     const roomLabel = room.roomCode || room.code || room.name || fallbackLabel || room.id;
     const houseLabel = room.houseName || room.house?.name || room.house?.houseName || '';
@@ -47,10 +49,10 @@ const MetersView = ({
         const rawUrl = result?.url || result?.link || result?.publicUrl;
         if (rawUrl) {
             if (rawUrl.startsWith('http')) return rawUrl;
-            if (rawUrl.startsWith('/')) return `${window.location.origin}${rawUrl}`;
-            if (rawUrl.startsWith('meter-reading/')) return `${window.location.origin}/${rawUrl}`;
-            if (!rawUrl.includes('/')) return `${window.location.origin}/meter-reading/${encodeURIComponent(rawUrl)}`;
-            return `${window.location.origin}/${rawUrl}`;
+            if (rawUrl.startsWith('/')) return `${FE_BASE_URL}${rawUrl}`;
+            if (rawUrl.startsWith('meter-reading/')) return `${FE_BASE_URL}/${rawUrl}`;
+            if (!rawUrl.includes('/')) return `${FE_BASE_URL}/meter-reading/${encodeURIComponent(rawUrl)}`;
+            return `${FE_BASE_URL}/${rawUrl}`;
         }
 
         if (result?.tokenHash || result?.hash) {
@@ -58,7 +60,7 @@ const MetersView = ({
         }
 
         const token = result?.token || result?.publicToken;
-        if (token) return `${window.location.origin}/meter-reading/${encodeURIComponent(token)}`;
+        if (token) return `${FE_BASE_URL}/meter-reading/${encodeURIComponent(token)}`;
 
         throw new Error('Máy chủ chưa trả về link ghi điện.');
     };
