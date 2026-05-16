@@ -48,14 +48,27 @@ const SavingsView = ({
         <div className="animate-in fade-in pb-20">
             <div className="sticky top-0 z-30 bg-slate-50/80 backdrop-blur-md px-1">
                 <div className="bg-slate-900 p-6 rounded-xl text-white shadow-xl relative border-b-8 border-slate-950">
-                    <div className="flex justify-between items-center">
-                        <button onClick={() => setIsSavingsStatsOpen(!isSavingsStatsOpen)} className="flex items-center gap-1 active:scale-95 transition-all text-left">
+                    <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setIsSavingsStatsOpen(!isSavingsStatsOpen)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                setIsSavingsStatsOpen(!isSavingsStatsOpen);
+                            }
+                        }}
+                        aria-expanded={isSavingsStatsOpen}
+                        className="flex cursor-pointer justify-between items-center rounded-lg active:bg-white/5"
+                    >
+                        <div className="flex items-center gap-1 active:scale-95 transition-all text-left">
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tổng tiền gửi tiết kiệm</p>
                             <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-300 ${!isSavingsStatsOpen ? 'rotate-180' : ''}`} />
-                        </button>
+                        </div>
                         {uniqueBankNames.length > 0 && (
                             <button
-                                onClick={() => {
+                                onClick={(e) => {
+                                    e.stopPropagation();
                                     if (collapsedSavingsBanks.length === uniqueBankNames.length) {
                                         setCollapsedSavingsBanks([]);
                                     } else {
@@ -110,13 +123,36 @@ const SavingsView = ({
                     const isCollapsed = collapsedSavingsBanks.includes(bank);
 
                     return (
-                        <div key={bank} className="mb-6 last:mb-0 animate-in fade-in">
-                            <div className="flex flex-col mb-3 bg-gradient-to-r from-slate-100 to-white p-3 rounded-xl border border-slate-200 shadow-sm gap-3">
+                        <div key={bank} className="mb-4 last:mb-0 animate-in fade-in">
+                            <div
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => {
+                                    if (isCollapsed) {
+                                        setCollapsedSavingsBanks(collapsedSavingsBanks.filter(b => b !== bank));
+                                    } else {
+                                        setCollapsedSavingsBanks([...collapsedSavingsBanks, bank]);
+                                    }
+                                }}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                        e.preventDefault();
+                                        if (isCollapsed) {
+                                            setCollapsedSavingsBanks(collapsedSavingsBanks.filter(b => b !== bank));
+                                        } else {
+                                            setCollapsedSavingsBanks([...collapsedSavingsBanks, bank]);
+                                        }
+                                    }
+                                }}
+                                aria-expanded={!isCollapsed}
+                                className="flex cursor-pointer flex-col mb-2 bg-gradient-to-r from-slate-100 to-white p-3 rounded-xl border border-slate-200 shadow-sm gap-3 active:bg-slate-50"
+                            >
                                 <div className="flex items-center gap-2.5">
                                     <div className="flex items-center shrink-0 ml-0.5">
                                         <input
                                             type="checkbox"
                                             checked={isSelected}
+                                            onClick={(e) => e.stopPropagation()}
                                             onChange={(e) => {
                                                 if (e.target.checked) setUnselectedSavingsBanks(unselectedSavingsBanks.filter(b => b !== bank));
                                                 else setUnselectedSavingsBanks([...unselectedSavingsBanks, bank]);
@@ -132,7 +168,8 @@ const SavingsView = ({
                                         <div className="flex items-center gap-2 shrink-0">
                                             <span className="text-[9px] font-black bg-amber-500 text-white px-2 py-0.5 rounded shadow-sm">{items.length} SỔ</span>
                                             <button
-                                                onClick={() => {
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
                                                     if (isCollapsed) {
                                                         setCollapsedSavingsBanks(collapsedSavingsBanks.filter(b => b !== bank));
                                                     } else {
@@ -160,7 +197,7 @@ const SavingsView = ({
                                 </div>
                             </div>
                             {!isCollapsed && (
-                                <div className={`space-y-3 transition-all ${!isSelected ? 'opacity-50 grayscale pointer-events-none' : ''}`}>
+                                <div className={`space-y-2 transition-all ${!isSelected ? 'opacity-50 grayscale pointer-events-none' : ''}`}>
                                     {items.map(s => {
                                         const endDate = new Date(s.startDate);
                                         const tMonths = s.termMonths || 0;

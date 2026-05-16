@@ -1,7 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import React, { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
-import { Copy, Download, ExternalLink, Loader2, X } from 'lucide-react';
+import { Copy, Download, ExternalLink, Loader2, RotateCcw, X } from 'lucide-react';
 const CANVAS_FONT = '"Segoe UI", Arial, Helvetica, sans-serif';
 
 const COLORS = {
@@ -648,16 +648,24 @@ export const buildMeterReadingQrCardDataUrl = async ({
   return { qrDataUrl, cardDataUrl };
 };
 
-const MeterReadingLinkQrModal = ({ linkInfo, onClose, onCopy }) => {
+const MeterReadingLinkQrModal = ({ linkInfo, onClose, onCopy, onReset, onValidateLink }) => {
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [qrCardDataUrl, setQrCardDataUrl] = useState('');
+  const [linkOverride, setLinkOverride] = useState('');
   const [isRendering, setIsRendering] = useState(false);
+  const [isOpening, setIsOpening] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
   const [message, setMessage] = useState('');
 
-  const link = linkInfo?.url || '';
+  const link = linkOverride || linkInfo?.url || '';
+  const currentLinkInfo = linkInfo ? { ...linkInfo, url: link } : null;
   const label = linkInfo?.label || 'Link ghi \u0111i\u1ec7n';
   const houseLabel = linkInfo?.houseLabel || '';
   const roomLabel = linkInfo?.roomLabel ? `Ph\u00f2ng ${linkInfo.roomLabel}` : label;
+
+  useEffect(() => {
+    setLinkOverride('');
+  }, [linkInfo?.url]);
 
   useEffect(() => {
     let cancelled = false;
@@ -692,7 +700,7 @@ const MeterReadingLinkQrModal = ({ linkInfo, onClose, onCopy }) => {
 
   const handleCopy = async () => {
     try {
-      await onCopy?.();
+      await onCopy?.(currentLinkInfo);
       setMessage('\u0110\u00e3 copy t\u00ean ph\u00f2ng v\u00e0 link.');
     } catch {
       setMessage('Kh\u00f4ng copy \u0111\u01b0\u1ee3c link. Vui l\u00f2ng th\u1eed l\u1ea1i.');
@@ -732,21 +740,85 @@ const MeterReadingLinkQrModal = ({ linkInfo, onClose, onCopy }) => {
     }
   };
 
-  const handlePreview = () => {
+  const getResetUrl = (result) => {
+    if (typeof result === 'string') return result;
+    return result?.url || '';
+  };
+  const handlePreview = async () => {
     if (!link) return;
-    window.open(link, '_blank', 'noopener,noreferrer');
+
+    try {
+      setIsOpening(true);
+      let openLink = link;
+
+      if (onValidateLink) {
+        setMessage('\u0110ang ki\u1ec3m tra link ghi \u0111i\u1ec7n...');
+        const isValid = await onValidateLink(currentLinkInfo);
+
+        if (isValid === false) {
+          if (!onReset) {
+            setMessage('Link \u0111\u00e3 h\u1ecfng. Vui l\u00f2ng reset link.');
+            return;
+          }
+
+          setMessage('Link \u0111\u00e3 h\u1ecfng, \u0111ang t\u1ea1o link m\u1edbi...');
+          const resetResult = await onReset(currentLinkInfo, { skipConfirm: true, autoOpen: true });
+          const resetUrl = getResetUrl(resetResult);
+          if (!resetUrl) {
+            setMessage('Kh\u00f4ng l\u1ea5y \u0111\u01b0\u1ee3c link m\u1edbi. Vui l\u00f2ng th\u1eed l\u1ea1i.');
+            return;
+          }
+          setQrDataUrl('');
+          setQrCardDataUrl('');
+          setIsRendering(true);
+          setLinkOverride(resetUrl);
+          openLink = resetUrl;
+          setMessage('Link c\u0169 b\u1ecb h\u1ecfng. \u0110\u00e3 t\u1ea1o link m\u1edbi v\u00e0 copy v\u00e0o clipboard, h\u00e3y g\u1eedi l\u1ea1i cho kh\u00e1ch.');
+        } else {
+          setMessage('');
+        }
+      }
+
+      window.open(openLink, '_blank', 'noopener,noreferrer');
+    } catch {
+      setMessage('Kh\u00f4ng ki\u1ec3m tra ho\u1eb7c m\u1edf \u0111\u01b0\u1ee3c link. Vui l\u00f2ng th\u1eed l\u1ea1i.');
+    } finally {
+      setIsOpening(false);
+    }
+  };
+  const handleReset = async () => {
+    if (!onReset) return;
+
+    try {
+      setIsResetting(true);
+      const resetResult = await onReset(currentLinkInfo);
+      const resetUrl = getResetUrl(resetResult);
+      if (resetResult !== false) {
+        if (resetUrl) {
+          setQrDataUrl('');
+          setQrCardDataUrl('');
+          setIsRendering(true);
+          setLinkOverride(resetUrl);
+        }
+        setMessage('\u0110\u00e3 reset link v\u00e0 c\u1eadp nh\u1eadt QR m\u1edbi.');
+      }
+    } catch {
+      setMessage('Kh\u00f4ng reset \u0111\u01b0\u1ee3c link. Vui l\u00f2ng th\u1eed l\u1ea1i.');
+    } finally {
+      setIsResetting(false);
+    }
   };
 
   return (
     <div className="fixed inset-0 z-[850] flex items-end justify-center bg-slate-950/55 px-4 pb-4 backdrop-blur-sm">
       <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl animate-in slide-in-from-bottom-4 duration-200">
         <div className="flex items-center justify-between gap-3 border-b border-slate-100 p-4">
-          <p className="text-[10px] font-black uppercase tracking-widest text-rose-600">QR link ghi điện</p>
+          <p className="text-[10px] font-black uppercase tracking-widest text-rose-600">QR link ghi {'\u0111i\u1ec7n'}</p>
           <button
             type="button"
             onClick={onClose}
             className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 active:scale-95"
-            aria-label="Đóng"
+            aria-label="\u0110\u00f3ng"
           >
             <X className="h-4 w-4" />
           </button>
@@ -769,19 +841,20 @@ const MeterReadingLinkQrModal = ({ linkInfo, onClose, onCopy }) => {
             </p>
           ) : null}
 
-          <div className="mt-3 grid grid-cols-4 gap-1.5">
+          <div className="mt-3 grid grid-cols-5 gap-1.5">
             <button
               type="button"
               onClick={handlePreview}
-              className="flex h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl bg-slate-900 px-1 text-[8px] font-black uppercase leading-none text-white shadow-sm active:scale-95 [-webkit-tap-highlight-color:transparent]"
+              disabled={isOpening}
+              className="flex h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-blue-100 bg-blue-50 px-1 text-[8px] font-black uppercase leading-none text-blue-700 shadow-sm active:scale-95 disabled:bg-slate-100 disabled:text-slate-300 [-webkit-tap-highlight-color:transparent]"
             >
-              <ExternalLink className="h-4 w-4" />
+              {isOpening ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
               <span className="whitespace-nowrap">{"M\u1edf"}</span>
             </button>
             <button
               type="button"
               onClick={handleCopy}
-              className="flex h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl bg-blue-700 px-1 text-[8px] font-black uppercase leading-none text-white shadow-sm active:scale-95 [-webkit-tap-highlight-color:transparent]"
+              className="flex h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-sky-100 bg-sky-50 px-1 text-[8px] font-black uppercase leading-none text-sky-700 shadow-sm active:scale-95 [-webkit-tap-highlight-color:transparent]"
             >
               <Copy className="h-4 w-4" />
               <span className="whitespace-nowrap">Link</span>
@@ -789,8 +862,8 @@ const MeterReadingLinkQrModal = ({ linkInfo, onClose, onCopy }) => {
             <button
               type="button"
               onClick={handleCopyQr}
-              disabled={!qrCardDataUrl && !qrDataUrl}
-              className="flex h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl bg-rose-600 px-1 text-[8px] font-black uppercase leading-none text-white shadow-sm active:scale-95 disabled:bg-slate-300 [-webkit-tap-highlight-color:transparent]"
+              disabled={isRendering || (!qrCardDataUrl && !qrDataUrl)}
+              className="flex h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-rose-100 bg-rose-50 px-1 text-[8px] font-black uppercase leading-none text-rose-700 shadow-sm active:scale-95 disabled:bg-slate-100 disabled:text-slate-300 [-webkit-tap-highlight-color:transparent]"
             >
               <Copy className="h-4 w-4" />
               <span className="whitespace-nowrap">{"\u1ea2nh"}</span>
@@ -798,11 +871,20 @@ const MeterReadingLinkQrModal = ({ linkInfo, onClose, onCopy }) => {
             <button
               type="button"
               onClick={handleDownload}
-              disabled={!qrCardDataUrl && !qrDataUrl}
-              className="flex h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl bg-emerald-600 px-1 text-[8px] font-black uppercase leading-none text-white shadow-sm active:scale-95 disabled:bg-slate-300 [-webkit-tap-highlight-color:transparent]"
+              disabled={isRendering || (!qrCardDataUrl && !qrDataUrl)}
+              className="flex h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-emerald-100 bg-emerald-50 px-1 text-[8px] font-black uppercase leading-none text-emerald-700 shadow-sm active:scale-95 disabled:bg-slate-100 disabled:text-slate-300 [-webkit-tap-highlight-color:transparent]"
             >
               <Download className="h-4 w-4" />
               <span className="whitespace-nowrap">{"L\u01b0u"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleReset}
+              disabled={isResetting || !onReset}
+              className="flex h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-amber-100 bg-amber-50 px-1 text-[8px] font-black uppercase leading-none text-amber-700 shadow-sm active:scale-95 disabled:bg-slate-100 disabled:text-slate-300 [-webkit-tap-highlight-color:transparent]"
+            >
+              {isResetting ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+              <span className="whitespace-nowrap">Reset</span>
             </button>
           </div>
         </div>

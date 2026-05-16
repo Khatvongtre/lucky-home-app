@@ -2,7 +2,7 @@ import React from 'react';
 import {
   Building2, User, TrendingUp, Sparkles, ChevronRight,
   CircleDollarSign, PiggyBank, PlusCircle, LogOut,
-  AlertTriangle, Zap, Receipt, FileText, QrCode, Loader2, RotateCcw, Download, ChevronDown, X
+  AlertTriangle, Zap, Receipt, FileText, QrCode, Loader2, Download, ChevronDown, X, Hexagon, CheckCircle2
 } from 'lucide-react';
 import { formatN, parseN } from '../utils/formatters';
 import ToastNotification from '../components/common/Toast';
@@ -61,6 +61,17 @@ const resolvePublicLink = (result) => {
 
 const copyMeterReadingLink = async (room, house, link) => {
   await navigator.clipboard.writeText(`${getRoomLinkLabel(room, house)}\n${link}`);
+};
+
+const getMeterReadingTokenFromLink = (link) => {
+  try {
+    const url = new URL(link, window.location.origin);
+    const parts = url.pathname.split('/').filter(Boolean);
+    const index = parts.indexOf('meter-reading');
+    return index >= 0 ? decodeURIComponent(parts[index + 1] || '') : '';
+  } catch {
+    return '';
+  }
 };
 
 const getSafeFileName = (...parts) => (
@@ -163,9 +174,11 @@ const HubView = ({
   const [downloadLoadingRoomId, setDownloadLoadingRoomId] = React.useState(null);
   const [isDownloadingHouseQr, setIsDownloadingHouseQr] = React.useState(false);
   const [isGeneratingBillImage, setIsGeneratingBillImage] = React.useState(false);
-  const [isQuickQrExpanded, setIsQuickQrExpanded] = React.useState(true);
+  const [isQuickQrExpanded, setIsQuickQrExpanded] = React.useState(false);
+  const [isWarningsExpanded, setIsWarningsExpanded] = React.useState(false);
+  const [isRecentHousesExpanded, setIsRecentHousesExpanded] = React.useState(false);
   const [isQuickHousePickerOpen, setIsQuickHousePickerOpen] = React.useState(false);
-  const [showOnlyIncompleteRooms, setShowOnlyIncompleteRooms] = React.useState(false);
+  const [showAllQuickRooms, setShowAllQuickRooms] = React.useState(false);
   const [quickMeterRoom, setQuickMeterRoom] = React.useState(null);
   const [quickMeterDrafts, setQuickMeterDrafts] = React.useState({});
   const [isQuickMeterSaving, setIsQuickMeterSaving] = React.useState(false);
@@ -185,7 +198,6 @@ const HubView = ({
   const occupancyRate = hubStats.totalRooms > 0
     ? Math.round((rentedRooms / hubStats.totalRooms) * 100)
     : 0;
-  const recentHouses = houses.slice(0, 3);
   const canManageHouseQr = (house) => (
     ['SuperAdmin', 'Owner', 'Manager'].includes(house?.userRole || user?.role)
     || ['SuperAdmin', 'Owner'].includes(user?.role)
@@ -262,9 +274,9 @@ const HubView = ({
     return hasMissingMeter || hasUnpaidBill;
   };
 
-  const visibleQuickRooms = showOnlyIncompleteRooms
-    ? quickRooms.filter(isQuickRoomIncomplete)
-    : quickRooms;
+  const incompleteQuickRooms = quickRooms.filter(isQuickRoomIncomplete);
+  const visibleQuickRooms = showAllQuickRooms ? quickRooms : incompleteQuickRooms;
+  const hasQuickRoomsToProcess = incompleteQuickRooms.length > 0;
 
   const getQuickRoomStatusStyle = ({ roomMeters, bill }) => {
     const hasMissingMeter = !roomMeters.length || roomMeters.some(meter => meter.newVal === null || meter.newVal === '' || meter.newVal === undefined);
@@ -678,24 +690,48 @@ const HubView = ({
     }
   };
 
-  const handleResetMeterLink = async (room) => {
-    const confirmed = await requestConfirm?.({
-      title: 'Reset link công tơ',
-      message: 'Reset link sẽ làm link cũ không còn truy cập được. Chỉ dùng khi phòng có khách thuê mới hoặc nghi link bị lộ.',
-    });
-    if (!confirmed) return;
+  const handleValidateMeterLink = async (linkInfo) => {
+    const token = getMeterReadingTokenFromLink(linkInfo?.url || '');
+    if (!token) return false;
+
+    try {
+      await api.get(`/meter-reading/session/${encodeURIComponent(token)}`);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const handleResetMeterLink = async (linkInfo, options = {}) => {
+    const room = linkInfo?.room;
+    if (!room) return false;
+
+    if (!options.skipConfirm) {
+      const confirmed = await requestConfirm?.({
+        title: 'Reset link công tơ',
+        message: 'Reset link sẽ làm link cũ không còn truy cập được. Chỉ dùng khi phòng có khách thuê mới hoặc nghi link bị lộ.',
+      });
+      if (!confirmed) return false;
+    }
 
     try {
       setLinkLoadingRoomId(room.id);
       const result = await api.post('/meter-reading/link/reset', {
         roomId: room.id,
-        houseId: room.houseId || selectedQuickHouse?.id,
+        houseId: room.houseId || linkInfo?.house?.id || selectedQuickHouse?.id,
       });
       const fullUrl = saveMeterLink(room.id, result);
-      await copyMeterReadingLink(room, selectedQuickHouse, fullUrl);
-      showToast?.(`Đã reset và copy link mới phòng ${getRoomCode(room)}`, 'success');
+      setQrLinkInfo(prev => prev ? { ...prev, url: fullUrl } : prev);
+      if (!options.autoOpen) {
+        await copyMeterReadingLink(room, linkInfo?.house || selectedQuickHouse, fullUrl);
+      } else {
+        await copyMeterReadingLink(room, linkInfo?.house || selectedQuickHouse, fullUrl).catch(() => null);
+      }
+      showToast?.(options.autoOpen ? `Link phòng ${getRoomCode(room)} bị hỏng. Đã tạo link mới, hãy gửi lại cho khách.` : `Đã reset và copy link mới phòng ${getRoomCode(room)}`, 'success');
+      return fullUrl;
     } catch (error) {
       showToast?.(error.message || 'Không reset được link công tơ.', 'error');
+      throw error;
     } finally {
       setLinkLoadingRoomId(null);
     }
@@ -746,7 +782,7 @@ const HubView = ({
   };
 
   return (
-    <div className="h-screen bg-slate-100 text-slate-900 font-sans flex flex-col max-w-lg mx-auto w-full relative border-x border-slate-200 shadow-2xl overflow-hidden">
+    <div className="h-screen bg-slate-100 text-slate-700 font-sans flex flex-col max-w-lg mx-auto w-full relative border-x border-slate-200 shadow-2xl overflow-hidden">
       <ToastNotification toast={toast} />
 
       <div className="shrink-0 bg-white border-b border-slate-200 px-4 pt-3 pb-3">
@@ -859,8 +895,20 @@ const HubView = ({
 
         {(isManagerOrAbove || quickQrHouses.length > 0) && quickQrHouses.length > 0 && (
           <section className="relative bg-white rounded-xl border border-slate-200 shadow-sm overflow-visible">
-            <div className="p-4 border-b border-slate-100">
-              <div className="flex items-center justify-between gap-3">
+            <div className="p-3 border-b border-slate-100">
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => setIsQuickQrExpanded(prev => !prev)}
+                onKeyDown={event => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    setIsQuickQrExpanded(prev => !prev);
+                  }
+                }}
+                className="flex cursor-pointer items-center justify-between gap-3 rounded-lg active:bg-slate-50"
+                aria-expanded={isQuickQrExpanded}
+              >
                 <div className="flex items-center gap-2">
                   <Zap className="w-4 h-4 text-green-800" />
                   <h3 className="text-[13px] font-black text-green-700 uppercase tracking-wide">
@@ -870,16 +918,10 @@ const HubView = ({
                 <div className="flex shrink-0 items-center gap-2">
                   <button
                     type="button"
-                    onClick={downloadAllHouseQr}
-                    disabled={!quickRooms.length || isDownloadingHouseQr || roomsLoadingHouseId === selectedQuickHouse?.id}
-                    className="flex items-center gap-1.5 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-[9px] font-black uppercase text-emerald-700 active:scale-95 disabled:opacity-50"
-                  >
-                    {isDownloadingHouseQr || roomsLoadingHouseId === selectedQuickHouse?.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-                    Tất cả
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsQuickQrExpanded(prev => !prev)}
+                    onClick={event => {
+                      event.stopPropagation();
+                      setIsQuickQrExpanded(prev => !prev);
+                    }}
                     className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 active:scale-95"
                     aria-label={isQuickQrExpanded ? 'Thu gọn QR ghi điện nhanh' : 'Mở rộng QR ghi điện nhanh'}
                   >
@@ -888,44 +930,75 @@ const HubView = ({
                 </div>
               </div>
 
-              <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
-                <div className="min-w-0">
-                  <p className="text-[10px] font-black uppercase text-slate-700">Chỉ phòng chưa xong</p>
-                  <p className="text-[9px] font-bold text-slate-400">{visibleQuickRooms.length}/{quickRooms.length} phòng đang hiển thị</p>
+              <div className="mt-2 flex items-center gap-2">
+                <div className={`flex min-w-0 flex-1 items-center justify-between gap-2 rounded-xl border px-3 py-2 ${hasQuickRoomsToProcess ? 'border-rose-100 bg-rose-50' : 'border-emerald-100 bg-emerald-50'}`}>
+                  <div className="flex min-w-0 items-center gap-2">
+                    {hasQuickRoomsToProcess ? (
+                      <Hexagon className="h-3.5 w-3.5 shrink-0 fill-rose-500 text-rose-500" />
+                    ) : (
+                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                    )}
+                    <p className={`truncate text-[10px] font-black uppercase ${hasQuickRoomsToProcess ? 'text-rose-700' : 'text-emerald-700'}`}>
+                      {hasQuickRoomsToProcess ? (showAllQuickRooms ? 'Hiển thị tất cả' : 'Cần xử lý') : 'Hoàn thành'}
+                    </p>
+                    {hasQuickRoomsToProcess && (
+                      <span className="shrink-0 rounded-md bg-rose-500 px-2 py-0.5 text-[10px] font-black leading-none text-white shadow-sm">
+                        {incompleteQuickRooms.length}
+                      </span>
+                    )}
+                  </div>
+                  {(hasQuickRoomsToProcess || showAllQuickRooms) && (
+                    <p className={`shrink-0 text-[9px] font-bold ${hasQuickRoomsToProcess ? 'text-rose-400' : 'text-emerald-500'}`}>{visibleQuickRooms.length}/{quickRooms.length}</p>
+                  )}
                 </div>
                 <button
                   type="button"
-                  onClick={() => setShowOnlyIncompleteRooms(prev => !prev)}
-                  className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${showOnlyIncompleteRooms ? 'bg-rose-600' : 'bg-slate-300'}`}
-                  aria-pressed={showOnlyIncompleteRooms}
+                  onClick={() => setShowAllQuickRooms(prev => !prev)}
+                  className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${showAllQuickRooms ? 'bg-emerald-600' : 'bg-rose-600'}`}
+                  aria-pressed={showAllQuickRooms}
                 >
-                  <span className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${showOnlyIncompleteRooms ? 'translate-x-5' : 'translate-x-0'}`} />
+                  <span className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${showAllQuickRooms ? 'translate-x-5' : 'translate-x-0'}`} />
                 </button>
               </div>
 
-              {quickQrHouses.length > 1 && (
-                <div className="relative z-40 mt-3">
-                  <span className="mb-1.5 block text-[9px] font-black uppercase tracking-widest text-slate-400">Chọn cơ sở</span>
+              <div className="mt-2 flex items-end gap-2">
+                <div className="relative z-40 min-w-0 flex-1">
+                  {quickQrHouses.length > 1 ? (
                   <button
                     type="button"
                     onClick={() => setIsQuickHousePickerOpen(prev => !prev)}
-                    className="flex w-full items-center gap-3 rounded-xl border border-rose-100 bg-rose-50/70 p-2.5 text-left shadow-inner active:scale-[0.99]"
+                    className={`flex h-12 w-full items-center gap-2 rounded-xl border px-2.5 text-left shadow-inner active:scale-[0.99] ${hasQuickRoomsToProcess ? 'border-rose-100 bg-rose-50/70' : 'border-emerald-100 bg-emerald-50/80'}`}
                     aria-expanded={isQuickHousePickerOpen}
                     aria-haspopup="listbox"
                   >
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-rose-600 shadow-sm">
+                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm ${hasQuickRoomsToProcess ? 'text-rose-600' : 'text-emerald-600'}`}>
                       <Building2 className="h-4 w-4" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-black uppercase text-slate-900">
+                      <p className="truncate text-xs font-black uppercase text-blue-800">
                         {getHouseLabel(selectedQuickHouse) || 'Cơ sở'}
                       </p>
                       <p className="mt-0.5 text-[10px] font-bold text-slate-500">
                         {quickRooms.length} phòng trong cơ sở đang chọn
                       </p>
                     </div>
-                    <ChevronDown className={`h-4 w-4 shrink-0 text-rose-500 transition-transform ${isQuickHousePickerOpen ? 'rotate-180' : ''}`} />
+                    <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${hasQuickRoomsToProcess ? 'text-rose-500' : 'text-emerald-600'} ${isQuickHousePickerOpen ? 'rotate-180' : ''}`} />
                   </button>
+                  ) : (
+                    <div className={`flex h-12 w-full items-center gap-2 rounded-xl border px-2.5 text-left ${hasQuickRoomsToProcess ? 'border-slate-100 bg-slate-50' : 'border-emerald-100 bg-emerald-50/80'}`}>
+                      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm ${hasQuickRoomsToProcess ? 'text-slate-500' : 'text-emerald-600'}`}>
+                        <Building2 className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-xs font-black uppercase text-blue-800">
+                          {getHouseLabel(selectedQuickHouse) || 'Cơ sở'}
+                        </p>
+                        <p className="mt-0.5 text-[9px] font-bold text-slate-500">
+                          {quickRooms.length} phòng
+                        </p>
+                      </div>
+                    </div>
+                  )}
 
                   {isQuickHousePickerOpen && (
                     <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg no-scrollbar" role="listbox">
@@ -965,10 +1038,20 @@ const HubView = ({
                     </div>
                   )}
                 </div>
-              )}
+                <button
+                  type="button"
+                  onClick={downloadAllHouseQr}
+                  disabled={!quickRooms.length || isDownloadingHouseQr || roomsLoadingHouseId === selectedQuickHouse?.id}
+                  className="flex h-12 w-11 shrink-0 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700 active:scale-95 disabled:opacity-50"
+                  aria-label="Tải toàn bộ QR"
+                  title="Tải toàn bộ QR"
+                >
+                  {isDownloadingHouseQr || roomsLoadingHouseId === selectedQuickHouse?.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
 
-            {isQuickQrExpanded && <div className="max-h-[280px] overflow-y-auto divide-y divide-slate-100 no-scrollbar">
+            {isQuickQrExpanded && <div className="max-h-[240px] overflow-y-auto divide-y divide-slate-200 no-scrollbar">
               {roomsLoadingHouseId === selectedQuickHouse?.id && visibleQuickRooms.length === 0 ? (
                 <div className="flex items-center justify-center gap-2 p-5 text-xs font-bold text-slate-400">
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -978,7 +1061,7 @@ const HubView = ({
                 <div className="p-5 text-center">
                   <QrCode className="mx-auto mb-2 h-8 w-8 text-slate-300" />
                   <p className="text-xs font-bold text-slate-500">
-                    {quickRooms.length === 0 ? 'Cơ sở này chưa có phòng.' : 'Không còn phòng chưa hoàn thành.'}
+                    {quickRooms.length === 0 ? 'Cơ sở này chưa có phòng.' : showAllQuickRooms ? 'Cơ sở này chưa có phòng.' : 'Không còn phòng cần xử lý.'}
                   </p>
                 </div>
               ) : (
@@ -993,21 +1076,21 @@ const HubView = ({
                   const rowStatusStyle = getQuickRoomStatusStyle({ roomMeters, bill: roomBill });
                   const missingBadges = getQuickMissingStatusBadges({ roomMeters, bill: roomBill });
                   return (
-                    <div key={room.id} className={`flex w-full items-center gap-2 p-3 ${rowStatusStyle.row}`}>
+                    <div key={room.id} className={`flex w-full items-center gap-1.5 border-b border-slate-200/70 p-2.5 last:border-b-0 ${rowStatusStyle.row}`}>
                       <button
                         type="button"
                         onClick={() => handleShowMeterLinkQr(room)}
                         disabled={isLoading || isOpeningReading || isOpeningBill || isDownloadingHouseQr}
-                        className="flex min-w-0 flex-1 items-center gap-3 rounded-xl p-1.5 text-left active:bg-rose-50 disabled:opacity-60"
+                        className="flex min-w-0 flex-1 items-center gap-2 rounded-xl p-1 text-left active:bg-rose-50 disabled:opacity-60"
                       >
-                        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${rowStatusStyle.icon}`}>
+                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${rowStatusStyle.icon}`}>
                           {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-[12px] font-black uppercase text-slate-800">
+                            <p className="truncate text-[11px] font-black uppercase text-blue-800">
                             {room.roomType === 'mbkd' ? 'MBKD ' : 'Phòng '}{roomCode}
                           </p>
-                          <div className="mt-1 flex flex-nowrap gap-1 overflow-x-auto no-scrollbar">
+                          <div className="mt-0.5 flex flex-nowrap gap-1 overflow-x-auto no-scrollbar">
                             {missingBadges.map(badge => (
                               <span key={badge.label} className={`shrink-0 rounded-md px-1.5 py-0.5 text-[7px] sm:text-[8px] font-black uppercase leading-none whitespace-nowrap ${badge.className}`}>
                                 {badge.label}
@@ -1038,15 +1121,6 @@ const HubView = ({
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleResetMeterLink(room)}
-                        disabled={isLoading || isOpeningReading || isOpeningBill || isDownloading}
-                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-red-100 bg-red-50 text-red-600 active:scale-95 disabled:opacity-60"
-                        aria-label={`Reset link phòng ${roomCode}`}
-                      >
-                        <RotateCcw className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
                         onClick={() => downloadRoomQr(room)}
                         disabled={isLoading || isOpeningReading || isOpeningBill || isDownloading || isDownloadingHouseQr}
                         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700 active:scale-95 disabled:opacity-60"
@@ -1064,55 +1138,104 @@ const HubView = ({
 
         {dashboardWarnings.length > 0 && (
           <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden animate-in zoom-in-95 duration-300">
-            <div className="p-3.5 flex items-center justify-between border-b border-slate-100 bg-slate-50">
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => setIsWarningsExpanded(prev => !prev)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  setIsWarningsExpanded(prev => !prev);
+                }
+              }}
+              aria-expanded={isWarningsExpanded}
+              className="p-3.5 flex cursor-pointer items-center justify-between gap-3 border-b border-slate-100 bg-slate-50 active:bg-rose-50"
+            >
               <div className="flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 text-rose-500" />
                 <h3 className="text-[13px] font-black text-rose-800 uppercase tracking-tight">Cần chú ý</h3>
               </div>
-              <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-md shadow-sm">{dashboardWarnings.length} Cảnh báo</span>
+              <div className="flex items-center gap-2">
+                <span className="bg-rose-500 text-white text-[10px] font-black px-2 py-0.5 rounded-md shadow-sm">{dashboardWarnings.length} Cảnh báo</span>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setIsWarningsExpanded(prev => !prev);
+                  }}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-rose-100 bg-white text-rose-600 transition active:scale-95"
+                  aria-label={isWarningsExpanded ? 'Thu gọn cảnh báo' : 'Mở rộng cảnh báo'}
+                >
+                  <ChevronDown className={`h-4 w-4 transition-transform ${isWarningsExpanded ? 'rotate-180' : ''}`} />
+                </button>
+              </div>
             </div>
-            <div className="divide-y divide-white max-h-[300px] overflow-y-auto no-scrollbar">
+            {isWarningsExpanded && <div className="divide-y divide-rose-100/80 max-h-[300px] overflow-y-auto no-scrollbar">
               {dashboardWarnings.map((w, idx) => {
                 const config = getWarningConfig(w.type);
                 const Icon = config.icon;
                 return (
-                  <button key={idx} onClick={() => handleWarningClick(w)} className={`w-full text-left p-3 flex items-start gap-3 transition-colors active:scale-[0.99] border-l-4 ${config.borderL} ${config.lightBg} hover:opacity-80`}>
+                  <button key={idx} onClick={() => handleWarningClick(w)} className={`w-full text-left p-3 flex items-start gap-3 transition-colors active:scale-[0.99] border-l-4 border-b border-rose-100/70 last:border-b-0 ${config.borderL} ${config.lightBg} hover:opacity-80`}>
                     <div className={`w-9 h-9 rounded-full shrink-0 flex items-center justify-center ${config.bg} ${config.color} border ${config.border} shadow-sm`}>
                       <Icon className="w-4 h-4" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-[12px] font-bold text-slate-800 leading-snug">{w.message}</p>
+                      <p className="text-[12px] font-bold text-slate-700 leading-snug">{w.message}</p>
                       {w.houseName && <p className={`text-[9px] font-black uppercase tracking-widest mt-1 flex items-center gap-1 ${config.color}`}><Building2 className="w-3 h-3" /> {w.houseName}</p>}
                     </div>
                     <ChevronRight className={`w-4 h-4 shrink-0 self-center ${config.color}`} />
                   </button>
                 )
               })}
-            </div>
+            </div>}
           </section>
         )}
 
         <section className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="p-4 flex items-center justify-between border-b border-slate-100">
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => setIsRecentHousesExpanded(prev => !prev)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                setIsRecentHousesExpanded(prev => !prev);
+              }
+            }}
+            aria-expanded={isRecentHousesExpanded}
+            className="p-4 flex cursor-pointer items-center justify-between gap-3 border-b border-slate-100 active:bg-blue-50"
+          >
             <div><h3 className="text-sm font-black text-blue-700 uppercase">Cơ sở của bạn</h3><p className="text-[11px] font-semibold text-slate-500 mt-0.5">Chọn nhanh để vào dashboard</p></div>
-            <button type="button" onClick={() => { setIsHubMode(false); setActiveTab('dashboard'); }} className="text-[10px] font-black text-blue-600 uppercase flex items-center gap-1">Tất cả <ChevronRight className="w-3.5 h-3.5" /></button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setIsRecentHousesExpanded(prev => !prev);
+                }}
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-blue-100 bg-blue-50 text-blue-600 transition active:scale-95"
+                aria-label={isRecentHousesExpanded ? 'Thu gọn cơ sở của bạn' : 'Mở rộng cơ sở của bạn'}
+              >
+                <ChevronDown className={`h-4 w-4 transition-transform ${isRecentHousesExpanded ? 'rotate-180' : ''}`} />
+              </button>
+            </div>
           </div>
-          <div className="divide-y divide-slate-100">
-            {recentHouses.length === 0 && (
+          {isRecentHousesExpanded && <div className="max-h-[340px] divide-y divide-slate-200 overflow-y-auto no-scrollbar">
+            {houses.length === 0 && (
               <div className="p-5 text-center">
                 <Building2 className="w-10 h-10 mx-auto text-slate-300 mb-3" />
                 <p className="text-xs font-bold text-slate-500">Bạn chưa có cơ sở nào.</p>
                 <button type="button" onClick={() => { setActiveTab('dashboard'); setIsHubMode(false); setEditingHouse(null); setIsAiCreateHouseOpen(true); }} className="mt-4 px-4 py-2.5 rounded-xl bg-blue-600 text-white text-[10px] font-black uppercase">Tạo cơ sở đầu tiên</button>
               </div>
             )}
-            {recentHouses.map(h => (
-              <button key={h.id} type="button" onClick={() => { setSelectedHouse(h); setConfig({ ...h }); setIsHubMode(false); setActiveTab('dashboard'); setSearchQuery(''); }} className="w-full p-3.5 flex items-center gap-3 text-left active:bg-slate-50 transition-colors">
+            {houses.map(h => (
+              <button key={h.id} type="button" onClick={() => { setSelectedHouse(h); setConfig({ ...h }); setIsHubMode(false); setActiveTab('dashboard'); setSearchQuery(''); }} className="w-full border-b border-slate-200/80 p-3.5 flex items-center gap-3 text-left active:bg-slate-50 transition-colors last:border-b-0">
                 <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0"><Building2 className="w-5 h-5" /></div>
                 <div className="flex-1 min-w-0"><div className="flex items-center gap-2"><h4 className="text-[13px] font-black text-blue-800 uppercase truncate">{h.name}</h4><span className="text-[7px] font-black px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 uppercase shrink-0">{h.userRole || user?.role}</span></div><p className="text-[10px] font-semibold text-slate-500 mt-0.5 truncate">{h.address || 'Chưa cập nhật địa chỉ'}</p></div>
                 <div className="text-right shrink-0"><p className="text-[12px] font-black text-emerald-700 tabular-nums">{Math.max((h.totalRooms || 0) - (h.emptyRooms || 0), 0)}/{h.totalRooms || 0}</p><p className="text-[7px] font-black text-slate-400 uppercase mt-0.5">đã thuê</p></div>
               </button>
             ))}
-          </div>
+          </div>}
         </section>
 
         <section className="grid grid-cols-2 gap-3"><button type="button" onClick={() => { setActiveTab('dashboard'); setIsHubMode(false); setEditingHouse(null); setIsAiCreateHouseOpen(true); }} className="rounded-xl bg-white border border-slate-200 p-3.5 flex items-center gap-3 text-left active:scale-[0.98] transition-all"><div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center"><PlusCircle className="w-5 h-5" /></div><div><p className="text-[11px] font-black text-blue-700 uppercase">Thêm cơ sở</p><p className="text-[9px] font-bold text-slate-500 mt-0.5">Nhập thủ công</p></div></button><button type="button" onClick={() => { setActiveTab('dashboard'); setIsHubMode(false); setIsAiPromptModalOpen(true); setAiPrompt(""); setIsListening(false); }} className="rounded-xl bg-white border border-slate-200 p-3.5 flex items-center gap-3 text-left active:scale-[0.98] transition-all"><div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center"><Sparkles className="w-5 h-5" /></div><div><p className="text-[11px] font-black text-indigo-700 uppercase">Tạo bằng AI</p><p className="text-[9px] font-bold text-slate-500 mt-0.5">Từ mô tả nhà</p></div></button></section>
@@ -1121,7 +1244,9 @@ const HubView = ({
       <MeterReadingLinkQrModal
         linkInfo={qrLinkInfo}
         onClose={() => setQrLinkInfo(null)}
-        onCopy={() => qrLinkInfo && copyMeterReadingLink(qrLinkInfo.room, qrLinkInfo.house, qrLinkInfo.url)}
+        onCopy={(currentLinkInfo) => currentLinkInfo && copyMeterReadingLink(currentLinkInfo.room, currentLinkInfo.house, currentLinkInfo.url)}
+        onReset={handleResetMeterLink}
+        onValidateLink={handleValidateMeterLink}
       />
       <BillReceipt
         bottomSheet={quickBillSheet}
@@ -1142,7 +1267,7 @@ const HubView = ({
             <div className="flex items-center justify-between gap-3 border-b border-slate-100 p-4">
               <div className="min-w-0">
                 <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">Ghi số điện nhanh</p>
-                <h3 className="mt-1 truncate text-base font-black text-slate-900">
+                <h3 className="mt-1 truncate text-base font-black text-blue-800">
                   {getHouseLabel(selectedQuickHouse)} - Phòng {getRoomCode(quickMeterRoom)}
                 </h3>
               </div>
@@ -1175,7 +1300,7 @@ const HubView = ({
                           <Zap className="h-4 w-4" />
                         </div>
                         <div className="min-w-0">
-                          <p className="truncate text-[12px] font-black uppercase text-slate-800">{meter.name}</p>
+                          <p className="truncate text-[12px] font-black uppercase text-blue-800">{meter.name}</p>
                           <p className="text-[10px] font-bold text-slate-500">Cũ: {formatN(oldValue)}</p>
                         </div>
                       </div>
@@ -1188,7 +1313,7 @@ const HubView = ({
                       inputMode="numeric"
                       value={draftValue}
                       onChange={event => setQuickMeterDrafts(prev => ({ ...prev, [meter.id]: event.target.value }))}
-                      className="w-full rounded-xl border-2 border-white bg-white px-4 py-3 text-center text-2xl font-black text-slate-950 outline-none focus:border-blue-400"
+                      className="w-full rounded-xl border-2 border-white bg-white px-4 py-3 text-center text-2xl font-black text-blue-900 outline-none focus:border-blue-400"
                       placeholder="Nhập số mới"
                     />
                     {isInvalid && (

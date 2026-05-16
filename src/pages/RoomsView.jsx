@@ -7,7 +7,6 @@ import {
     LucideEdit,
     PlusCircle,
     QrCode,
-    RotateCcw,
     Users2,
 } from 'lucide-react';
 import { api } from '../services/api';
@@ -38,6 +37,17 @@ const getRoomLinkLabel = (room) => {
 const copyMeterReadingLink = async (room, link) => {
     const label = getRoomLinkLabel(room);
     await navigator.clipboard.writeText(`${label}\n${link}`);
+};
+
+const getMeterReadingTokenFromLink = (link) => {
+    try {
+        const url = new URL(link, window.location.origin);
+        const parts = url.pathname.split('/').filter(Boolean);
+        const index = parts.indexOf('meter-reading');
+        return index >= 0 ? decodeURIComponent(parts[index + 1] || '') : '';
+    } catch {
+        return '';
+    }
 };
 
 const getHouseLabel = (selectedHouse) => (
@@ -138,22 +148,45 @@ const RoomsView = ({
         }
     };
 
-    const handleResetMeterLink = async (event, room) => {
-        event.stopPropagation();
-        const confirmed = await requestConfirm?.({
-            title: 'Reset link công tơ',
-            message: 'Reset link sẽ làm link cũ không còn truy cập được. Chỉ dùng khi phòng có khách thuê mới hoặc nghi link bị lộ.',
-        });
-        if (!confirmed) return;
+    const handleValidateMeterLink = async (linkInfo) => {
+        const token = getMeterReadingTokenFromLink(linkInfo?.url || '');
+        if (!token) return false;
+
+        try {
+            await api.get(`/meter-reading/session/${encodeURIComponent(token)}`);
+            return true;
+        } catch {
+            return false;
+        }
+    };
+
+    const handleResetMeterLink = async (linkInfo, options = {}) => {
+        const room = linkInfo?.room;
+        if (!room) return false;
+
+        if (!options.skipConfirm) {
+            const confirmed = await requestConfirm?.({
+                title: 'Reset link công tơ',
+                message: 'Reset link sẽ làm link cũ không còn truy cập được. Chỉ dùng khi phòng có khách thuê mới hoặc nghi link bị lộ.',
+            });
+            if (!confirmed) return false;
+        }
 
         try {
             setLinkLoadingRoomId(room.id);
             const result = await api.post('/meter-reading/link/reset', { roomId: room.id });
             const fullUrl = saveMeterLink(room.id, result);
-            await copyMeterReadingLink(room, fullUrl);
-            showToast?.(`Đã reset và copy link mới phòng ${room.roomCode || room.id}`, 'success');
+            setQrLinkInfo(prev => prev ? { ...prev, url: fullUrl } : prev);
+            if (!options.autoOpen) {
+                await copyMeterReadingLink(room, fullUrl);
+            } else {
+                await copyMeterReadingLink(room, fullUrl).catch(() => null);
+            }
+            showToast?.(options.autoOpen ? `Link phòng ${room.roomCode || room.id} bị hỏng. Đã tạo link mới, hãy gửi lại cho khách.` : `Đã reset và copy link mới phòng ${room.roomCode || room.id}`, 'success');
+            return fullUrl;
         } catch (error) {
             showToast?.(error.message || 'Không reset được link công tơ.', 'error');
+            throw error;
         } finally {
             setLinkLoadingRoomId(null);
         }
@@ -250,7 +283,7 @@ const RoomsView = ({
 
                             {isManagerOrAbove && (
                                 <div className="mt-2 border-t border-slate-200/70 pt-2">
-                                    <div className="grid grid-cols-2 gap-1.5">
+                                    <div className="grid grid-cols-1 gap-1.5">
                                         <button
                                             type="button"
                                             onClick={(event) => handleShowMeterLinkQr(event, room)}
@@ -259,15 +292,6 @@ const RoomsView = ({
                                         >
                                             {isLinkLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <QrCode className="h-3 w-3" />}
                                             QR link
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={(event) => handleResetMeterLink(event, room)}
-                                            disabled={isLinkLoading}
-                                            className="flex items-center justify-center gap-1 rounded-lg border border-red-100 bg-red-50 px-2 py-2 text-[8px] font-black uppercase text-red-700 active:scale-95 disabled:opacity-60"
-                                        >
-                                            <RotateCcw className="h-3 w-3" />
-                                            Reset
                                         </button>
                                     </div>
                                 </div>
@@ -290,7 +314,9 @@ const RoomsView = ({
             <MeterReadingLinkQrModal
                 linkInfo={qrLinkInfo}
                 onClose={() => setQrLinkInfo(null)}
-                onCopy={() => qrLinkInfo && copyMeterReadingLink(qrLinkInfo.room, qrLinkInfo.url)}
+                onCopy={(currentLinkInfo) => currentLinkInfo && copyMeterReadingLink(currentLinkInfo.room, currentLinkInfo.url)}
+                onReset={handleResetMeterLink}
+                onValidateLink={handleValidateMeterLink}
             />
         </div>
     );
