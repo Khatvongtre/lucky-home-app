@@ -879,16 +879,9 @@ const MeterReadingLinkQrModal = ({ linkInfo, onClose, onCopy, onReset, onValidat
   return (
     <div {...swipeBackHandlers} className="fixed inset-0 z-[850] flex items-end justify-center bg-slate-950/55 px-4 pb-4 backdrop-blur-sm">
       <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl animate-in slide-in-from-bottom-4 duration-200">
-        <div className="flex items-center justify-between gap-3 border-b border-slate-100 p-4">
-          <p className="text-[10px] font-black uppercase tracking-widest text-rose-600">QR link ghi {'\u0111i\u1ec7n'}</p>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500 active:scale-95"
-            aria-label="\u0110\u00f3ng"
-          >
-            <X className="h-4 w-4" />
-          </button>
+        <div className="border-b border-slate-100 px-4 py-3">
+          <p className="text-[9px] font-black uppercase tracking-widest text-rose-600">QR link ghi {'\u0111i\u1ec7n'}</p>
+          <p className="mt-0.5 truncate text-[11px] font-bold text-slate-500">{label}</p>
         </div>
 
         <div className="p-4">
@@ -908,15 +901,15 @@ const MeterReadingLinkQrModal = ({ linkInfo, onClose, onCopy, onReset, onValidat
             </p>
           ) : null}
 
-          <div className="mt-3 grid grid-cols-6 gap-1.5">
+          <div className="mt-3 grid grid-cols-3 gap-2">
             <button
               type="button"
-              onClick={handleShareQr}
-              disabled={isSharing || isRendering || (!qrCardDataUrl && !qrDataUrl)}
-              className="flex h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-teal-100 bg-teal-50 px-1 text-[8px] font-black uppercase leading-none text-teal-700 shadow-sm active:scale-95 disabled:bg-slate-100 disabled:text-slate-300 [-webkit-tap-highlight-color:transparent]"
+              onClick={handleCopyQr}
+              disabled={isRendering || (!qrCardDataUrl && !qrDataUrl)}
+              className="flex h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-rose-100 bg-rose-50 px-1 text-[8px] font-black uppercase leading-none text-rose-700 shadow-sm active:scale-95 disabled:bg-slate-100 disabled:text-slate-300 [-webkit-tap-highlight-color:transparent]"
             >
-              {isSharing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}
-              <span className="whitespace-nowrap">Zalo</span>
+              <Copy className="h-4 w-4" />
+              <span className="whitespace-nowrap">{"\u1ea2nh"}</span>
             </button>
             <button
               type="button"
@@ -937,12 +930,12 @@ const MeterReadingLinkQrModal = ({ linkInfo, onClose, onCopy, onReset, onValidat
             </button>
             <button
               type="button"
-              onClick={handleCopyQr}
-              disabled={isRendering || (!qrCardDataUrl && !qrDataUrl)}
-              className="flex h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-rose-100 bg-rose-50 px-1 text-[8px] font-black uppercase leading-none text-rose-700 shadow-sm active:scale-95 disabled:bg-slate-100 disabled:text-slate-300 [-webkit-tap-highlight-color:transparent]"
+              onClick={handleShareQr}
+              disabled={isSharing || isRendering || (!qrCardDataUrl && !qrDataUrl)}
+              className="flex h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-xl border border-teal-100 bg-teal-50 px-1 text-[8px] font-black uppercase leading-none text-teal-700 shadow-sm active:scale-95 disabled:bg-slate-100 disabled:text-slate-300 [-webkit-tap-highlight-color:transparent]"
             >
-              <Copy className="h-4 w-4" />
-              <span className="whitespace-nowrap">{"\u1ea2nh"}</span>
+              {isSharing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}
+              <span className="whitespace-nowrap">Zalo</span>
             </button>
             <button
               type="button"
@@ -963,6 +956,14 @@ const MeterReadingLinkQrModal = ({ linkInfo, onClose, onCopy, onReset, onValidat
               <span className="whitespace-nowrap">Reset</span>
             </button>
           </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100 py-3.5 text-[11px] font-black uppercase tracking-widest text-slate-600 shadow-sm transition-all active:scale-95"
+          >
+            <X className="h-4 w-4" /> {'\u0110\u00f3ng'}
+          </button>
         </div>
       </div>
     </div>

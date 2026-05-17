@@ -19,7 +19,7 @@ $config = if ($Variant -eq 'hu-chi-tieu') {
     Capacitor = 'capacitor.lucky-home.json'
     AppId = 'com.luckyhome.app'
     AppName = 'Lucky Home'
-    Icon = 'public/logo.png'
+    Icon = 'public/Logo-luckyhome.png'
   }
 }
 

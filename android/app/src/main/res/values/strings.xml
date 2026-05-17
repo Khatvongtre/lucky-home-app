@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Hũ Chi Tiêu</string>
-    <string name="title_activity_main">Hũ Chi Tiêu</string>
-    <string name="package_name">com.luckyhome.huchitieu</string>
-    <string name="custom_url_scheme">com.luckyhome.huchitieu</string>
+    <string name="app_name">Lucky Home</string>
+    <string name="title_activity_main">Lucky Home</string>
+    <string name="package_name">com.luckyhome.app</string>
+    <string name="custom_url_scheme">com.luckyhome.app</string>
 </resources>

@@ -2,7 +2,7 @@ import React from 'react';
 import {
   Building2, User, TrendingUp, Sparkles, ChevronRight,
   CircleDollarSign, PiggyBank, PlusCircle, LogOut,
-  AlertTriangle, Zap, Receipt, FileText, QrCode, Loader2, Download, ChevronDown, X, Hexagon, CheckCircle2, Share2, Users2, Bike, CreditCard
+  AlertTriangle, Zap, Receipt, FileText, QrCode, Loader2, Download, ChevronDown, X, Hexagon, CheckCircle2, Share2, Users2, Bike, CreditCard, Smile, Frown
 } from 'lucide-react';
 import { formatN, parseN } from '../utils/formatters';
 import ToastNotification from '../components/common/Toast';
@@ -233,6 +233,7 @@ const HubView = ({
     || ['SuperAdmin', 'Owner'].includes(user?.role);
   const quickBillCanEdit = ['SuperAdmin', 'Owner', 'Manager'].includes(selectedQuickHouse?.userRole || user?.role)
     || ['SuperAdmin', 'Owner'].includes(user?.role);
+  const quickBillCanPay = quickBillCanEdit;
 
   const getQuickHouseRoomStats = (house) => {
     const houseRooms = roomsByHouse[house?.id] || [];
@@ -285,37 +286,55 @@ const HubView = ({
     return { daysLeft, dueDate };
   };
 
-  const getQuickHouseComboboxChips = (house) => {
+  const getQuickHouseComboboxChips = (house, { includeOccupancyStats = false, dueDaysThreshold = 5 } = {}) => {
     const dueInfo = getQuickHouseRentDueInfo(house);
-    if (dueInfo && dueInfo.daysLeft >= 0 && dueInfo.daysLeft <= 5) {
-      return [{
+    const chips = [];
+
+    if (dueInfo && dueInfo.daysLeft >= 0 && dueInfo.daysLeft <= dueDaysThreshold) {
+      chips.push({
         label: dueInfo.daysLeft === 0 ? 'Hôm nay đóng tiền' : `Còn ${dueInfo.daysLeft} ngày đóng tiền`,
         icon: CreditCard,
         iconClassName: 'text-rose-600',
         className: 'border-slate-200 bg-white/70 text-slate-600',
-      }];
+        fullRow: true,
+      });
     }
 
     const stats = getQuickHouseRoomStats(house);
-    return [
-      stats.emptyRooms > 0 ? { label: `${stats.emptyRooms} trống`, icon: Building2, iconClassName: 'text-emerald-600', className: 'border-slate-200 bg-white/70 text-slate-600' } : null,
-      stats.totalEbikes > 0 ? { label: `${stats.totalEbikes} xe điện`, icon: Bike, iconClassName: 'text-amber-600', className: 'border-slate-200 bg-white/70 text-slate-600' } : null,
-      stats.totalPeople > 0 ? { label: `${stats.totalPeople} người`, icon: Users2, iconClassName: 'text-blue-600', className: 'border-slate-200 bg-white/70 text-slate-600' } : null,
-    ].filter(Boolean);
+    if (stats.emptyRooms > 0) {
+      chips.push({ label: `${stats.emptyRooms} trống`, icon: Building2, iconClassName: 'text-emerald-600', className: 'border-slate-200 bg-white/70 text-slate-600' });
+    }
+    if (includeOccupancyStats && stats.totalEbikes > 0) {
+      chips.push({ label: `${stats.totalEbikes} xe điện`, icon: Bike, iconClassName: 'text-amber-600', className: 'border-slate-200 bg-white/70 text-slate-600' });
+    }
+    if (includeOccupancyStats && stats.totalPeople > 0) {
+      chips.push({ label: `${stats.totalPeople} người`, icon: Users2, iconClassName: 'text-blue-600', className: 'border-slate-200 bg-white/70 text-slate-600' });
+    }
+
+    return chips;
   };
 
-  const renderQuickHouseComboboxChips = (house, className = '') => {
-    const chips = getQuickHouseComboboxChips(house);
+  const renderQuickHouseComboboxChips = (house, className = '', options = {}) => {
+    const chips = getQuickHouseComboboxChips(house, options);
     if (!chips.length) return null;
+    const fullRowChips = chips.filter(chip => chip.fullRow);
+    const inlineChips = chips.filter(chip => !chip.fullRow);
+
+    const renderChip = (chip, extraClassName = '') => (
+      <span key={chip.label} className={`flex shrink-0 items-center rounded-md border px-1.5 py-0.5 text-[8px] font-bold uppercase leading-none ${chip.className} ${extraClassName}`}>
+        {chip.icon ? <chip.icon className={`mr-1 h-3 w-3 ${chip.iconClassName || ''}`} /> : null}
+        {chip.label}
+      </span>
+    );
 
     return (
-      <div className={`mt-1 flex min-w-0 flex-wrap gap-1 ${className}`}>
-        {chips.map(chip => (
-          <span key={chip.label} className={`flex shrink-0 items-center rounded-md border px-1.5 py-0.5 text-[8px] font-bold uppercase leading-none ${chip.className}`}>
-            {chip.icon ? <chip.icon className={`mr-1 h-3 w-3 ${chip.iconClassName || ''}`} /> : null}
-            {chip.label}
-          </span>
-        ))}
+      <div className={`mt-1 min-w-0 space-y-1 ${className}`}>
+        {fullRowChips.map(chip => renderChip(chip, 'w-fit max-w-full'))}
+        {inlineChips.length > 0 && (
+          <div className="flex min-w-0 flex-wrap gap-1">
+            {inlineChips.map(chip => renderChip(chip))}
+          </div>
+        )}
       </div>
     );
   };
@@ -1042,6 +1061,42 @@ const HubView = ({
     }
   };
 
+  const toggleQuickQrExpanded = () => {
+    setIsQuickHousePickerOpen(false);
+    setIsQuickQrExpanded(prev => {
+      const next = !prev;
+      if (next) {
+        setIsWarningsExpanded(false);
+        setIsRecentHousesExpanded(false);
+      }
+      return next;
+    });
+  };
+
+  const toggleWarningsExpanded = () => {
+    setIsWarningsExpanded(prev => {
+      const next = !prev;
+      if (next) {
+        setIsQuickQrExpanded(false);
+        setIsQuickHousePickerOpen(false);
+        setIsRecentHousesExpanded(false);
+      }
+      return next;
+    });
+  };
+
+  const toggleRecentHousesExpanded = () => {
+    setIsRecentHousesExpanded(prev => {
+      const next = !prev;
+      if (next) {
+        setIsQuickQrExpanded(false);
+        setIsQuickHousePickerOpen(false);
+        setIsWarningsExpanded(false);
+      }
+      return next;
+    });
+  };
+
   const getWarningConfig = (type) => {
     switch (type) {
       case 'SAVING': return { icon: PiggyBank, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100', borderL: 'border-l-emerald-500', lightBg: 'bg-emerald-50/50' };
@@ -1053,6 +1108,14 @@ const HubView = ({
     }
   };
 
+  const hubGreeting = dashboardWarnings.length > 0
+    ? `Xin Chào, Có ${dashboardWarnings.length} việc cần chú ý hôm nay !`
+    : 'Xin Chào, Mọi thứ đang ổn, cùng kiểm tra nhanh nhé!';
+  const hubGreetingTone = dashboardWarnings.length > 0
+    ? 'from-rose-50 via-red-50 to-white text-rose-700 ring-rose-100'
+    : 'from-indigo-50 via-blue-50 to-white text-indigo-700 ring-indigo-100';
+  const HubGreetingIcon = dashboardWarnings.length > 0 ? Frown : Smile;
+
   return (
     <div className="h-screen bg-slate-100 text-slate-700 font-sans flex flex-col max-w-lg mx-auto w-full relative border-x border-slate-200 shadow-2xl overflow-hidden">
       <ToastNotification toast={toast} />
@@ -1060,19 +1123,18 @@ const HubView = ({
       <div className="shrink-0 bg-white border-b border-slate-200 px-4 pt-3 pb-3">
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <h1 className="text-base font-black text-indigo-700 tracking-tight truncate">
-              {user?.fullName || 'Lucky Home'}
-            </h1>
-            <div className="mt-1 flex min-w-0 items-center gap-1.5 overflow-hidden">
-              <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[8px] font-black uppercase text-emerald-700 ring-1 ring-emerald-100">
-                <Building2 className="h-3 w-3" />
-                {hubStats.totalHouses} cơ sở
+            <div className="flex min-w-0 items-center gap-1.5">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100">
+                <User className="h-3.5 w-3.5" />
               </span>
-              <span className="inline-flex min-w-0 items-center gap-1 rounded-md bg-blue-50 px-1.5 py-0.5 text-[8px] font-black uppercase text-blue-700 ring-1 ring-blue-100">
-                <Users2 className="h-3 w-3 shrink-0" />
-                <span className="truncate">{rentedRooms}/{hubStats.totalRooms} phòng thuê</span>
-              </span>
+              <h1 className="truncate text-base font-black tracking-tight text-indigo-700">
+                {user?.fullName || 'Lucky Home'}
+              </h1>
             </div>
+            <p className={`mt-1 flex max-w-full items-center gap-1 truncate rounded-md bg-gradient-to-r px-1.5 py-0.5 text-[9px] font-black ring-1 ${hubGreetingTone}`}>
+              <HubGreetingIcon className="h-3 w-3 shrink-0" />
+              <span className="truncate">{hubGreeting}</span>
+            </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <NotificationBell
@@ -1109,9 +1171,13 @@ const HubView = ({
                   <h2 className="mt-0.5 truncate text-[13px] font-black uppercase tracking-wide text-white">Kỳ {operationPeriod}</h2>
                 </div>
               </div>
-              <div className="shrink-0 rounded-lg bg-white/10 px-2.5 py-1.5 text-right ring-1 ring-white/15 backdrop-blur">
-                <p className="text-[8px] font-black uppercase text-slate-300">Lấp đầy</p>
-                <p className="text-[16px] font-black text-emerald-200 tabular-nums">{occupancyRate}%</p>
+              <div className="shrink-0 rounded-lg bg-white/10 px-3 py-2 ring-1 ring-white/15 backdrop-blur">
+                <div className="grid  items-center gap-2.5">
+                  <div className=" text-center">
+                    <p className="text-[8px] font-black uppercase tracking-wide text-slate-300">Lấp đầy</p>
+                    <p className="mt-0.5 text-[18px] font-black leading-none text-emerald-200 tabular-nums">{occupancyRate}%</p>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1213,15 +1279,11 @@ const HubView = ({
               <div
                 role="button"
                 tabIndex={0}
-                onClick={() => {
-                  setIsQuickHousePickerOpen(false);
-                  setIsQuickQrExpanded(prev => !prev);
-                }}
+                onClick={toggleQuickQrExpanded}
                 onKeyDown={event => {
                   if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
-                    setIsQuickHousePickerOpen(false);
-                    setIsQuickQrExpanded(prev => !prev);
+                    toggleQuickQrExpanded();
                   }
                 }}
                 className="flex cursor-pointer items-center justify-between gap-2 rounded-lg bg-white/70 px-2.5 py-2 text-amber-900 ring-1 ring-amber-100 active:bg-amber-50"
@@ -1231,9 +1293,14 @@ const HubView = ({
                   <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-white shadow-sm shadow-amber-200">
                     <Zap className="h-4 w-4" />
                   </span>
-                  <h3 className="shrink-0 text-[13px] font-black uppercase tracking-wide text-amber-900">
-                    Xử lý nhanh
-                  </h3>
+                  <div className="min-w-0">
+                    <h3 className="truncate text-[13px] font-black uppercase tracking-wide text-amber-900">
+                      Xử lý nhanh
+                    </h3>
+                    <p className="mt-0.5 truncate text-[8px] font-bold uppercase text-amber-600">Chốt điện, hóa đơn</p>
+                  </div>
+                </div>
+                <div className="flex min-w-0 shrink-0 items-center justify-end gap-1">
                   <span className={`inline-flex h-4 shrink-0 items-center justify-center rounded px-1.5 text-[8px] font-black leading-none shadow-sm ${totalIncompleteQuickRooms > 0 ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-white'}`}>
                     {totalIncompleteQuickRooms} phòng
                   </span>
@@ -1243,11 +1310,10 @@ const HubView = ({
                     </span>
                   )}
                 </div>
-                <div className="shrink-0" />
               </div>
 
-              <div className="mt-2 flex items-center gap-2">
-                <div className={`flex min-w-0 flex-1 items-center justify-between gap-1.5 rounded-lg border px-2.5 py-1.5 ${hasQuickRoomsToProcess ? 'border-rose-100 bg-rose-50' : 'border-emerald-100 bg-emerald-50'}`}>
+              {isQuickQrExpanded && <div className="mt-2 flex items-center gap-2">
+                <div className={`flex min-w-0 flex-1 items-center justify-between gap-1.5 rounded-lg border px-2.5 py-1 ${hasQuickRoomsToProcess ? 'border-rose-100 bg-rose-50' : 'border-emerald-100 bg-emerald-50'}`}>
                   <div className="flex min-w-0 items-center gap-1.5">
                     {hasQuickRoomsToProcess ? (
                       <Hexagon className="h-3.5 w-3.5 shrink-0 fill-rose-500 text-rose-500" />
@@ -1275,44 +1341,42 @@ const HubView = ({
                 <button
                   type="button"
                   onClick={() => setShowAllQuickRooms(prev => !prev)}
-                  className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${showAllQuickRooms ? 'bg-emerald-600' : 'bg-rose-600'}`}
+                  className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${showAllQuickRooms ? 'bg-emerald-600' : 'bg-rose-600'}`}
                   aria-pressed={showAllQuickRooms}
                 >
-                  <span className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${showAllQuickRooms ? 'translate-x-5' : 'translate-x-0'}`} />
+                  <span className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${showAllQuickRooms ? 'translate-x-4' : 'translate-x-0'}`} />
                 </button>
-              </div>
+              </div>}
 
-              <div className="mt-2 flex items-end gap-2">
+              {isQuickQrExpanded && <div className="mt-2 flex items-center gap-2">
                 <div className="relative z-40 min-w-0 flex-1">
                   {quickQrHouses.length > 1 ? (
-                  <button
-                    type="button"
-                    onClick={() => setIsQuickHousePickerOpen(prev => !prev)}
-                    className={`flex h-11 w-full items-center gap-2 rounded-xl border px-2.5 text-left shadow-inner active:scale-[0.99] ${hasQuickRoomsToProcess ? 'border-rose-100 bg-rose-50/70' : 'border-emerald-100 bg-emerald-50/80'}`}
-                    aria-expanded={isQuickHousePickerOpen}
-                    aria-haspopup="listbox"
-                  >
-                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm ${hasQuickRoomsToProcess ? 'text-rose-600' : 'text-emerald-600'}`}>
-                      <Building2 className="h-4 w-4" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-[11px] font-black uppercase text-blue-800">
-                        {getHouseLabel(selectedQuickHouse) || 'Cơ sở'}
-                      </p>
-                      {renderQuickHouseComboboxChips(selectedQuickHouse)}
-                    </div>
-                    <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${hasQuickRoomsToProcess ? 'text-rose-500' : 'text-emerald-600'} ${isQuickHousePickerOpen ? 'rotate-180' : ''}`} />
-                  </button>
-                  ) : (
-                    <div className={`flex h-11 w-full items-center gap-2 rounded-xl border px-2.5 text-left ${hasQuickRoomsToProcess ? 'border-slate-100 bg-slate-50' : 'border-emerald-100 bg-emerald-50/80'}`}>
-                      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm ${hasQuickRoomsToProcess ? 'text-slate-500' : 'text-emerald-600'}`}>
-                        <Building2 className="h-4 w-4" />
+                    <button
+                      type="button"
+                      onClick={() => setIsQuickHousePickerOpen(prev => !prev)}
+                      className={`flex h-9 w-full items-center gap-2 rounded-lg border px-2 text-left shadow-inner active:scale-[0.99] ${hasQuickRoomsToProcess ? 'border-rose-100 bg-rose-50/70' : 'border-emerald-100 bg-emerald-50/80'}`}
+                      aria-expanded={isQuickHousePickerOpen}
+                      aria-haspopup="listbox"
+                    >
+                      <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm ${hasQuickRoomsToProcess ? 'text-rose-600' : 'text-emerald-600'}`}>
+                        <Building2 className="h-3.5 w-3.5" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-[11px] font-black uppercase text-blue-800">
                           {getHouseLabel(selectedQuickHouse) || 'Cơ sở'}
                         </p>
-                        {renderQuickHouseComboboxChips(selectedQuickHouse)}
+                      </div>
+                      <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${hasQuickRoomsToProcess ? 'text-rose-500' : 'text-emerald-600'} ${isQuickHousePickerOpen ? 'rotate-180' : ''}`} />
+                    </button>
+                  ) : (
+                    <div className={`flex h-9 w-full items-center gap-2 rounded-lg border px-2 text-left ${hasQuickRoomsToProcess ? 'border-slate-100 bg-slate-50' : 'border-emerald-100 bg-emerald-50/80'}`}>
+                      <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm ${hasQuickRoomsToProcess ? 'text-slate-500' : 'text-emerald-600'}`}>
+                        <Building2 className="h-3.5 w-3.5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[11px] font-black uppercase text-blue-800">
+                          {getHouseLabel(selectedQuickHouse) || 'Cơ sở'}
+                        </p>
                       </div>
                     </div>
                   )}
@@ -1343,7 +1407,7 @@ const HubView = ({
                               <p className="truncate text-[11px] font-black uppercase">
                                 {getHouseLabel(house) || 'Cơ sở'}
                               </p>
-                              {renderQuickHouseComboboxChips(house)}
+                              {renderQuickHouseComboboxChips(house, '', { includeOccupancyStats: true, dueDaysThreshold: 30 })}
                             </div>
                             {incompleteCount > 0 ? (
                               <div className="flex shrink-0 flex-col items-end gap-1">
@@ -1371,13 +1435,13 @@ const HubView = ({
                   type="button"
                   onClick={downloadAllHouseQr}
                   disabled={!quickRooms.length || isDownloadingHouseQr || roomsLoadingHouseId === selectedQuickHouse?.id}
-                  className="flex h-11 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700 active:scale-95 disabled:opacity-50"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-100 bg-emerald-50 text-emerald-700 active:scale-95 disabled:opacity-50"
                   aria-label="Tải toàn bộ QR"
                   title="Tải toàn bộ QR"
                 >
                   {isDownloadingHouseQr || roomsLoadingHouseId === selectedQuickHouse?.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                 </button>
-              </div>
+              </div>}
             </div>
 
             {isQuickQrExpanded && <div className="max-h-[240px] overflow-y-auto divide-y divide-slate-200 no-scrollbar">
@@ -1417,7 +1481,7 @@ const HubView = ({
                           {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
                         </div>
                         <div className="min-w-0 flex-1">
-                            <p className="truncate text-[10px] font-black uppercase text-blue-800">
+                          <p className="truncate text-[10px] font-black uppercase text-blue-800">
                             {room.roomType === 'mbkd' ? 'MBKD ' : 'Phòng '}{roomCode}
                           </p>
                           <div className="mt-0.5 flex flex-nowrap gap-1 overflow-x-auto no-scrollbar">
@@ -1429,7 +1493,7 @@ const HubView = ({
                           </div>
                         </div>
                       </button>
-                      {hasUnpaidQuickBill && quickBillCanManage ? (
+                      {hasUnpaidQuickBill && quickBillCanPay ? (
                         <button
                           type="button"
                           onClick={(event) => {
@@ -1487,27 +1551,29 @@ const HubView = ({
             <div
               role="button"
               tabIndex={0}
-              onClick={() => setIsWarningsExpanded(prev => !prev)}
+              onClick={toggleWarningsExpanded}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault();
-                  setIsWarningsExpanded(prev => !prev);
+                  toggleWarningsExpanded();
                 }
               }}
               aria-expanded={isWarningsExpanded}
-              className="flex cursor-pointer items-center justify-between gap-3 border-b border-rose-100 bg-gradient-to-br from-rose-50 via-red-50 to-white p-2.5 text-rose-900 active:bg-rose-50"
+              className="flex cursor-pointer items-center justify-between gap-2 border-b border-rose-100 bg-gradient-to-br from-rose-50 via-red-50 to-white p-2.5 text-rose-900 active:bg-rose-50"
             >
-              <div className="flex min-w-0 items-center gap-2 rounded-lg bg-white/70 px-2.5 py-2 ring-1 ring-rose-100">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-rose-500 text-white shadow-sm shadow-rose-200">
-                  <AlertTriangle className="h-4 w-4" />
-                </span>
-                <div className="min-w-0">
-                  <h3 className="truncate text-[13px] font-black uppercase tracking-tight text-rose-900">Cần chú ý</h3>
-                  <p className="mt-0.5 truncate text-[8px] font-bold uppercase text-rose-500">Ưu tiên xử lý các việc đến hạn</p>
+              <div className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-lg bg-white/70 px-2.5 py-2 ring-1 ring-rose-100">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-rose-500 text-white shadow-sm shadow-rose-200">
+                    <AlertTriangle className="h-4 w-4" />
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="truncate text-[13px] font-black uppercase tracking-tight text-rose-900">Cần chú ý</h3>
+                    <p className="mt-0.5 truncate text-[8px] font-bold uppercase text-rose-500">Ưu tiên xử lý các việc đến hạn</p>
+                  </div>
                 </div>
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <span className="rounded-md bg-rose-500 px-2 py-0.5 text-[10px] font-black leading-none text-white shadow-sm">{dashboardWarnings.length} cảnh báo</span>
+                <div className="flex shrink-0 items-center justify-end gap-2">
+                  <span className="rounded-md bg-rose-500 px-2 py-0.5 text-[10px] font-black leading-none text-white shadow-sm">{dashboardWarnings.length} cảnh báo</span>
+                </div>
               </div>
             </div>
             {isWarningsExpanded && <div className="divide-y divide-rose-100/80 max-h-[300px] overflow-y-auto no-scrollbar">
@@ -1535,27 +1601,29 @@ const HubView = ({
           <div
             role="button"
             tabIndex={0}
-            onClick={() => setIsRecentHousesExpanded(prev => !prev)}
+            onClick={toggleRecentHousesExpanded}
             onKeyDown={(event) => {
               if (event.key === 'Enter' || event.key === ' ') {
                 event.preventDefault();
-                setIsRecentHousesExpanded(prev => !prev);
+                toggleRecentHousesExpanded();
               }
             }}
             aria-expanded={isRecentHousesExpanded}
-            className="flex cursor-pointer items-center justify-between gap-3 border-b border-blue-100 bg-gradient-to-br from-blue-50 via-indigo-50 to-white p-2.5 text-blue-900 active:bg-blue-50"
+            className="flex cursor-pointer items-center justify-between gap-2 border-b border-blue-100 bg-gradient-to-br from-blue-50 via-indigo-50 to-white p-2.5 text-blue-900 active:bg-blue-50"
           >
-            <div className="flex min-w-0 items-center gap-2 rounded-lg bg-white/70 px-2.5 py-2 ring-1 ring-blue-100">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm shadow-blue-200">
-                <Building2 className="h-4 w-4" />
-              </span>
-              <div className="min-w-0">
-                <h3 className="truncate text-[13px] font-black uppercase tracking-tight text-blue-900">Cơ sở của bạn</h3>
-                <p className="mt-0.5 truncate text-[8px] font-bold uppercase text-blue-500">Chọn nhanh để vào dashboard</p>
+            <div className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-lg bg-white/70 px-2.5 py-2 ring-1 ring-blue-100">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm shadow-blue-200">
+                  <Building2 className="h-4 w-4" />
+                </span>
+                <div className="min-w-0">
+                  <h3 className="truncate text-[13px] font-black uppercase tracking-tight text-blue-900">Cơ sở của bạn</h3>
+                  <p className="mt-0.5 truncate text-[8px] font-bold uppercase text-blue-500">Chọn nhanh để vào dashboard</p>
+                </div>
               </div>
-            </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <span className="rounded-md bg-blue-600 px-2 py-0.5 text-[10px] font-black leading-none text-white shadow-sm">{houses.length} cơ sở</span>
+              <div className="flex shrink-0 items-center justify-end gap-2">
+                <span className="rounded-md bg-blue-600 px-2 py-0.5 text-[10px] font-black leading-none text-white shadow-sm">{houses.length} cơ sở</span>
+              </div>
             </div>
           </div>
           {isRecentHousesExpanded && <div className="max-h-[340px] divide-y divide-slate-200 overflow-y-auto no-scrollbar">

@@ -1,6 +1,6 @@
 {
-  "appId": "com.luckyhome.huchitieu",
-  "appName": "H\u0169 Chi Ti\u00eau",
+  "appId": "com.luckyhome.app",
+  "appName": "Lucky Home",
   "webDir": "dist",
   "server": {
     "androidScheme": "http"
