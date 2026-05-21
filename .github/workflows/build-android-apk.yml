@@ -44,13 +44,33 @@ jobs:
         run: npm ci
 
       - name: Build Lucky Home APK
+        shell: pwsh
         run: |
           npm run android:apk:home
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Copy Lucky Home APK
+        shell: pwsh
+        run: |
+          $apkPath = 'android/app/build/outputs/apk/debug/app-debug.apk'
+          if (!(Test-Path -LiteralPath $apkPath)) {
+            throw "Lucky Home APK was not created at $apkPath."
+          }
           Copy-Item -LiteralPath android/app/build/outputs/apk/debug/app-debug.apk -Destination apk/lucky-home.apk -Force
 
       - name: Build Hu Chi Tieu APK
+        shell: pwsh
         run: |
           npm run android:apk:hu-chi-tieu
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Copy Hu Chi Tieu APK
+        shell: pwsh
+        run: |
+          $apkPath = 'android/app/build/outputs/apk/debug/app-debug.apk'
+          if (!(Test-Path -LiteralPath $apkPath)) {
+            throw "Hu Chi Tieu APK was not created at $apkPath."
+          }
           Copy-Item -LiteralPath android/app/build/outputs/apk/debug/app-debug.apk -Destination apk/hu-chi-tieu.apk -Force
 
       - name: Update APK manifest
