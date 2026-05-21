@@ -1,5 +1,6 @@
 import React from 'react';
 import { User, Lock, LogOut } from 'lucide-react';
+import AppUpdatePanel from '../components/common/AppUpdatePanel';
 
 const ProfileView = ({
     user,
@@ -50,6 +51,10 @@ const ProfileView = ({
                         </button>
                     </div>
                 </form>
+            </div>
+
+            <div className="mt-4">
+                <AppUpdatePanel />
             </div>
 
             <button

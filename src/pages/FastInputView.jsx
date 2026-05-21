@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, X, Loader2, Zap, Camera, CheckCircle2, Pencil, TrendingUp, TrendingDown, Wallet, Delete, Home } from 'lucide-react';
+import { Mic, X, Loader2, Zap, Camera, CheckCircle2, Pencil, TrendingUp, TrendingDown, Wallet, Delete, Home, UserRound } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { SpeechRecognition } from '@capacitor-community/speech-recognition';
 import { formatN } from '../utils/formatters';
@@ -284,9 +284,22 @@ const FastInputView = ({ setActiveTab, setIsHubMode, showToast, isStandalone = f
                     </div>
                     <h1 className="text-sm font-black uppercase tracking-widest">AI Nhập Nhanh</h1>
                 </div>
-                <button onClick={handleClose} className="p-2 bg-white/10 rounded-xl active:scale-95 text-white">
-                    <X className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-2">
+                    {isStandalone && (
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab('profile')}
+                            className="p-2 bg-white/10 rounded-xl active:scale-95 text-white"
+                            aria-label="Tài khoản và cập nhật"
+                            title="Tài khoản và cập nhật"
+                        >
+                            <UserRound className="w-4 h-4" />
+                        </button>
+                    )}
+                    <button onClick={handleClose} className="p-2 bg-white/10 rounded-xl active:scale-95 text-white">
+                        <X className="w-4 h-4" />
+                    </button>
+                </div>
             </div>
 
             {!parsedResult ? (

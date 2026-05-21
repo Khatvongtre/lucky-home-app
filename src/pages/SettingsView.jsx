@@ -1,5 +1,6 @@
 import { ChevronDown, Loader2, Lock, LogOut, QrCode, Save, User } from 'lucide-react';
 import { formatN, parseN } from '../utils/formatters';
+import AppUpdatePanel from '../components/common/AppUpdatePanel';
 
 const SettingsSection = ({ title, isExpanded, onToggle, children }) => (
   <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
@@ -172,6 +173,8 @@ const SettingsView = ({
           </div>
         </form>
       </SettingsSection>
+
+      <AppUpdatePanel />
     </div>
   );
 };

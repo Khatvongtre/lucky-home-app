@@ -1,0 +1,107 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - apk/**
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    name: Build Android APK downloads
+    runs-on: windows-latest
+    env:
+      VITE_APP_BUILD_NUMBER: ${{ github.run_number }}
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set build metadata
+        shell: pwsh
+        run: |
+          $buildDate = (Get-Date).ToUniversalTime().ToString('o')
+          Add-Content -LiteralPath $env:GITHUB_ENV -Value "VITE_APP_BUILD_DATE=$buildDate"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Lucky Home APK
+        run: |
+          npm run android:apk:home
+          Copy-Item -LiteralPath android/app/build/outputs/apk/debug/app-debug.apk -Destination apk/lucky-home.apk -Force
+
+      - name: Build Hu Chi Tieu APK
+        run: |
+          npm run android:apk:hu-chi-tieu
+          Copy-Item -LiteralPath android/app/build/outputs/apk/debug/app-debug.apk -Destination apk/hu-chi-tieu.apk -Force
+
+      - name: Update APK manifest
+        shell: pwsh
+        run: |
+          $manifest = [ordered]@{
+            schemaVersion = 1
+            generatedAt = $env:VITE_APP_BUILD_DATE
+            buildNumber = [int]$env:VITE_APP_BUILD_NUMBER
+            variants = [ordered]@{
+              home = [ordered]@{
+                label = 'Lucky Home'
+                apkName = 'lucky-home.apk'
+                downloadUrl = 'https://raw.githubusercontent.com/Khatvongtre/lucky-home-app/main/apk/lucky-home.apk'
+              }
+              'hu-chi-tieu' = [ordered]@{
+                label = 'Hu Chi Tieu'
+                apkName = 'hu-chi-tieu.apk'
+                downloadUrl = 'https://raw.githubusercontent.com/Khatvongtre/lucky-home-app/main/apk/hu-chi-tieu.apk'
+              }
+            }
+          }
+          $json = $manifest | ConvertTo-Json -Depth 6
+          [System.IO.File]::WriteAllText((Join-Path $PWD 'apk/update.json'), $json, [System.Text.UTF8Encoding]::new($false))
+
+      - name: Upload Lucky Home APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: lucky-home.apk
+          path: apk/lucky-home.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload Hu Chi Tieu APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: hu-chi-tieu.apk
+          path: apk/hu-chi-tieu.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish APK downloads
+        shell: pwsh
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add apk/lucky-home.apk apk/hu-chi-tieu.apk apk/update.json
+          git diff --cached --quiet
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host 'APK downloads already match this build.'
+            exit 0
+          }
+          git commit -m 'chore: update Android APK downloads [skip ci]'
+          git push

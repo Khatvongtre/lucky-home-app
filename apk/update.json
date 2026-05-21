@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": null,
+  "buildNumber": 0,
+  "variants": {
+    "home": {
+      "label": "Lucky Home",
+      "apkName": "lucky-home.apk",
+      "downloadUrl": "https://raw.githubusercontent.com/Khatvongtre/lucky-home-app/main/apk/lucky-home.apk"
+    },
+    "hu-chi-tieu": {
+      "label": "Hu Chi Tieu",
+      "apkName": "hu-chi-tieu.apk",
+      "downloadUrl": "https://raw.githubusercontent.com/Khatvongtre/lucky-home-app/main/apk/hu-chi-tieu.apk"
+    }
+  }
+}
