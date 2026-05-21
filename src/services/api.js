@@ -1,6 +1,5 @@
 import { authStorage } from "./authStorage";
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
+import { fetchFromApi } from "./apiServer";
 
 const getHeaders = () => {
     const token = authStorage.getToken();
@@ -55,7 +54,7 @@ const handleError = (error) => {
 
 const request = async (url, options = {}) => {
     try {
-        const res = await fetch(`${API_URL}${url}`, {
+        const res = await fetchFromApi(url, {
             ...options,
             cache: "no-store",
             headers: {

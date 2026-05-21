@@ -10,9 +10,9 @@ import NotificationBell from '../components/notifications/NotificationBell';
 import MeterReadingLinkQrModal, { buildMeterReadingQrCardDataUrl } from '../components/common/MeterReadingLinkQrModal';
 import BillReceipt from '../components/bills/BillReceipt';
 import { api } from '../services/api';
+import { getApiBaseUrl } from '../services/apiServer';
 import { shareDataUrlImage, shareElementImage } from '../utils/imageExport';
 
-const API_URL = import.meta.env.VITE_API_URL;
 const FE_BASE_URL = (import.meta.env.VITE_FE_URL || window.location.origin).replace(/\/+$/g, '');
 
 const LINK_CACHE_KEY = 'lucky_home_meter_links';
@@ -179,6 +179,7 @@ const HubView = ({
   isManagerOrAbove = false,
   requestConfirm,
 }) => {
+  const API_URL = getApiBaseUrl();
   const [quickHouseId, setQuickHouseId] = React.useState(houses[0]?.id || '');
   const [roomsByHouse, setRoomsByHouse] = React.useState({});
   const [metersByHouse, setMetersByHouse] = React.useState({});

@@ -18,8 +18,7 @@ import {
 } from 'lucide-react';
 import { formatN, parseN } from '../utils/formatters';
 import { authStorage } from '../services/authStorage';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+import { fetchFromApi, getApiBaseUrl } from '../services/apiServer';
 
 const getRoomTokenFromPath = () => {
   const parts = window.location.pathname.split('/').filter(Boolean);
@@ -85,7 +84,7 @@ const normalizeSession = (data, roomToken) => {
 
 const requestPublicJson = async (url, options = {}) => {
   const token = authStorage.getToken();
-  const res = await fetch(`${API_URL}${url}`, {
+  const res = await fetchFromApi(url, {
     ...options,
     cache: 'no-store',
     headers: {
@@ -199,6 +198,7 @@ const PublicInvoiceReceipt = ({
   onDownloadQr,
   onPaymentNotice,
 }) => {
+  const API_URL = getApiBaseUrl();
   const bill = buildReceiptModel(session, invoice);
   const config = session.config || {};
   const bankBin = config.bankBin || '970422';

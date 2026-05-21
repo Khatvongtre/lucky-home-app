@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Bell, CheckCheck, Circle, Loader2, RefreshCw } from 'lucide-react';
 import { api } from '../../services/api';
+import { getApiBaseUrl } from '../../services/apiServer';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 const NOTIFICATION_PAGE_SIZE = 20;
 
 const parseMetadata = (metadataJson) => {
@@ -21,7 +21,7 @@ const resolveBackendAssetUrl = (src) => {
   if (src.startsWith('data:') || src.startsWith('blob:')) return src;
 
   try {
-    return new URL(src, API_URL).toString();
+    return new URL(src, getApiBaseUrl()).toString();
   } catch {
     return src;
   }

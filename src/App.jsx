@@ -32,17 +32,17 @@ import { useMonthNavigation } from './hooks/useMonthNavigation';
 import { useUnauthorizedLogout } from './hooks/useUnauthorizedLogout';
 import { useAppUiState } from './hooks/useAppUiState';
 import PageLoading from './components/common/PageLoading';
+import { getApiBaseUrl } from './services/apiServer';
 
 const MeterReadingPublicView = lazy(() => import('./pages/MeterReadingPublicView'));
 
 // ==========================================
 // CẤU HÌNH API BACKEND (.NET 8)
 // ==========================================
-const API_URL = import.meta.env.VITE_API_URL;
 const APP_VARIANT = import.meta.env.VITE_APP_VARIANT || 'home';
 const isHuChiTieuVariant = APP_VARIANT === 'hu-chi-tieu';
 if (import.meta.env.DEV) {
-  console.log("API URL:", API_URL);
+  console.log("API URL:", getApiBaseUrl());
   console.log("App variant:", APP_VARIANT);
 }
 
@@ -50,6 +50,8 @@ if (import.meta.env.DEV) {
 // ỨNG DỤNG CHÍNH
 // ==========================================
 const MainApp = () => {
+  const API_URL = getApiBaseUrl();
+
   // ==========================================
   // 1. GLOBAL STATES
   // ==========================================
