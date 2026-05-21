@@ -69,14 +69,10 @@ const FastInputView = ({ setActiveTab, setIsHubMode, showToast, isStandalone = f
 
     // Tự động mở bàn phím số Numpad nếu số tiền đang trống
     useEffect(() => {
-        if (parsedResult) {
-            if (!parsedResult.amount) {
-                setActiveField('amount');
-            } else {
-                setActiveField(null);
-            }
+        if (parsedResult && !parsedResult.amount && !activeField) {
+            setActiveField('amount');
         }
-    }, [parsedResult]);
+    }, [activeField, parsedResult]);
 
     // Xử lý phím bấm trên Numpad ảo
     const handleNumpadClick = (key) => {

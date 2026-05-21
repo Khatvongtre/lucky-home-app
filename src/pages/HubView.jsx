@@ -151,6 +151,23 @@ const dedupeBills = (billList = []) => {
   return Array.from(billMap.values());
 };
 
+const isTransactionInMonth = (transaction, year, month) => {
+  const transactionMonth = Number(transaction.month);
+  const transactionYear = Number(transaction.year);
+  return transactionMonth === month && transactionYear === year;
+};
+
+const summarizeTransactions = (transactions = [], year, month) => (
+  transactions
+    .filter(transaction => isTransactionInMonth(transaction, year, month))
+    .reduce((acc, transaction) => {
+      const amount = Number(transaction.amount) || 0;
+      if (transaction.type === 'in') acc.revenue += amount;
+      if (transaction.type === 'out') acc.txExp += amount;
+      return acc;
+    }, { revenue: 0, txExp: 0 })
+);
+
 const HubView = ({
   user, houses, setIsHubMode, setActiveTab, setSelectedHouse,
   setConfig, setSearchQuery, setEditingHouse, setIsAiCreateHouseOpen,
@@ -612,24 +629,23 @@ const HubView = ({
     const year = targetDate.getFullYear();
 
     const loadMonthlyStats = async () => {
-      const summaries = await Promise.all(houses.map(house => (
-        api.get(`/management/dashboard/summary/${house.id}?year=${year}&month=${month}`).catch(() => null)
+      const transactionGroups = await Promise.all(houses.map(house => (
+        api.get(`/transaction/${house.id}?type=all`).catch(() => [])
       )));
 
       if (cancelled) return;
 
-      const nextStats = summaries.reduce((acc, summary, index) => {
+      const nextStats = transactionGroups.reduce((acc, transactions, index) => {
         const house = houses[index];
         const fixedCosts = (Number(house?.rentPrice) || 0) + (Number(house?.internetFee) || 0) + (Number(house?.otherFees) || 0);
-        acc.fixedCosts += fixedCosts;
+        const monthlyTransactions = summarizeTransactions(Array.isArray(transactions) ? transactions : [], year, month);
 
-        if (!summary) return acc;
-        const revenue = Number(summary.revenue) || 0;
-        const expense = Number(summary.expense) || 0;
-        acc.revenue += revenue;
-        acc.expense += expense;
-        acc.txExp += Math.max(0, expense - fixedCosts);
-        acc.profit += Number(summary.profit ?? (revenue - expense)) || 0;
+        acc.revenue += monthlyTransactions.revenue;
+        acc.txExp += monthlyTransactions.txExp;
+        acc.fixedCosts += fixedCosts;
+        acc.expense += fixedCosts + monthlyTransactions.txExp;
+        acc.profit += monthlyTransactions.revenue - fixedCosts - monthlyTransactions.txExp;
+
         return acc;
       }, { revenue: 0, expense: 0, fixedCosts: 0, txExp: 0, profit: 0 });
 
