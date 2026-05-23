@@ -19,10 +19,9 @@ If you are developing a production application, we recommend using TypeScript wi
 
 The `Build Android APK` GitHub Action runs after pushes to `main` and can also be started manually from the Actions tab.
 
-Each run builds the `home` and `hu-chi-tieu` debug APK variants, copies them into `apk/` with fixed file names, uploads them as artifacts, then commits the download files back to `main`:
+Each run currently builds the `home` debug APK variant, copies it into `apk/` with a fixed file name, uploads it as an artifact, then commits the download file back to `main`:
 
 - `apk/lucky-home.apk`
-- `apk/hu-chi-tieu.apk`
 - `apk/update.json`
 
 The app reads `apk/update.json` through the stable GitHub raw URL, compares the current APK build number with the latest server build, and downloads the matching variant from the Profile or Settings update panel. Open a successful workflow run in GitHub Actions when an artifact download is needed instead.

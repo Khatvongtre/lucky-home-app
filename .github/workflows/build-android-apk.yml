@@ -58,21 +58,6 @@ jobs:
           }
           Copy-Item -LiteralPath android/app/build/outputs/apk/debug/app-debug.apk -Destination apk/lucky-home.apk -Force
 
-      - name: Build Hu Chi Tieu APK
-        shell: pwsh
-        run: |
-          npm run android:apk:hu-chi-tieu
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-      - name: Copy Hu Chi Tieu APK
-        shell: pwsh
-        run: |
-          $apkPath = 'android/app/build/outputs/apk/debug/app-debug.apk'
-          if (!(Test-Path -LiteralPath $apkPath)) {
-            throw "Hu Chi Tieu APK was not created at $apkPath."
-          }
-          Copy-Item -LiteralPath android/app/build/outputs/apk/debug/app-debug.apk -Destination apk/hu-chi-tieu.apk -Force
-
       - name: Update APK manifest
         shell: pwsh
         run: |
@@ -85,11 +70,6 @@ jobs:
                 label = 'Lucky Home'
                 apkName = 'lucky-home.apk'
                 downloadUrl = 'https://raw.githubusercontent.com/Khatvongtre/lucky-home-app/main/apk/lucky-home.apk'
-              }
-              'hu-chi-tieu' = [ordered]@{
-                label = 'Hu Chi Tieu'
-                apkName = 'hu-chi-tieu.apk'
-                downloadUrl = 'https://raw.githubusercontent.com/Khatvongtre/lucky-home-app/main/apk/hu-chi-tieu.apk'
               }
             }
           }
@@ -104,20 +84,12 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Upload Hu Chi Tieu APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: hu-chi-tieu.apk
-          path: apk/hu-chi-tieu.apk
-          if-no-files-found: error
-          retention-days: 14
-
       - name: Publish APK downloads
         shell: pwsh
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add apk/lucky-home.apk apk/hu-chi-tieu.apk apk/update.json
+          git add apk/lucky-home.apk apk/update.json
           git diff --cached --quiet
           if ($LASTEXITCODE -eq 0) {
             Write-Host 'APK downloads already match this build.'

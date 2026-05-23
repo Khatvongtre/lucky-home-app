@@ -46,8 +46,18 @@ apply from: 'capacitor.build.gradle'
 
 try {
     def servicesJSON = file('google-services.json')
-    if (servicesJSON.text) {
+    if (servicesJSON.exists() && servicesJSON.text.trim()) {
+        def servicesConfig = new groovy.json.JsonSlurper().parse(servicesJSON)
+        def firebasePackageNames = servicesConfig.client.collect {
+            it.client_info.android_client_info.package_name
+        }
+        def currentApplicationId = android.defaultConfig.applicationId
+
+        if (!firebasePackageNames.contains(currentApplicationId)) {
+            logger.lifecycle("google-services.json does not contain ${currentApplicationId}; google-services plugin not applied for this variant.")
+        } else {
         apply plugin: 'com.google.gms.google-services'
+        }
     }
 } catch(Exception e) {
     logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
