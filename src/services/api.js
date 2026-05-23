@@ -77,5 +77,9 @@ export const api = {
     get: (url) => request(url),
     post: (url, body) => jsonRequest("POST", url, body),
     put: (url, body) => jsonRequest("PUT", url, body),
-    delete: (url) => request(url, { method: "DELETE" }),
+    delete: (url, body) => (
+        body === undefined
+            ? request(url, { method: "DELETE" })
+            : jsonRequest("DELETE", url, body)
+    ),
 };

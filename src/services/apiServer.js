@@ -1,4 +1,4 @@
-const DEFAULT_API_URL = 'http://localhost:3000/api';
+const DEFAULT_API_URL = 'http://localhost:2331/api';
 const FAILOVER_STATUSES = new Set([502, 503, 504]);
 const PRIMARY_HEALTH_URL = '/health';
 const PRIMARY_RECOVERY_PROBE_INTERVAL_MS = 60_000;
@@ -28,7 +28,7 @@ const isGetRequest = (options) => !options.method || String(options.method).toUp
 
 const cancelResponseBody = (response) => {
   const cancelPromise = response.body?.cancel?.();
-  cancelPromise?.catch(() => {});
+  cancelPromise?.catch(() => { });
 };
 
 const shouldProbePrimary = (options) => (

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "370001471053",
+    "project_id": "luckyhome-d09a0",
+    "storage_bucket": "luckyhome-d09a0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:370001471053:android:d2aa250486995a95505e04",
+        "android_client_info": {
+          "package_name": "com.luckyhome.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBo596Cu4rv1R4T94sipFtnoN4WeDWoNjI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

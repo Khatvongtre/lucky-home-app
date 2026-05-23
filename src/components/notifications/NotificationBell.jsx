@@ -2,19 +2,14 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Bell, CheckCheck, Circle, Loader2, RefreshCw } from 'lucide-react';
 import { api } from '../../services/api';
 import { getApiBaseUrl } from '../../services/apiServer';
+import {
+  NOTIFICATION_REFRESH_EVENT,
+  markNotificationRead,
+  navigateToNotification,
+  parseNotificationMetadata,
+} from '../../services/notificationFlow';
 
 const NOTIFICATION_PAGE_SIZE = 20;
-
-const parseMetadata = (metadataJson) => {
-  if (!metadataJson) return {};
-  if (typeof metadataJson === 'object') return metadataJson;
-
-  try {
-    return JSON.parse(metadataJson);
-  } catch {
-    return {};
-  }
-};
 
 const resolveBackendAssetUrl = (src) => {
   if (!src || typeof src !== 'string') return src;
@@ -59,20 +54,6 @@ const buildNotificationQuery = ({ houseId, unreadOnly, take, skip }) => {
   if (skip) params.set('skip', String(skip));
   const query = params.toString();
   return `/notifications${query ? `?${query}` : ''}`;
-};
-
-const parseNavigateTarget = (navigateTo = '') => {
-  const safeTarget = navigateTo || '';
-  const [path, queryString = ''] = safeTarget.split('?');
-  const query = new URLSearchParams(queryString);
-  const parts = path.split('/').filter(Boolean);
-
-  return {
-    tab: parts[0] || '',
-    houseId: parts[1] || query.get('houseId') || '',
-    year: Number(query.get('year')) || null,
-    month: Number(query.get('month')) || null,
-  };
 };
 
 const NotificationBell = ({
@@ -142,6 +123,12 @@ const NotificationBell = ({
   }, [loadNotifications]);
 
   useEffect(() => {
+    const handleRefresh = () => loadNotifications({ silent: true });
+    window.addEventListener(NOTIFICATION_REFRESH_EVENT, handleRefresh);
+    return () => window.removeEventListener(NOTIFICATION_REFRESH_EVENT, handleRefresh);
+  }, [loadNotifications]);
+
+  useEffect(() => {
     const handlePointerDown = (event) => {
       if (!rootRef.current?.contains(event.target)) setIsOpen(false);
     };
@@ -157,27 +144,17 @@ const NotificationBell = ({
     };
   }, []);
 
-  const navigateToNotification = useCallback((notification) => {
-    const metadata = parseMetadata(notification.metadataJson);
-    const target = parseNavigateTarget(notification.navigateTo);
-    const targetHouseId = notification.houseId || target.houseId || metadata.houseId;
-    const targetHouse = houses.find(house => String(house.id) === String(targetHouseId));
-
-    if (targetHouse) {
-      setSelectedHouse?.(targetHouse);
-      setConfig?.({ ...targetHouse });
-    } else if (selectedHouse) {
-      setSelectedHouse?.(selectedHouse);
-      setConfig?.({ ...selectedHouse });
-    }
-
-    if (target.month && target.year) {
-      setViewDate?.(new Date(target.year, target.month - 1, 1));
-    }
-
-    setIsHubMode?.(false);
-    setActiveTab?.(target.tab === 'bills' ? 'bills' : (target.tab || 'dashboard'));
-    setHighlightedItemId?.(metadata.billId || notification.billId || metadata.roomId || notification.roomId || metadata.targetId || notification.id);
+  const navigateFromNotification = useCallback((notification) => {
+    navigateToNotification(notification, {
+      houses,
+      selectedHouse,
+      setSelectedHouse,
+      setConfig,
+      setIsHubMode,
+      setActiveTab,
+      setHighlightedItemId,
+      setViewDate,
+    });
   }, [houses, selectedHouse, setActiveTab, setConfig, setHighlightedItemId, setIsHubMode, setSelectedHouse, setViewDate]);
 
   const handleToggle = async () => {
@@ -203,12 +180,12 @@ const NotificationBell = ({
     const wasUnread = !notification.isRead;
     if (wasUnread) markReadLocally(notification.id);
     setIsOpen(false);
-    navigateToNotification(notification);
+    navigateFromNotification(notification);
 
     if (!wasUnread) return;
 
     try {
-      await api.post(`/notifications/${notification.id}/read`);
+      await markNotificationRead(notification);
     } catch {
       await loadNotifications({ silent: true });
     }
@@ -303,7 +280,7 @@ const NotificationBell = ({
 
             {notifications.map(notification => {
               const unread = !notification.isRead;
-              const metadata = parseMetadata(notification.metadataJson);
+              const metadata = parseNotificationMetadata(notification.metadataJson);
               const imageUrl = resolveBackendAssetUrl(metadata.imageUrl);
               const showImage = imageUrl && !failedImageUrls[imageUrl];
 

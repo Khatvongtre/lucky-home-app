@@ -31,6 +31,11 @@ import { useAutoClearHighlight } from './hooks/useAutoClearHighlight';
 import { useMonthNavigation } from './hooks/useMonthNavigation';
 import { useUnauthorizedLogout } from './hooks/useUnauthorizedLogout';
 import { useAppUiState } from './hooks/useAppUiState';
+import { useFcmToken } from './hooks/useFcmToken';
+import { useFcmTokenSync } from './hooks/useFcmTokenSync';
+import { usePushNotificationFlow } from './hooks/usePushNotificationFlow';
+import { useNativePushNotifications } from './hooks/useNativePushNotifications';
+import ForegroundNotificationPopup from './components/notifications/ForegroundNotificationPopup';
 import PageLoading from './components/common/PageLoading';
 import { getApiBaseUrl } from './services/apiServer';
 
@@ -140,6 +145,24 @@ const MainApp = () => {
     handleLogout: clearAuthSession,
     handleChangePassword,
   } = useAuthSession({ showToast });
+  useNativePushNotifications({ isLoggedIn });
+  const fcmToken = useFcmToken();
+  const { deleteCurrentFcmToken } = useFcmTokenSync({ isLoggedIn, fcmToken });
+  const {
+    foregroundNotification,
+    dismissForegroundNotification,
+    openForegroundNotification,
+  } = usePushNotificationFlow({
+    isLoggedIn,
+    houses,
+    selectedHouse,
+    setSelectedHouse,
+    setConfig,
+    setIsHubMode,
+    setActiveTab,
+    setHighlightedItemId,
+    setViewDate,
+  });
 
   const {
     isOwnerOrAdmin,
@@ -412,9 +435,10 @@ const MainApp = () => {
   }, [resetAiMessages, resetHouseData, resetNavigationHistory, resetSavings]);
 
   const handleLogout = useCallback(() => {
+    void deleteCurrentFcmToken();
     clearAuthSession();
     resetAppAfterLogout();
-  }, [clearAuthSession, resetAppAfterLogout]);
+  }, [clearAuthSession, deleteCurrentFcmToken, resetAppAfterLogout]);
 
   useUnauthorizedLogout(handleLogout);
 
@@ -538,15 +562,28 @@ const MainApp = () => {
       }}
     />
   );
+  const foregroundNotificationPopup = (
+    <ForegroundNotificationPopup
+      notification={foregroundNotification}
+      onClose={dismissForegroundNotification}
+      onOpen={openForegroundNotification}
+    />
+  );
 
   if (!isLoggedIn || isHubMode || (!selectedHouse && !isGlobalTab) || activeTab === 'fast_input') {
-    return entryRoute;
+    return (
+      <>
+        {entryRoute}
+        {foregroundNotificationPopup}
+      </>
+    );
   }
 
   // 4. MAIN APP (Khi đã chọn cơ sở, hoặc truy cập Tab có tính Global như Tiết Kiệm)
   return (
     <div ref={appShellRef} className="h-screen bg-slate-50 text-slate-900 font-sans flex flex-col max-w-lg mx-auto w-full relative border-x border-slate-100 shadow-2xl overflow-hidden">
       <ToastNotification toast={toast} />
+      {foregroundNotificationPopup}
       <ConfirmDialog
         dialog={confirmDialog}
         onCancel={() => closeConfirmDialog(false)}
