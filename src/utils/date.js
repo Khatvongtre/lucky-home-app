@@ -49,3 +49,17 @@ export const getSafeDate = (dStr) => {
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     }
 };
+
+export const getSavingMaturityDate = (startDateStr, termMonths = 0) => {
+    if (!startDateStr) return null;
+
+    const startDate = new Date(startDateStr);
+    if (Number.isNaN(startDate.getTime())) return null;
+
+    const months = Number(termMonths) || 0;
+    const endDate = new Date(startDate);
+    endDate.setMonth(endDate.getMonth() + Math.floor(months));
+    endDate.setDate(endDate.getDate() + Math.round((months - Math.floor(months)) * 30));
+
+    return endDate;
+};

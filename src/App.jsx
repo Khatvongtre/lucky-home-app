@@ -78,6 +78,8 @@ const MainApp = () => {
     setHouseSearchQuery,
     selectedStatsHouses,
     setSelectedStatsHouses,
+    savingMaturityFilter,
+    setSavingMaturityFilter,
     unselectedSavingsBanks,
     setUnselectedSavingsBanks,
     collapsedSavingsBanks,
@@ -377,7 +379,7 @@ const MainApp = () => {
     setActiveTab('dashboard');
     setSearchQuery('');
     setShowQuickMenu(false);
-  }, []);
+  }, [setSearchQuery, setShowQuickMenu]);
 
   const handleHubShortcutPointerDown = useCallback((event) => {
     if (event.button !== 0) return;
@@ -461,6 +463,7 @@ const MainApp = () => {
     bills,
     savings,
     searchQuery,
+    savingMaturityFilter,
     unselectedSavingsBanks,
     selectedHouse,
     dashboardSummary,
@@ -709,6 +712,8 @@ const MainApp = () => {
           setCollapsedSavingsBanks,
           summarySavings,
           currentSavings,
+          savingMaturityFilter,
+          setSavingMaturityFilter,
           unselectedSavingsBanks,
           setUnselectedSavingsBanks,
           setEditingSaving,

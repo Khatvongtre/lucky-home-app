@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { parseN } from '../utils/formatters';
+import { getSavingMaturityDate } from '../utils/date';
 
 export const monthLabels = {
   'this-month': 'Tháng này',
@@ -53,6 +54,7 @@ export const useAppDerivedData = ({
   bills,
   savings,
   searchQuery,
+  savingMaturityFilter,
   unselectedSavingsBanks,
   selectedHouse,
   dashboardSummary,
@@ -81,8 +83,23 @@ export const useAppDerivedData = ({
   );
 
   const currentSavings = useMemo(
-    () => savings.filter(saving => matches(saving.bankName, normalizedQuery) || matches(saving.note, normalizedQuery)),
-    [savings, normalizedQuery],
+    () => {
+      const toTime = savingMaturityFilter?.to ? new Date(savingMaturityFilter.to).setHours(23, 59, 59, 999) : null;
+
+      return savings.filter(saving => {
+        const matchesSearch = matches(saving.bankName, normalizedQuery) || matches(saving.note, normalizedQuery);
+        if (!matchesSearch) return false;
+        if (!toTime) return true;
+
+        const maturityDate = getSavingMaturityDate(saving.startDate, saving.termMonths);
+        const maturityTime = maturityDate?.getTime();
+        if (!Number.isFinite(maturityTime)) return false;
+
+        if (toTime && maturityTime > toTime) return false;
+        return true;
+      });
+    },
+    [savings, normalizedQuery, savingMaturityFilter],
   );
 
   const uniqueBankNames = useMemo(
