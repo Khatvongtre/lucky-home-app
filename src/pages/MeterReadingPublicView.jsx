@@ -472,6 +472,7 @@ const MeterReadingPublicView = () => {
   const [correctionMessage, setCorrectionMessage] = useState('');
   const [paymentNoticeMessage, setPaymentNoticeMessage] = useState('');
   const [transferCopyMessage, setTransferCopyMessage] = useState('');
+  const [showPreviousInvoice, setShowPreviousInvoice] = useState(false);
   const [error, setError] = useState('');
   const [cameraError, setCameraError] = useState('');
   const [stream, setStream] = useState(null);
@@ -936,8 +937,8 @@ const MeterReadingPublicView = () => {
                   </p>
                 ) : null}
                 <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
-                  <span className="rounded-full bg-white px-3 py-1.5 text-[11px] font-black uppercase tracking-wide text-blue-700 shadow-sm ring-1 ring-white/70">
-                    {session.period}
+                  <span className="flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[11px] font-black uppercase tracking-wide text-blue-800 shadow-sm ring-1 ring-white/70">
+                    THÁNG {session.period}
                   </span>
                   <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${invoicePreview || isSubmitted ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
                     {statusLabel} - {statusPill}

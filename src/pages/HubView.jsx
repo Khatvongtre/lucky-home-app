@@ -227,10 +227,8 @@ const HubView = ({
   const occupancyRate = hubStats.totalRooms > 0
     ? Math.round((rentedRooms / hubStats.totalRooms) * 100)
     : 0;
-  const operationPeriod = (viewDate || new Date()).toLocaleDateString('vi-VN', {
-    month: '2-digit',
-    year: 'numeric',
-  });
+  const targetViewDate = viewDate || new Date();
+  const operationPeriod = `${String(targetViewDate.getMonth() + 1).padStart(2, '0')}/${targetViewDate.getFullYear()}`;
   const hubFundTotal = hubFunds.reduce((total, fund) => total + (Number(fund.balance) || 0), 0);
   const hubSavingTotal = hubSavings.reduce((total, saving) => total + (Number(saving.amount) || 0), 0);
   const operationStats = hubMonthlyStats || hubStats;
@@ -404,10 +402,11 @@ const HubView = ({
     };
   };
 
-  const getQuickMeterButtonClass = (roomMeters, meterDueState) => {
+  const getQuickMeterButtonClass = (roomMeters, meterDueState, bill) => {
     if (metersLoadingHouseId === selectedQuickHouse?.id) return 'border-slate-200 bg-slate-50 text-slate-400';
     if (!roomMeters.length) return 'border-slate-200 bg-slate-50 text-slate-400';
-    const hasMissingValue = roomMeters.some(meter => meter.newVal === null || meter.newVal === '' || meter.newVal === undefined);
+    const isPaid = bill && isPaidStatus(bill.status);
+    const hasMissingValue = roomMeters.some(meter => meter.newVal === null || meter.newVal === '' || meter.newVal === undefined) || isPaid;
 
     if (hasMissingValue) {
       if (meterDueState && meterDueState.daysFromDue > 5) return 'border-rose-100 bg-rose-50 text-rose-700';
@@ -421,9 +420,9 @@ const HubView = ({
   const getQuickMissingStatusBadges = ({ room, roomMeters, bill, house = selectedQuickHouse }) => {
     const badges = [];
     const hasNoMeters = !roomMeters.length;
-    const hasMissingMeter = hasNoMeters || roomMeters.some(meter => meter.newVal === null || meter.newVal === '' || meter.newVal === undefined);
-    const meterDueState = getQuickRoomMeterDueState(room, bill, house);
     const isPaid = bill && isPaidStatus(bill.status);
+    const hasMissingMeter = hasNoMeters || roomMeters.some(meter => meter.newVal === null || meter.newVal === '' || meter.newVal === undefined) || isPaid;
+    const meterDueState = getQuickRoomMeterDueState(room, bill, house);
 
     if (metersLoadingHouseId === selectedQuickHouse?.id) {
       badges.push({ label: 'Đang tải công tơ', className: 'bg-slate-100 text-slate-500' });
@@ -491,8 +490,8 @@ const HubView = ({
     : quickQrHouses.filter(house => getQuickHouseIncompleteCount(house) > 0);
 
   const getQuickRoomStatusStyle = ({ roomMeters, bill, meterDueState }) => {
-    const hasMissingMeter = !roomMeters.length || roomMeters.some(meter => meter.newVal === null || meter.newVal === '' || meter.newVal === undefined);
     const isPaid = bill && isPaidStatus(bill.status);
+    const hasMissingMeter = !roomMeters.length || roomMeters.some(meter => meter.newVal === null || meter.newVal === '' || meter.newVal === undefined) || isPaid;
 
     if (hasMissingMeter && meterDueState.daysFromDue >= -5) {
       if (meterDueState.daysFromDue > 5) {
@@ -543,6 +542,8 @@ const HubView = ({
 
   React.useEffect(() => {
     setHasManualQuickHouse(false);
+    setMetersByHouse({});
+    setBillsByHouse({});
   }, [quickQrHouseIdsKey, viewDate]);
 
   const loadQuickRooms = async (house, { silent = false } = {}) => {
@@ -1220,10 +1221,33 @@ const HubView = ({
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/12 text-emerald-200 shadow-sm shadow-emerald-950/30 ring-1 ring-white/15">
                   <TrendingUp className="h-5 w-5" />
                 </div>
-                <div className="min-w-0">
-                  <p className="text-[9px] font-black uppercase tracking-widest text-emerald-200">Vận hành tháng này</p>
-                  <h2 className="mt-0.5 truncate text-[13px] font-black uppercase tracking-wide text-white">Kỳ {operationPeriod}</h2>
-                </div>
+                <label className="min-w-0 relative flex cursor-pointer flex-col justify-center rounded-lg px-2 py-1 -ml-2 transition-colors hover:bg-white/10 active:bg-white/20">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-emerald-200">Vận hành</p>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <h2 className="truncate text-[13px] font-black uppercase tracking-wide text-white">Tháng {operationPeriod}</h2>
+                    <ChevronDown className="h-3 w-3 text-emerald-200" />
+                  </div>
+                  {setViewDate && (
+                    <input
+                      type="month"
+                      className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
+                      onClick={(e) => {
+                        try {
+                          if (typeof e.target.showPicker === 'function') {
+                            e.target.showPicker();
+                          }
+                        } catch (err) { }
+                      }}
+                      value={`${(viewDate || new Date()).getFullYear()}-${String((viewDate || new Date()).getMonth() + 1).padStart(2, '0')}`}
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          const [y, m] = e.target.value.split('-');
+                          setViewDate(new Date(parseInt(y, 10), parseInt(m, 10) - 1, 1));
+                        }
+                      }}
+                    />
+                  )}
+                </label>
               </div>
               <div className="shrink-0 rounded-lg bg-white/10 px-3 py-2 ring-1 ring-white/15 backdrop-blur">
                 <div className="grid  items-center gap-2.5">
@@ -1567,9 +1591,9 @@ const HubView = ({
                           type="button"
                           onClick={() => handleOpenMeterReading(room)}
                           disabled={isLoading || isOpeningReading || isOpeningBill || isDownloadingHouseQr}
-                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border active:scale-95 disabled:opacity-60 ${getQuickMeterButtonClass(roomMeters, meterDueState)}`}
+                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border active:scale-95 disabled:opacity-60 ${getQuickMeterButtonClass(roomMeters, meterDueState, roomBill)}`}
                           aria-label={`Ghi số điện phòng ${roomCode}`}
-                          title={!roomMeters.length ? 'Chưa gắn công tơ' : roomMeters.some(meter => meter.newVal === null || meter.newVal === '' || meter.newVal === undefined) ? 'Chưa nhập đủ chỉ số' : 'Đã nhập chỉ số'}
+                          title={!roomMeters.length ? 'Chưa gắn công tơ' : (roomMeters.some(meter => meter.newVal === null || meter.newVal === '' || meter.newVal === undefined) || (roomBill && isPaidStatus(roomBill.status))) ? 'Chưa nhập đủ chỉ số' : 'Đã nhập chỉ số'}
                         >
                           {isOpeningReading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
                         </button>
@@ -1738,7 +1762,7 @@ const HubView = ({
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
                   <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">Ghi số điện nhanh</p>
-                  {quickMeterRoom.targetMonth && quickMeterRoom.targetYear && (
+                  {quickMeterRoom?.targetMonth && quickMeterRoom?.targetYear && (
                     <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[8px] font-black text-blue-700">
                       Kỳ {quickMeterRoom.targetMonth}/{quickMeterRoom.targetYear}
                     </span>
