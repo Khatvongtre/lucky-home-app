@@ -1200,6 +1200,42 @@ const MeterReadingPublicView = () => {
               </div>
             </div>
           ) : null}
+
+          {session?.previousInvoice ? (
+            <section className="rounded-xl border border-slate-200/80 bg-white px-3 py-3 shadow-sm">
+              <button
+                type="button"
+                onClick={() => setShowPreviousInvoice(prev => !prev)}
+                className="flex w-full items-center justify-between active:scale-[0.99]"
+              >
+                <div className="flex items-center gap-2">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
+                    <CheckCircle2 className="h-4 w-4" />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Kỳ trước</p>
+                    <p className="text-xs font-bold text-slate-700">Xem hóa đơn đã thanh toán</p>
+                  </div>
+                </div>
+                <ChevronRight className={`h-4 w-4 text-slate-400 transition-transform ${showPreviousInvoice ? 'rotate-90' : ''}`} />
+              </button>
+
+              {showPreviousInvoice && (
+                <div className="mt-3 border-t border-slate-100 pt-3">
+                  <PublicInvoiceReceipt
+                    session={session}
+                    invoice={session.previousInvoice}
+                    isPaymentNotifying={false}
+                    onTransferClick={handleTransferClick}
+                    onTransferClose={() => setIsTransferOpen(false)}
+                    onCopyTransfer={handleCopyTransfer}
+                    onDownloadQr={handleDownloadQr}
+                    onPaymentNotice={() => { }}
+                  />
+                </div>
+              )}
+            </section>
+          ) : null}
         </main>
 
         {isConfirmOpen && (

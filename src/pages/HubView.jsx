@@ -379,50 +379,67 @@ const HubView = ({
     return Number.isFinite(day) && day >= 1 && day <= 31 ? day : null;
   };
 
-  const getQuickRoomMeterDueState = (room, house = selectedQuickHouse) => {
+  const getQuickRoomMeterDueState = (room, bill, house = selectedQuickHouse) => {
     const paymentDay = getQuickRoomPaymentDay(room, house);
     if (!paymentDay) return { isInWindow: true, daysFromDue: 0 };
 
     const targetDate = viewDate || new Date();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const dueDate = new Date(targetDate.getFullYear(), targetDate.getMonth(), paymentDay);
+
+    let dueDate = new Date(targetDate.getFullYear(), targetDate.getMonth(), paymentDay);
     dueDate.setHours(0, 0, 0, 0);
+
+    const isPaid = bill && isPaidStatus(bill.status);
+    if (isPaid) {
+      dueDate = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, paymentDay);
+      dueDate.setHours(0, 0, 0, 0);
+    }
+
     const daysFromDue = Math.floor((today - dueDate) / (1000 * 60 * 60 * 24));
 
     return {
       daysFromDue,
-      isInWindow: daysFromDue >= -3 && daysFromDue <= 3,
+      isInWindow: daysFromDue >= -5 && daysFromDue <= 5,
     };
   };
 
-  const getQuickMeterButtonClass = (roomMeters) => {
+  const getQuickMeterButtonClass = (roomMeters, meterDueState) => {
     if (metersLoadingHouseId === selectedQuickHouse?.id) return 'border-slate-200 bg-slate-50 text-slate-400';
     if (!roomMeters.length) return 'border-slate-200 bg-slate-50 text-slate-400';
     const hasMissingValue = roomMeters.some(meter => meter.newVal === null || meter.newVal === '' || meter.newVal === undefined);
-    return hasMissingValue
-      ? 'border-amber-100 bg-amber-50 text-amber-700'
-      : 'border-emerald-100 bg-emerald-50 text-emerald-700';
+
+    if (hasMissingValue) {
+      if (meterDueState && meterDueState.daysFromDue > 5) return 'border-rose-100 bg-rose-50 text-rose-700';
+      if (meterDueState && meterDueState.daysFromDue < -5) return 'border-slate-200 bg-slate-50 text-slate-400';
+      return 'border-amber-100 bg-amber-50 text-amber-700';
+    }
+
+    return 'border-emerald-100 bg-emerald-50 text-emerald-700';
   };
 
   const getQuickMissingStatusBadges = ({ room, roomMeters, bill, house = selectedQuickHouse }) => {
     const badges = [];
     const hasNoMeters = !roomMeters.length;
     const hasMissingMeter = hasNoMeters || roomMeters.some(meter => meter.newVal === null || meter.newVal === '' || meter.newVal === undefined);
-    const meterDueState = getQuickRoomMeterDueState(room, house);
+    const meterDueState = getQuickRoomMeterDueState(room, bill, house);
     const isPaid = bill && isPaidStatus(bill.status);
 
     if (metersLoadingHouseId === selectedQuickHouse?.id) {
       badges.push({ label: 'Đang tải công tơ', className: 'bg-slate-100 text-slate-500' });
     } else if (hasNoMeters) {
       badges.push({ label: 'Chưa gắn công tơ', className: 'bg-slate-100 text-slate-500' });
-    } else if (hasMissingMeter && meterDueState.isInWindow) {
+    } else if (hasMissingMeter && meterDueState.daysFromDue >= -5 && meterDueState.daysFromDue <= 5) {
       badges.push({ label: 'Chưa chốt điện', className: 'bg-amber-100 text-amber-700' });
-    } else if (hasMissingMeter) {
-      const daysUntilDue = Math.max(0, Math.abs(meterDueState.daysFromDue));
+    } else if (hasMissingMeter && meterDueState.daysFromDue > 5) {
       badges.push({
-        label: meterDueState.daysFromDue < -3 ? `Còn ${daysUntilDue} ngày chốt` : `Quá hạn ${daysUntilDue} ngày`,
-        className: meterDueState.daysFromDue < -3 ? 'bg-slate-100 text-slate-500' : 'bg-rose-100 text-rose-700',
+        label: `Quá hạn ${meterDueState.daysFromDue} ngày`,
+        className: 'bg-rose-100 text-rose-700',
+      });
+    } else if (hasMissingMeter && meterDueState.daysFromDue < -5) {
+      badges.push({
+        label: `Còn ${Math.abs(meterDueState.daysFromDue)} ngày chốt`,
+        className: 'bg-slate-100 text-slate-500',
       });
     }
 
@@ -441,11 +458,14 @@ const HubView = ({
     const houseId = room.houseId || house?.id;
     const roomMeters = getQuickRoomMeters(room, metersByHouse[houseId] || quickMeters);
     const bill = getQuickRoomBill(room, billsByHouse[houseId] || quickBills);
-    const meterDueState = getQuickRoomMeterDueState(room, house);
+    const meterDueState = getQuickRoomMeterDueState(room, bill, house);
     const hasMissingMeter = !roomMeters.length
       || roomMeters.some(meter => meter.newVal === null || meter.newVal === '' || meter.newVal === undefined);
     const hasUnpaidBill = bill && !isPaidStatus(bill.status);
-    return (hasMissingMeter && meterDueState.isInWindow) || hasUnpaidBill;
+
+    const isMeterPending = hasMissingMeter && meterDueState.daysFromDue >= -5;
+
+    return isMeterPending || hasUnpaidBill;
   };
 
   const incompleteQuickRooms = quickRooms.filter(isQuickRoomIncomplete);
@@ -470,17 +490,26 @@ const HubView = ({
     ? quickQrHouses
     : quickQrHouses.filter(house => getQuickHouseIncompleteCount(house) > 0);
 
-  const getQuickRoomStatusStyle = ({ roomMeters, bill }) => {
+  const getQuickRoomStatusStyle = ({ roomMeters, bill, meterDueState }) => {
     const hasMissingMeter = !roomMeters.length || roomMeters.some(meter => meter.newVal === null || meter.newVal === '' || meter.newVal === undefined);
     const isPaid = bill && isPaidStatus(bill.status);
 
-    if (hasMissingMeter) return {
-      row: 'bg-amber-50/60 border-l-4 border-l-amber-400',
-      icon: 'bg-amber-100 text-amber-700',
-      text: 'text-amber-700',
-    };
+    if (hasMissingMeter && meterDueState.daysFromDue >= -5) {
+      if (meterDueState.daysFromDue > 5) {
+        return {
+          row: 'bg-rose-50/60 border-l-4 border-l-rose-400',
+          icon: 'bg-rose-100 text-rose-700',
+          text: 'text-rose-700',
+        };
+      }
+      return {
+        row: 'bg-amber-50/60 border-l-4 border-l-amber-400',
+        icon: 'bg-amber-100 text-amber-700',
+        text: 'text-amber-700',
+      };
+    }
 
-    if (!bill || !isPaid) return {
+    if (bill && !isPaid) return {
       row: 'bg-rose-50/60 border-l-4 border-l-rose-400',
       icon: 'bg-rose-100 text-rose-700',
       text: 'text-rose-700',
@@ -733,7 +762,20 @@ const HubView = ({
   const handleOpenMeterReading = async (room) => {
     try {
       setReadingLoadingRoomId(room.id);
-      const bills = await loadQuickBills(room.houseId || selectedQuickHouse?.id, true);
+      const houseId = room.houseId || selectedQuickHouse?.id;
+
+      const roomBill = getQuickRoomBill(room);
+      let targetMonth = (viewDate || new Date()).getMonth() + 1;
+      let targetYear = (viewDate || new Date()).getFullYear();
+
+      if (roomBill && isPaidStatus(roomBill.status)) {
+        const nextMonthDate = new Date(targetYear, targetMonth, 1);
+        targetMonth = nextMonthDate.getMonth() + 1;
+        targetYear = nextMonthDate.getFullYear();
+      }
+
+      const billsData = await api.get(`/bill/${houseId}?year=${targetYear}&month=${targetMonth}`);
+      const bills = Array.isArray(billsData) ? billsData : (billsData?.bills || []);
       const roomCode = String(getRoomCode(room));
       const paidBill = bills.find(item => (
         isPaidStatus(item.status)
@@ -741,12 +783,15 @@ const HubView = ({
       ));
 
       if (paidBill) {
-        showToast?.(`Hóa đơn phòng ${roomCode} kỳ này đã thanh toán, không thể cập nhật chỉ số trong kỳ này.`, 'error');
+        showToast?.(`Hóa đơn phòng ${roomCode} kỳ ${targetMonth}/${targetYear} đã thanh toán, không thể cập nhật chỉ số.`, 'error');
         return;
       }
 
-      const meters = await loadQuickMeters(room.houseId || selectedQuickHouse?.id);
-      const roomMeters = meters.filter(meter => (meter.roomIds || []).map(String).includes(String(room.id)));
+      const metersData = await api.get(`/meter/${houseId}?year=${targetYear}&month=${targetMonth}`);
+      const roomMeters = (metersData || []).map(meter => ({
+        ...meter,
+        roomIds: JSON.parse(meter.roomIdsJson || '[]'),
+      })).filter(meter => (meter.roomIds || []).map(String).includes(String(room.id)));
 
       if (roomMeters.length === 0) {
         showToast?.('Phòng này chưa được gắn công tơ.', 'error');
@@ -757,7 +802,9 @@ const HubView = ({
         ...acc,
         [meter.id]: meter.newVal ?? '',
       }), {}));
-      setQuickMeterRoom(room);
+      setQuickMeterRoom({ ...room, targetMonth, targetYear, activeMeters: roomMeters });
+    } catch (error) {
+      showToast?.(error.message || 'Lỗi mở công tơ.', 'error');
     } finally {
       setReadingLoadingRoomId(null);
     }
@@ -768,10 +815,11 @@ const HubView = ({
     if (!quickMeterRoom || !selectedQuickHouse) return;
 
     const meterDate = viewDate || new Date();
-    const monthSelected = meterDate.getMonth() + 1;
-    const yearSelected = meterDate.getFullYear();
+    const monthSelected = quickMeterRoom.targetMonth || (meterDate.getMonth() + 1);
+    const yearSelected = quickMeterRoom.targetYear || meterDate.getFullYear();
+    const activeMeters = quickMeterRoom.activeMeters || activeQuickRoomMeters;
 
-    const updates = activeQuickRoomMeters
+    const updates = activeMeters
       .filter(meter => quickMeterDrafts[meter.id] !== null && quickMeterDrafts[meter.id] !== '' && quickMeterDrafts[meter.id] !== undefined)
       .map(meter => ({
         id: meter.id,
@@ -780,7 +828,7 @@ const HubView = ({
         type: meter.type,
         oldVal: parseN(String(meter.oldVal)),
         newVal: parseN(String(quickMeterDrafts[meter.id])),
-        roomIdsJson: JSON.stringify(meter.roomIds || []),
+        roomIdsJson: JSON.stringify(meter.roomIds || JSON.parse(meter.roomIdsJson || '[]')),
         year: yearSelected,
         month: monthSelected,
       }));
@@ -790,7 +838,7 @@ const HubView = ({
       return;
     }
 
-    const invalidMeter = activeQuickRoomMeters.find(meter => {
+    const invalidMeter = activeMeters.find(meter => {
       const value = quickMeterDrafts[meter.id];
       return value !== null && value !== '' && value !== undefined
         && parseN(String(value)) < parseN(String(meter.oldVal));
@@ -804,17 +852,6 @@ const HubView = ({
     try {
       setIsQuickMeterSaving(true);
       const houseId = quickMeterRoom.houseId || selectedQuickHouse.id;
-      const bills = await loadQuickBills(houseId, true);
-      const roomCode = String(getRoomCode(quickMeterRoom));
-      const paidBill = bills.find(item => (
-        isPaidStatus(item.status)
-        && (String(item.roomCode || item.roomId) === roomCode || String(item.roomId) === String(quickMeterRoom.id))
-      ));
-
-      if (paidBill) {
-        showToast?.(`Hóa đơn phòng ${roomCode} kỳ này đã thanh toán, không thể cập nhật chỉ số trong kỳ này.`, 'error');
-        return;
-      }
 
       await api.post('/meter/update', updates);
       const result = await api.post('/bill/generate', {
@@ -1483,7 +1520,8 @@ const HubView = ({
                   const roomCode = getRoomCode(room);
                   const roomBill = getQuickRoomBill(room);
                   const roomMeters = getQuickRoomMeters(room);
-                  const rowStatusStyle = getQuickRoomStatusStyle({ roomMeters, bill: roomBill });
+                  const meterDueState = getQuickRoomMeterDueState(room, roomBill, selectedQuickHouse);
+                  const rowStatusStyle = getQuickRoomStatusStyle({ roomMeters, bill: roomBill, meterDueState });
                   const missingBadges = getQuickMissingStatusBadges({ room, roomMeters, bill: roomBill });
                   const hasUnpaidQuickBill = roomBill && !isPaidStatus(roomBill.status);
                   return (
@@ -1529,7 +1567,7 @@ const HubView = ({
                           type="button"
                           onClick={() => handleOpenMeterReading(room)}
                           disabled={isLoading || isOpeningReading || isOpeningBill || isDownloadingHouseQr}
-                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border active:scale-95 disabled:opacity-60 ${getQuickMeterButtonClass(roomMeters)}`}
+                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border active:scale-95 disabled:opacity-60 ${getQuickMeterButtonClass(roomMeters, meterDueState)}`}
                           aria-label={`Ghi số điện phòng ${roomCode}`}
                           title={!roomMeters.length ? 'Chưa gắn công tơ' : roomMeters.some(meter => meter.newVal === null || meter.newVal === '' || meter.newVal === undefined) ? 'Chưa nhập đủ chỉ số' : 'Đã nhập chỉ số'}
                         >
@@ -1698,7 +1736,14 @@ const HubView = ({
           <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl animate-in slide-in-from-bottom-4 duration-200">
             <div className="flex items-center justify-between gap-3 border-b border-slate-100 p-4">
               <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">Ghi số điện nhanh</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">Ghi số điện nhanh</p>
+                  {quickMeterRoom.targetMonth && quickMeterRoom.targetYear && (
+                    <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[8px] font-black text-blue-700">
+                      Kỳ {quickMeterRoom.targetMonth}/{quickMeterRoom.targetYear}
+                    </span>
+                  )}
+                </div>
                 <h3 className="mt-1 truncate text-base font-black text-blue-800">
                   {getHouseLabel(selectedQuickHouse)} - Phòng {getRoomCode(quickMeterRoom)}
                 </h3>
@@ -1717,7 +1762,7 @@ const HubView = ({
             </div>
 
             <div className="max-h-[65vh] overflow-y-auto p-4 no-scrollbar">
-              {activeQuickRoomMeters.map(meter => {
+              {(quickMeterRoom.activeMeters || activeQuickRoomMeters).map(meter => {
                 const draftValue = quickMeterDrafts[meter.id] ?? '';
                 const oldValue = parseN(String(meter.oldVal || 0));
                 const newValue = parseN(String(draftValue || 0));
