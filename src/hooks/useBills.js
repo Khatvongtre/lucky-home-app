@@ -10,6 +10,7 @@ const billBaseTotal = (details = {}) => (
   + (details.internet || 0)
   + (details.service || 0)
   + (details.ebikes || 0)
+  + (details.monthlyFee || 0)
 );
 
 export const useBills = ({

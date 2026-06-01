@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Calendar, Flame, Zap, Edit, Boxes, Receipt, ZapOff, Loader2, QrCode } from 'lucide-react';
 import { api } from '../services/api';
 import { formatN, parseN } from '../utils/formatters';
+import { getMeterReadingDueState } from '../utils/date';
 import MeterReadingLinkQrModal from '../components/common/MeterReadingLinkQrModal';
 
 const FE_BASE_URL = (import.meta.env.VITE_FE_URL || window.location.origin).replace(/\/+$/g, '');
@@ -179,23 +180,19 @@ const MetersView = ({
             totalPrice = consumption * (config.priceElec || 0);
           }
 
-          const linkedRooms = rooms?.filter(r => m.roomIds?.includes(r.id)) || [];
-          let minPaymentDay = null;
-          linkedRooms.forEach(r => {
-            if (r.paymentDate) {
-              const pd = Number(r.paymentDate);
-              if (!Number.isNaN(pd) && (minPaymentDay === null || pd < minPaymentDay)) minPaymentDay = pd;
-            }
-          });
-          if (minPaymentDay === null && config?.paymentDay) minPaymentDay = Number(config.paymentDay);
-
           let daysPastDue = 0;
-          if (minPaymentDay !== null && isNewEmpty && viewDate) {
+          const linkedRooms = rooms?.filter(r => m.roomIds?.includes(r.id)) || [];
+          if (isNewEmpty && viewDate) {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
-            const dueDate = new Date(viewDate.getFullYear(), viewDate.getMonth(), minPaymentDay);
-            const diffDaysVal = Math.floor((today - dueDate) / (1000 * 60 * 60 * 24));
-            if (diffDaysVal > 0) daysPastDue = diffDaysVal;
+            linkedRooms.forEach(room => {
+              const dueState = getMeterReadingDueState(room, {
+                targetDate: viewDate,
+                today,
+                fallbackDay: config?.paymentDay,
+              });
+              if (dueState.daysFromDue > daysPastDue) daysPastDue = dueState.daysFromDue;
+            });
           }
 
           const hId = highlightedItemId ? String(highlightedItemId) : null;

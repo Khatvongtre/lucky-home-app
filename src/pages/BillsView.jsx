@@ -2,6 +2,16 @@ import React, { useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Receipt, AlertTriangle } from 'lucide-react';
 import { formatN } from '../utils/formatters';
 
+const getBillDetails = (bill = {}) => bill.details || {};
+
+const getPeriodLabel = (details = {}) => {
+    const periodMonths = Number(details.periodMonths) || 1;
+    if (periodMonths <= 1) return '';
+    return details.periodFrom && details.periodTo
+        ? `${details.periodFrom} - ${details.periodTo}`
+        : `${periodMonths} tháng`;
+};
+
 const BillsView = ({
     handlePrevMonth,
     handleNextMonth,
@@ -68,6 +78,7 @@ const BillsView = ({
                     currentBills.map(bill => {
                         const hId = highlightedItemId ? String(highlightedItemId) : null;
                         const isHighlighted = hId && (String(bill.id) === hId || String(bill.roomId) === hId);
+                        const periodLabel = getPeriodLabel(getBillDetails(bill));
 
                         let cardClasses = `bg-white p-3.5 rounded-xl border-2 shadow-sm flex items-center justify-between active:scale-[0.98] transition-all cursor-pointer ${bill.status === 'paid' ? 'border-emerald-100/60' : 'border-rose-100'}`;
                         if (isHighlighted) cardClasses += " border-red-500 shadow-red-200 animate-pulse bg-red-50 ring-2 ring-red-200";
@@ -93,6 +104,11 @@ const BillsView = ({
                                             }`}>
                                             {bill.status === 'paid' ? 'Đã thu tiền' : 'Chưa thu'}
                                         </div>
+                                        {periodLabel && (
+                                            <p className="mt-1 text-[8px] font-bold uppercase tracking-tight text-indigo-500">
+                                                Kỳ hóa đơn: {periodLabel}
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
 

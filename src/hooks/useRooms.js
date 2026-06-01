@@ -26,6 +26,28 @@ export const useRooms = ({
     const fd = new FormData(e.target);
     const start = fd.get('start');
     const months = Number(fd.get('months'));
+    const paymentPeriodMonths = Number(fd.get('paymentPeriodMonths') || 1);
+    const meterReadingPeriodMonths = Number(fd.get('meterReadingPeriodMonths') || 1);
+    const meterReadingStartDate = fd.get('meterReadingStartDate') || null;
+    const meterReadingDayRaw = fd.get('meterReadingDay');
+    const meterReadingDay = meterReadingDayRaw === null || String(meterReadingDayRaw).trim() === ''
+      ? null
+      : Number(meterReadingDayRaw);
+
+    if (!Number.isInteger(paymentPeriodMonths) || paymentPeriodMonths < 1) {
+      showToast('Đóng tiền mỗi phải là số nguyên từ 1 tháng trở lên.', 'error');
+      return;
+    }
+
+    if (!Number.isInteger(meterReadingPeriodMonths) || meterReadingPeriodMonths < 1) {
+      showToast('Chốt điện mỗi phải là số nguyên từ 1 tháng trở lên.', 'error');
+      return;
+    }
+
+    if (meterReadingDay !== null && (!Number.isInteger(meterReadingDay) || meterReadingDay < 1 || meterReadingDay > 31)) {
+      showToast('Ngày chốt điện phải từ 1 đến 31.', 'error');
+      return;
+    }
 
     const payload = {
       id: editingRoom ? editingRoom.id : crypto.randomUUID(),
@@ -44,6 +66,10 @@ export const useRooms = ({
       months,
       paymentDate: Number(fd.get('payDay')),
       heaterMeterId: fd.get('heaterType') === 'shared' ? fd.get('heaterMeterId') : null,
+      paymentPeriodMonths,
+      meterReadingPeriodMonths,
+      meterReadingStartDate,
+      meterReadingDay,
     };
 
     try {

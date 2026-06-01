@@ -181,6 +181,10 @@ const buildReceiptModel = (session, invoice) => {
       ebikes: invoiceDetails.ebikes || 0,
       monthlyFee: invoiceDetails.monthlyFee || 0,
       discount: invoiceDetails.discount || 0,
+      periodMonths: invoiceDetails.periodMonths,
+      periodFrom: invoiceDetails.periodFrom,
+      periodTo: invoiceDetails.periodTo,
+      monthlyRent: invoiceDetails.monthlyRent,
     },
   };
 };
@@ -200,6 +204,8 @@ const PublicInvoiceReceipt = ({
 }) => {
   const API_URL = getApiBaseUrl();
   const bill = buildReceiptModel(session, invoice);
+  const periodMonths = Number(bill.details.periodMonths) || 1;
+  const isMultiMonthBill = periodMonths > 1;
   const config = session.config || {};
   const bankBin = config.bankBin || '970422';
   const bankAcc = config.bankAcc || '0';
@@ -237,9 +243,29 @@ const PublicInvoiceReceipt = ({
           </div>
         </div>
 
+        {isMultiMonthBill && (
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-3">
+              <p className="text-[8px] font-black uppercase tracking-widest text-indigo-500">Kỳ hóa đơn</p>
+              <p className="mt-1 text-[12px] font-black text-indigo-700">{bill.details.periodFrom} - {bill.details.periodTo}</p>
+            </div>
+            <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-3 text-right">
+              <p className="text-[8px] font-black uppercase tracking-widest text-indigo-500">Chu kỳ thanh toán</p>
+              <p className="mt-1 text-[12px] font-black text-indigo-700">{periodMonths} tháng</p>
+            </div>
+          </div>
+        )}
+
         <div className="border border-slate-200 rounded-xl px-3 py-1 bg-white">
           <div className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200">
-            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Tiền phòng</span>
+            <div className="flex flex-col">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Tiền phòng</span>
+              {isMultiMonthBill && bill.details.monthlyRent ? (
+                <p className="text-[9px] text-blue-500 font-semibold leading-tight mt-0.5">
+                  {formatN(bill.details.monthlyRent)} x {periodMonths} tháng = {formatN(bill.details.rent)}
+                </p>
+              ) : null}
+            </div>
             <span className="text-[13px] font-black text-slate-800">{formatN(bill.details.rent)}</span>
           </div>
 

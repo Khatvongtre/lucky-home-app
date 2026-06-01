@@ -66,6 +66,9 @@ const BillReceipt = ({
     if (!bottomSheet || bottomSheet.type !== 'bill') return null;
 
     const bill = bottomSheet.data;
+    const details = bill.details || {};
+    const periodMonths = Number(details.periodMonths) || 1;
+    const isMultiMonthBill = periodMonths > 1;
     const isBillPaid = ['paid', 'completed', 'done'].includes(String(bill.status || '').toLowerCase());
     const canEditPendingBill = !isBillPaid;
     const meterImages = buildMeterImages(bill, API_URL)
@@ -81,7 +84,7 @@ const BillReceipt = ({
         bill.roomId,
         bill.currentMonthFull,
         bill.total,
-        bill.details.discount || 0
+        details.discount || 0
     ].join('|');
     const qrSrc = `${API_URL}/vietqr/generate?bankBin=${bankBin}&bankAcc=${bankAcc}&amount=${bill.total}&addInfo=${encodeURIComponent(qrAddInfo)}&t=${encodeURIComponent(qrFingerprint)}`;
 
@@ -126,11 +129,31 @@ const BillReceipt = ({
                                 </div>
                             </div>
 
+                            {isMultiMonthBill && (
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-3">
+                                        <p className="text-[8px] font-black uppercase tracking-widest text-indigo-500">Kỳ hóa đơn</p>
+                                        <p className="mt-1 text-[12px] font-black text-indigo-700">{details.periodFrom} - {details.periodTo}</p>
+                                    </div>
+                                    <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-3 text-right">
+                                        <p className="text-[8px] font-black uppercase tracking-widest text-indigo-500">Chu kỳ thanh toán</p>
+                                        <p className="mt-1 text-[12px] font-black text-indigo-700">{periodMonths} tháng</p>
+                                    </div>
+                                </div>
+                            )}
+
                             {/* 2. Chi tiết các khoản phí */}
                             <div className="border border-slate-200 rounded-xl px-3 py-1 bg-white">
                                 <div className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200">
-                                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Tiền phòng</span>
-                                    <span className="text-[13px] font-black text-slate-800">{formatN(bottomSheet.data.details.rent)}</span>
+                                    <div className="flex flex-col">
+                                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Tiền phòng</span>
+                                        {isMultiMonthBill && details.monthlyRent ? (
+                                            <p className="text-[9px] text-blue-500 font-semibold leading-tight mt-0.5">
+                                                {formatN(details.monthlyRent)} x {periodMonths} tháng = {formatN(details.rent)}
+                                            </p>
+                                        ) : null}
+                                    </div>
+                                    <span className="text-[13px] font-black text-slate-800">{formatN(details.rent)}</span>
                                 </div>
 
                                 <div className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200">
@@ -140,7 +163,7 @@ const BillReceipt = ({
                                             Số: {bottomSheet.data.meter?.old} → {bottomSheet.data.meter?.new} <span className="text-blue-600">({bottomSheet.data.meter?.new - bottomSheet.data.meter?.old} số)</span>
                                         </p>
                                     </div>
-                                    <span className="text-[13px] font-black text-slate-800">{formatN(bottomSheet.data.details.elec)}</span>
+                                    <span className="text-[13px] font-black text-slate-800">{formatN(details.elec)}</span>
                                 </div>
 
                                 {bottomSheet.data.heaterMeter && (
@@ -151,15 +174,15 @@ const BillReceipt = ({
                                                 Số: {bottomSheet.data.heaterMeter.old} → {bottomSheet.data.heaterMeter.new} <span className="text-rose-600">({bottomSheet.data.heaterMeter.new - bottomSheet.data.heaterMeter.old} số)</span>
                                             </p>
                                         </div>
-                                        <span className="text-[13px] font-black text-slate-800">{formatN(bottomSheet.data.details.heater)}</span>
+                                        <span className="text-[13px] font-black text-slate-800">{formatN(details.heater)}</span>
                                     </div>
                                 )}
 
                                 {[
-                                    { label: "Tiền nước", val: bottomSheet.data.details.water },
-                                    { label: "Phí dịch vụ", val: bottomSheet.data.details.service || 0 },
-                                    { label: "Internet", val: bottomSheet.data.details.internet || 0 },
-                                    { label: "Xe điện", val: bottomSheet.data.details.ebikes || 0 }
+                                    { label: "Tiền nước", val: details.water },
+                                    { label: "Phí dịch vụ", val: details.service || 0 },
+                                    { label: "Internet", val: details.internet || 0 },
+                                    { label: "Xe điện", val: details.ebikes || 0 }
                                 ].map((item, idx) => (
                                     <div key={idx} className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200 last:border-0">
                                         <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">{item.label}</span>
@@ -167,10 +190,10 @@ const BillReceipt = ({
                                     </div>
                                 ))}
 
-                                {bottomSheet.data.details.monthlyFee > 0 && (
+                                {details.monthlyFee > 0 && (
                                     <div className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200 last:border-0">
                                         <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Phí DV Hàng tháng (MBKD)</span>
-                                        <span className="text-[13px] font-black text-slate-800">{formatN(bottomSheet.data.details.monthlyFee)}</span>
+                                        <span className="text-[13px] font-black text-slate-800">{formatN(details.monthlyFee)}</span>
                                     </div>
                                 )}
 
@@ -188,7 +211,7 @@ const BillReceipt = ({
                                             />
                                         </div>
                                     ) : (
-                                        <span className="text-[13px] font-black text-red-600">-{formatN(bottomSheet.data.details.discount || 0)}</span>
+                                        <span className="text-[13px] font-black text-red-600">-{formatN(details.discount || 0)}</span>
                                     )}
                                 </div>
                                 <div className="bg-indigo-600 p-3 rounded-lg text-white mb-2 mt-2 shadow-sm flex items-center justify-between">

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronLeft, Building2, User } from 'lucide-react';
+import { ChevronLeft, User } from 'lucide-react';
 import NotificationBell from '../notifications/NotificationBell';
 
 const TAB_TITLES = {
@@ -50,10 +50,6 @@ const Header = ({
                 <h2 className="text-[10px] font-black uppercase tracking-widest text-blue-50 mt-0.5">
                     {TAB_TITLES[activeTab] || 'Trang chủ'}
                 </h2>
-            </div>
-            <div className="absolute left-1/2 -translate-x-1/2 hidden sm:flex items-center space-x-1.5">
-                <Building2 className="w-4 h-4 opacity-80" />
-                <h2 className="text-sm font-black uppercase tracking-tighter mt-0.5">Lucky Home</h2>
             </div>
             <div className="flex items-center space-x-2">
                 <NotificationBell

@@ -55,6 +55,28 @@ const getHouseLabel = (selectedHouse) => (
     selectedHouse?.houseName || selectedHouse?.name || selectedHouse?.title || ''
 );
 
+const getPeriodMonths = (value) => {
+    const months = Number(value);
+    return Number.isInteger(months) && months >= 1 ? months : 1;
+};
+
+const getMeterReadingDisplayDay = (room) => room.meterReadingDay ?? room.paymentDate ?? '';
+
+const formatDateVN = (value) => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) return '';
+    return `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
+};
+
+const sortRoomsByType = (rooms = []) => (
+    [...rooms].sort((a, b) => {
+        const aPriority = a.roomType === 'mbkd' ? 0 : 1;
+        const bPriority = b.roomType === 'mbkd' ? 0 : 1;
+        return aPriority - bPriority;
+    })
+);
+
 const resolvePublicLink = (result) => {
     const rawUrl = result?.url || result?.link || result?.publicUrl;
     if (rawUrl) {
@@ -130,7 +152,7 @@ const RoomsView = ({
     };
 
     const handleShowMeterLinkQr = async (event, room) => {
-        event.stopPropagation();
+        event?.stopPropagation?.();
 
         try {
             setLinkLoadingRoomId(room.id);
@@ -195,17 +217,28 @@ const RoomsView = ({
 
     return (
         <div className="space-y-4 pb-20 animate-in slide-in-from-right">
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 gap-2">
                 {currentRooms.length === 0 && (
                     <p className="text-xs text-slate-400 italic mt-5 col-span-2 text-center">
                         Chưa có phòng nào. Bấm Thêm phòng mới bên dưới.
                     </p>
                 )}
 
-                {currentRooms.map(room => {
+                {sortRoomsByType(currentRooms).map(room => {
+                    const roomCode = room.roomCode || room.id;
+                    const roomTypeLabel = room.roomType === 'mbkd' ? 'MBKD' : 'Phòng';
+                    const roomTitle = room.roomType === 'mbkd' ? roomCode : `P.${roomCode}`;
+                    const roomTitleBadgeStyle = room.roomType === 'mbkd' ? 'bg-purple-600 text-white' : 'bg-blue-600 text-white';
+                    const roomTypeStyle = room.roomType === 'mbkd'
+                        ? 'bg-purple-50 text-purple-700 ring-purple-100'
+                        : 'bg-blue-50 text-blue-700 ring-blue-100';
                     const payDays = getDueInfo(room.paymentDate)?.daysLeft || 0;
                     const contractEndDate = endContract(room.contractStart, room.months);
                     const endDays = diffDays(contractEndDate);
+                    const paymentPeriodMonths = getPeriodMonths(room.paymentPeriodMonths);
+                    const meterReadingPeriodMonths = getPeriodMonths(room.meterReadingPeriodMonths);
+                    const meterReadingDisplayDay = getMeterReadingDisplayDay(room);
+                    const meterReadingStartLabel = formatDateVN(room.meterReadingStartDate);
                     const isPayUrgent = room.status === 'full' && payDays <= 3;
                     const isPaySoon = room.status === 'full' && payDays > 3 && payDays <= 7;
                     const showContractWarning = room.status === 'full' && contractEndDate && endDays <= 30;
@@ -214,89 +247,132 @@ const RoomsView = ({
                     const isLinkLoading = linkLoadingRoomId === room.id;
 
                     let cardStyle = room.status !== 'full'
-                        ? 'bg-white/70 border-dashed border-slate-200 opacity-75'
+                        ? 'border-slate-200 bg-white opacity-80'
                         : isPayUrgent
-                            ? 'bg-red-50 border-red-200 shadow-red-100'
+                            ? 'border-red-200 bg-white shadow-red-100'
                             : isPaySoon
-                                ? 'bg-amber-50 border-amber-200 shadow-amber-100'
-                                : 'bg-white border-slate-200 shadow-slate-100';
-                    if (isHighlighted) cardStyle += ' border-red-500 shadow-red-200 animate-pulse bg-red-50 ring-2 ring-red-200';
+                                ? 'border-amber-200 bg-white shadow-amber-100'
+                                : 'border-slate-200 bg-white shadow-slate-100';
+                    if (isHighlighted) cardStyle += ' border-red-500 shadow-red-200 animate-pulse ring-2 ring-red-200';
 
-                    const roomBadgeStyle = room.status !== 'full'
-                        ? 'bg-slate-200 text-slate-600'
+                    const statusPillStyle = room.status !== 'full'
+                        ? 'bg-slate-100 text-slate-600 ring-slate-200'
                         : isPayUrgent
-                            ? 'bg-red-600 text-white'
+                            ? 'bg-red-50 text-red-700 ring-red-200'
                             : isPaySoon
-                                ? 'bg-amber-500 text-white'
-                                : 'bg-blue-600 text-white';
-                    const payColor = isPayUrgent ? 'bg-red-100 text-red-700 border-red-200' : isPaySoon ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-100';
+                                ? 'bg-amber-50 text-amber-700 ring-amber-200'
+                                : 'bg-blue-50 text-blue-700 ring-blue-200';
+                    const payColor = isPayUrgent ? 'text-red-700 bg-red-50 ring-red-200' : isPaySoon ? 'text-amber-700 bg-amber-50 ring-amber-200' : 'text-emerald-700 bg-emerald-50 ring-emerald-200';
                     const endColor = endDays <= 7 ? 'bg-red-100 text-red-700 border-red-200' : 'bg-amber-100 text-amber-700 border-amber-200';
+                    const statusRail = room.status !== 'full'
+                        ? 'bg-slate-300'
+                        : isPayUrgent
+                            ? 'bg-red-500'
+                            : isPaySoon
+                                ? 'bg-amber-500'
+                                : 'bg-blue-500';
 
                     return (
                         <div
                             id={`room-card-${room.id}`}
                             key={room.id}
                             onClick={() => { if (isHighlighted && setHighlightedItemId) setHighlightedItemId(null); }}
-                            className={`p-3 rounded-xl border-2 shadow-sm relative transition-all flex flex-col active:scale-[0.99] ${cardStyle}`}
+                            className={`relative overflow-hidden rounded-lg border shadow-sm transition-all active:scale-[0.99] ${cardStyle}`}
                         >
-                            <div className="flex justify-between items-center mb-1.5">
-                                <span className={`px-2 py-0.5 rounded-md font-black text-[10px] shadow-sm ${roomBadgeStyle}`}>
-                                    {room.roomType === 'mbkd' ? 'MBKD ' : 'P.'}{room.roomCode || room.id} {room.status === 'empty' ? '- TRỐNG' : ''}
-                                </span>
-                                <button
-                                    type="button"
-                                    onClick={() => { setEditingRoom(room); setIsAddRoomModalOpen(true); }}
-                                    className="w-6 h-6 bg-white border border-slate-200 rounded-full flex items-center justify-center text-slate-500 hover:bg-blue-600 hover:border-blue-600 hover:text-white active:scale-95 transition-all shadow-sm"
-                                >
-                                    <LucideEdit className="w-3 h-3" />
-                                </button>
-                            </div>
+                            <div className={`absolute inset-y-0 left-0 w-1 ${statusRail}`} />
 
-                            <p className={`text-[14px] font-black leading-none mb-2 ${isPayUrgent ? 'text-red-700' : isPaySoon ? 'text-amber-700' : 'text-blue-800'}`}>
-                                {formatN(room.price)}
-                            </p>
-
-                            {room.status === 'full' && (
-                                <div className="space-y-1.5 border-t border-slate-200/70 pt-2 flex-1">
-                                    <div className="flex justify-between items-center text-[8px] font-bold uppercase gap-2">
-                                        <span className="text-slate-500 flex items-center"><CreditCard className="w-3 h-3 mr-1 text-blue-600" /> Đóng tiền</span>
-                                        <span className={`px-1.5 py-0.5 rounded-md border text-center font-black ${payColor}`}>Còn {payDays > 0 ? payDays : 0} ngày</span>
-                                    </div>
-                                    {showContractWarning && (
-                                        <div className="flex justify-between items-center text-[8px] font-bold uppercase gap-2">
-                                            <span className="text-slate-500 flex items-center"><Calendar className="w-3 h-3 mr-1 text-amber-600" /> Hợp đồng</span>
-                                            <span className={`px-1.5 py-0.5 rounded-md border text-center font-black ${endColor}`}>Còn {endDays > 0 ? endDays : 0} ngày</span>
+                            <div className="p-3 pl-4">
+                                <div className="flex items-start justify-between gap-2">
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex min-w-0 items-center gap-1.5">
+                                            {isManagerOrAbove ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={(event) => handleShowMeterLinkQr(event, room)}
+                                                    disabled={isLinkLoading}
+                                                    className={`min-w-0 truncate rounded-md px-2 py-1 text-left text-[13px] font-black uppercase leading-none shadow-sm active:scale-[0.98] disabled:opacity-60 ${roomTitleBadgeStyle}`}
+                                                    title="Mở QR ghi điện"
+                                                >
+                                                    {roomTitle}
+                                                </button>
+                                            ) : (
+                                                <h3 className={`truncate rounded-md px-2 py-1 text-[13px] font-black uppercase leading-none shadow-sm ${roomTitleBadgeStyle}`}>
+                                                    {roomTitle}
+                                                </h3>
+                                            )}
+                                            <span className={`shrink-0 rounded px-1.5 py-0.5 text-[8px] font-black uppercase leading-none ring-1 ${roomTypeStyle}`}>
+                                                {roomTypeLabel}
+                                            </span>
+                                            {room.status === 'empty' && (
+                                                <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[8px] font-black uppercase text-slate-500 ring-1 ring-slate-200">
+                                                    Trống
+                                                </span>
+                                            )}
                                         </div>
-                                    )}
-                                </div>
-                            )}
-
-                            <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-slate-200/70 pt-2">
-                                <div className="flex items-center text-slate-600 font-bold text-[9px] bg-white/70 border border-slate-200 px-1.5 py-0.5 rounded-md">
-                                    <Users2 className="w-3 h-3 mr-1 text-blue-600" />{room.peopleCount ?? room.people ?? 0} người
-                                </div>
-                                {room.eBikeCount > 0 && (
-                                    <div className="flex items-center text-slate-600 font-bold text-[9px] bg-white/70 border border-slate-200 px-1.5 py-0.5 rounded-md">
-                                        <Bike className="w-3 h-3 mr-1 text-amber-600" />{room.eBikeCount ?? room.ebikes ?? 0} xe điện
                                     </div>
-                                )}
-                            </div>
-
-                            {isManagerOrAbove && (
-                                <div className="mt-2 border-t border-slate-200/70 pt-2">
-                                    <div className="grid grid-cols-1 gap-1.5">
+                                    {isManagerOrAbove && (
                                         <button
                                             type="button"
                                             onClick={(event) => handleShowMeterLinkQr(event, room)}
                                             disabled={isLinkLoading}
-                                            className="flex items-center justify-center gap-1 rounded-lg border border-rose-100 bg-rose-50 px-2 py-2 text-[8px] font-black uppercase text-rose-700 active:scale-95 disabled:opacity-60"
+                                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-rose-100 bg-rose-50 text-rose-700 shadow-sm transition-all active:scale-95 disabled:opacity-60"
+                                            title="QR ghi điện"
                                         >
-                                            {isLinkLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <QrCode className="h-3 w-3" />}
-                                            QR link
+                                            {isLinkLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <QrCode className="h-3.5 w-3.5" />}
                                         </button>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => { setEditingRoom(room); setIsAddRoomModalOpen(true); }}
+                                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition-all hover:border-blue-600 hover:bg-blue-600 hover:text-white active:scale-95"
+                                        title="Sửa phòng"
+                                    >
+                                        <LucideEdit className="h-3.5 w-3.5" />
+                                    </button>
+                                </div>
+
+                                <div className="mt-2 flex items-center justify-between gap-2">
+                                    <div className="min-w-0">
+                                        <p className={`truncate text-[18px] font-black leading-none tabular-nums ${isPayUrgent ? 'text-red-700' : isPaySoon ? 'text-amber-700' : 'text-blue-700'}`}>
+                                            {formatN(room.price)}
+                                        </p>
+                                    </div>
+                                    {room.status === 'full' && (
+                                        <div className={`rounded-md px-2 py-1 text-right ring-1 ${payColor}`}>
+                                            <p className="text-[10px] font-black leading-none">Còn {payDays > 0 ? payDays : 0} ngày</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="mt-2 flex flex-wrap items-center gap-1.5 border-y border-slate-100 py-1.5">
+                                    <div className="inline-flex items-center rounded-md bg-slate-50 px-1.5 py-0.5 text-[9px] font-bold text-slate-600 ring-1 ring-slate-200">
+                                        <Users2 className="mr-1 h-3 w-3 text-blue-600" />{room.peopleCount ?? room.people ?? 0} người
+                                    </div>
+                                    {room.eBikeCount > 0 && (
+                                        <div className="inline-flex items-center rounded-md bg-slate-50 px-1.5 py-0.5 text-[9px] font-bold text-slate-600 ring-1 ring-slate-200">
+                                            <Bike className="mr-1 h-3 w-3 text-amber-600" />{room.eBikeCount ?? room.ebikes ?? 0} xe điện
+                                        </div>
+                                    )}
+                                    {showContractWarning && (
+                                        <div className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[9px] font-black ${endColor}`}>
+                                            <Calendar className="mr-1 h-3 w-3" /> HĐ còn {endDays > 0 ? endDays : 0} ngày
+                                        </div>
+                                    )}
+                                    <div className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[9px] font-black uppercase ring-1 ${statusPillStyle}`}>
+                                        {room.status === 'full' ? 'Đang thuê' : 'Đang trống'}
                                     </div>
                                 </div>
-                            )}
+
+                                <div className="mt-2 flex flex-wrap gap-1.5 text-[9px]">
+                                    <span className="rounded-md bg-blue-50 px-1.5 py-0.5 font-black text-blue-700 ring-1 ring-blue-100">Đóng {paymentPeriodMonths} tháng/lần</span>
+                                    <span className="rounded-md bg-amber-50 px-1.5 py-0.5 font-black text-amber-700 ring-1 ring-amber-100">Điện {meterReadingPeriodMonths} tháng/lần</span>
+                                    <span className="rounded-md bg-slate-50 px-1.5 py-0.5 font-black text-slate-700 ring-1 ring-slate-200">Ngày {meterReadingDisplayDay || '-'}</span>
+                                    {meterReadingStartLabel && (
+                                        <span className="rounded-md bg-slate-50 px-1.5 py-0.5 font-black text-slate-700 ring-1 ring-slate-200">Từ {meterReadingStartLabel}</span>
+                                    )}
+                                </div>
+
+                            </div>
                         </div>
                     );
                 })}
@@ -324,5 +400,3 @@ const RoomsView = ({
 };
 
 export default RoomsView;
-
-

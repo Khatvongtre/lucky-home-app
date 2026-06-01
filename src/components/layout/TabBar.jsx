@@ -13,8 +13,8 @@ const TabBar = ({
     selectedHouse
 }) => {
     return (
-        <div className="fixed bottom-0 left-0 right-0 z-[70] pointer-events-none">
-            <div className="bg-white border-t border-slate-100 h-14 flex items-center justify-around px-2 pointer-events-auto shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
+        <div className="fixed bottom-0 left-1/2 z-[70] w-full max-w-lg -translate-x-1/2 pointer-events-none">
+            <div className="h-14 bg-white border-x border-t border-slate-100 flex items-center justify-around px-2 pointer-events-auto shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
                 {[
                     { id: 'dashboard', icon: LayoutDashboard, label: 'Trang chủ' },
                     shouldShowMeterBanner

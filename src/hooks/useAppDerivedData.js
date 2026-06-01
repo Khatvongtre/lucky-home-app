@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { parseN } from '../utils/formatters';
-import { getSavingMaturityDate } from '../utils/date';
+import { getSavingMaturityDate, isMeterReadingDueNear } from '../utils/date';
 
 export const monthLabels = {
   'this-month': 'Tháng này',
@@ -135,20 +135,12 @@ export const useAppDerivedData = ({
   const now = new Date();
   now.setHours(0, 0, 0, 0);
   const shouldShowMeterBanner = rooms.some(room => {
-    if (room.status !== 'full' || !room.paymentDate) return false;
-
-    const paymentDay = Number(room.paymentDate);
-    if (isNaN(paymentDay)) return false;
-
-    const candidateDates = [
-      new Date(now.getFullYear(), now.getMonth() - 1, paymentDay),
-      new Date(now.getFullYear(), now.getMonth(), paymentDay),
-      new Date(now.getFullYear(), now.getMonth() + 1, paymentDay),
-    ];
-
-    return candidateDates.some(date => {
-      const diffDays = Math.round((now - date) / (1000 * 60 * 60 * 24));
-      return diffDays >= -1 && diffDays <= 3;
+    if (room.status !== 'full') return false;
+    return isMeterReadingDueNear(room, {
+      referenceDate: now,
+      fallbackDay: config?.paymentDay,
+      beforeDays: 1,
+      afterDays: 3,
     });
   });
 

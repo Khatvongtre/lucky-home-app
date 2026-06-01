@@ -12,6 +12,7 @@ import BillReceipt from '../components/bills/BillReceipt';
 import { api } from '../services/api';
 import { getApiBaseUrl } from '../services/apiServer';
 import { shareDataUrlImage, shareElementImage } from '../utils/imageExport';
+import { getMeterReadingDueState } from '../utils/date';
 
 const FE_BASE_URL = (import.meta.env.VITE_FE_URL || window.location.origin).replace(/\/+$/g, '');
 
@@ -114,6 +115,7 @@ const billBaseTotal = (details = {}) => (
   + (details.internet || 0)
   + (details.service || 0)
   + (details.ebikes || 0)
+  + (details.monthlyFee || 0)
 );
 
 const billTimestamp = (bill = {}) => {
@@ -371,35 +373,24 @@ const HubView = ({
     meters.filter(meter => (meter.roomIds || []).map(String).includes(String(room.id)))
   );
 
-  const getQuickRoomPaymentDay = (room, house = selectedQuickHouse) => {
-    const rawDay = room?.paymentDate || room?.paymentDay || house?.paymentDay;
-    const day = Number(rawDay);
-    return Number.isFinite(day) && day >= 1 && day <= 31 ? day : null;
-  };
-
   const getQuickRoomMeterDueState = (room, bill, house = selectedQuickHouse) => {
-    const paymentDay = getQuickRoomPaymentDay(room, house);
-    if (!paymentDay) return { isInWindow: true, daysFromDue: 0 };
-
     const targetDate = viewDate || new Date();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-
-    let dueDate = new Date(targetDate.getFullYear(), targetDate.getMonth(), paymentDay);
-    dueDate.setHours(0, 0, 0, 0);
-
     const isPaid = bill && isPaidStatus(bill.status);
-    if (isPaid) {
-      dueDate = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, paymentDay);
-      dueDate.setHours(0, 0, 0, 0);
-    }
+    const cycleDate = isPaid
+      ? new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 1)
+      : targetDate;
 
-    const daysFromDue = Math.floor((today - dueDate) / (1000 * 60 * 60 * 24));
+    const dueState = getMeterReadingDueState(room, {
+      targetDate: cycleDate,
+      today,
+      fallbackDay: house?.paymentDay,
+    });
 
-    return {
-      daysFromDue,
-      isInWindow: daysFromDue >= -5 && daysFromDue <= 5,
-    };
+    return dueState.daysFromDue === null
+      ? { isInWindow: false, daysFromDue: -999, dueDate: null }
+      : dueState;
   };
 
   const getQuickMeterButtonClass = (roomMeters, meterDueState, bill) => {
@@ -428,14 +419,14 @@ const HubView = ({
       badges.push({ label: 'Đang tải công tơ', className: 'bg-slate-100 text-slate-500' });
     } else if (hasNoMeters) {
       badges.push({ label: 'Chưa gắn công tơ', className: 'bg-slate-100 text-slate-500' });
-    } else if (hasMissingMeter && meterDueState.daysFromDue >= -5 && meterDueState.daysFromDue <= 5) {
+    } else if (hasMissingMeter && meterDueState.dueDate && meterDueState.daysFromDue >= -5 && meterDueState.daysFromDue <= 5) {
       badges.push({ label: 'Chưa chốt điện', className: 'bg-amber-100 text-amber-700' });
-    } else if (hasMissingMeter && meterDueState.daysFromDue > 5) {
+    } else if (hasMissingMeter && meterDueState.dueDate && meterDueState.daysFromDue > 5) {
       badges.push({
         label: `Quá hạn ${meterDueState.daysFromDue} ngày`,
         className: 'bg-rose-100 text-rose-700',
       });
-    } else if (hasMissingMeter && meterDueState.daysFromDue < -5) {
+    } else if (hasMissingMeter && meterDueState.dueDate && meterDueState.daysFromDue < -5) {
       badges.push({
         label: `Còn ${Math.abs(meterDueState.daysFromDue)} ngày chốt`,
         className: 'bg-slate-100 text-slate-500',
@@ -1352,8 +1343,8 @@ const HubView = ({
         </section>
 
         {(isManagerOrAbove || quickQrHouses.length > 0) && quickQrHouses.length > 0 && (
-          <section className="relative overflow-visible rounded-xl border border-amber-200 bg-white shadow-md shadow-amber-100/70">
-            <div className="rounded-t-xl border-b border-amber-100 bg-gradient-to-br from-amber-50 via-orange-50 to-white p-2.5">
+          <section className="relative overflow-visible rounded-xl border border-amber-200 bg-white shadow-md shadow-amber-100/60">
+            <div className="rounded-t-[10px] border-b border-amber-100 bg-gradient-to-br from-amber-50 via-orange-50 to-white p-0">
               <div
                 role="button"
                 tabIndex={0}
@@ -1364,11 +1355,11 @@ const HubView = ({
                     toggleQuickQrExpanded();
                   }
                 }}
-                className="flex cursor-pointer items-center justify-between gap-2 rounded-lg bg-white/70 px-2.5 py-2 text-amber-900 ring-1 ring-amber-100 active:bg-amber-50"
+                className="flex cursor-pointer items-center justify-between gap-2 rounded-t-[10px] bg-white/80 px-3 py-2.5 text-amber-900 ring-1 ring-inset ring-amber-100 active:bg-amber-50"
                 aria-expanded={isQuickQrExpanded}
               >
                 <div className="flex min-w-0 items-center gap-1.5">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-white shadow-sm shadow-amber-200">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500 text-white shadow-sm shadow-amber-200">
                     <Zap className="h-4 w-4" />
                   </span>
                   <div className="min-w-0">
@@ -1390,135 +1381,137 @@ const HubView = ({
                 </div>
               </div>
 
-              {isQuickQrExpanded && <div className="mt-2 flex items-center gap-2">
-                <div className={`flex min-w-0 flex-1 items-center justify-between gap-1.5 rounded-lg border px-2.5 py-1 ${hasQuickRoomsToProcess ? 'border-rose-100 bg-rose-50' : 'border-emerald-100 bg-emerald-50'}`}>
-                  <div className="flex min-w-0 items-center gap-1.5">
-                    {hasQuickRoomsToProcess ? (
-                      <Hexagon className="h-3.5 w-3.5 shrink-0 fill-rose-500 text-rose-500" />
-                    ) : (
-                      <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
-                    )}
-                    <p className={`shrink-0 text-[9px] font-black uppercase ${hasQuickRoomsToProcess ? 'text-rose-700' : 'text-emerald-700'}`}>
-                      {hasQuickRoomsToProcess ? (showAllQuickRooms ? 'Hiển thị tất cả' : 'Cần xử lý') : 'Hoàn thành'}
-                    </p>
-                    {hasQuickRoomsToProcess && (
-                      <span className="inline-flex h-4 shrink-0 items-center justify-center rounded bg-rose-500 px-1.5 text-[8px] font-black leading-none text-white shadow-sm">
-                        {incompleteQuickRooms.length} phòng
-                      </span>
-                    )}
-                    {selectedQuickHouseUnpaidAmount > 0 && (
-                      <span className="inline-flex h-4 min-w-0 shrink items-center justify-center rounded bg-rose-100 px-1.5 text-[8px] font-black leading-none text-rose-700">
-                        {formatN(selectedQuickHouseUnpaidAmount)} đ
-                      </span>
+              {isQuickQrExpanded && <div className="p-2.5 pt-2">
+                <div className="flex items-center gap-2">
+                  <div className={`flex min-w-0 flex-1 items-center justify-between gap-1.5 rounded-lg border px-2.5 py-1 ${hasQuickRoomsToProcess ? 'border-rose-100 bg-rose-50' : 'border-emerald-100 bg-emerald-50'}`}>
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      {hasQuickRoomsToProcess ? (
+                        <Hexagon className="h-3.5 w-3.5 shrink-0 fill-rose-500 text-rose-500" />
+                      ) : (
+                        <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                      )}
+                      <p className={`shrink-0 text-[9px] font-black uppercase ${hasQuickRoomsToProcess ? 'text-rose-700' : 'text-emerald-700'}`}>
+                        {hasQuickRoomsToProcess ? (showAllQuickRooms ? 'Hiển thị tất cả' : 'Cần xử lý') : 'Hoàn thành'}
+                      </p>
+                      {hasQuickRoomsToProcess && (
+                        <span className="inline-flex h-4 shrink-0 items-center justify-center rounded bg-rose-500 px-1.5 text-[8px] font-black leading-none text-white shadow-sm">
+                          {incompleteQuickRooms.length} phòng
+                        </span>
+                      )}
+                      {selectedQuickHouseUnpaidAmount > 0 && (
+                        <span className="inline-flex h-4 min-w-0 shrink items-center justify-center rounded bg-rose-100 px-1.5 text-[8px] font-black leading-none text-rose-700">
+                          {formatN(selectedQuickHouseUnpaidAmount)} đ
+                        </span>
+                      )}
+                    </div>
+                    {(hasQuickRoomsToProcess || showAllQuickRooms) && (
+                      <p className={`shrink-0 text-[8px] font-bold ${hasQuickRoomsToProcess ? 'text-rose-400' : 'text-emerald-500'}`}>{visibleQuickRooms.length}/{quickRooms.length}</p>
                     )}
                   </div>
-                  {(hasQuickRoomsToProcess || showAllQuickRooms) && (
-                    <p className={`shrink-0 text-[8px] font-bold ${hasQuickRoomsToProcess ? 'text-rose-400' : 'text-emerald-500'}`}>{visibleQuickRooms.length}/{quickRooms.length}</p>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowAllQuickRooms(prev => !prev)}
+                    className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${showAllQuickRooms ? 'bg-emerald-600' : 'bg-rose-600'}`}
+                    aria-pressed={showAllQuickRooms}
+                  >
+                    <span className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${showAllQuickRooms ? 'translate-x-4' : 'translate-x-0'}`} />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setShowAllQuickRooms(prev => !prev)}
-                  className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${showAllQuickRooms ? 'bg-emerald-600' : 'bg-rose-600'}`}
-                  aria-pressed={showAllQuickRooms}
-                >
-                  <span className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${showAllQuickRooms ? 'translate-x-4' : 'translate-x-0'}`} />
-                </button>
-              </div>}
 
-              {isQuickQrExpanded && <div className="mt-2 flex items-center gap-2">
-                <div className="relative z-40 min-w-0 flex-1">
-                  {quickQrHouses.length > 1 ? (
-                    <button
-                      type="button"
-                      onClick={() => setIsQuickHousePickerOpen(prev => !prev)}
-                      className={`flex h-9 w-full items-center gap-2 rounded-lg border px-2 text-left shadow-inner active:scale-[0.99] ${hasQuickRoomsToProcess ? 'border-rose-100 bg-rose-50/70' : 'border-emerald-100 bg-emerald-50/80'}`}
-                      aria-expanded={isQuickHousePickerOpen}
-                      aria-haspopup="listbox"
-                    >
-                      <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm ${hasQuickRoomsToProcess ? 'text-rose-600' : 'text-emerald-600'}`}>
-                        <Building2 className="h-3.5 w-3.5" />
+                <div className="mt-2 flex items-center gap-2">
+                  <div className="relative z-40 min-w-0 flex-1">
+                    {quickQrHouses.length > 1 ? (
+                      <button
+                        type="button"
+                        onClick={() => setIsQuickHousePickerOpen(prev => !prev)}
+                        className={`flex h-9 w-full items-center gap-2 rounded-lg border px-2 text-left shadow-inner active:scale-[0.99] ${hasQuickRoomsToProcess ? 'border-rose-100 bg-rose-50/70' : 'border-emerald-100 bg-emerald-50/80'}`}
+                        aria-expanded={isQuickHousePickerOpen}
+                        aria-haspopup="listbox"
+                      >
+                        <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm ${hasQuickRoomsToProcess ? 'text-rose-600' : 'text-emerald-600'}`}>
+                          <Building2 className="h-3.5 w-3.5" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[11px] font-black uppercase text-blue-800">
+                            {getHouseLabel(selectedQuickHouse) || 'Cơ sở'}
+                          </p>
+                        </div>
+                        <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${hasQuickRoomsToProcess ? 'text-rose-500' : 'text-emerald-600'} ${isQuickHousePickerOpen ? 'rotate-180' : ''}`} />
+                      </button>
+                    ) : (
+                      <div className={`flex h-9 w-full items-center gap-2 rounded-lg border px-2 text-left ${hasQuickRoomsToProcess ? 'border-slate-100 bg-slate-50' : 'border-emerald-100 bg-emerald-50/80'}`}>
+                        <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm ${hasQuickRoomsToProcess ? 'text-slate-500' : 'text-emerald-600'}`}>
+                          <Building2 className="h-3.5 w-3.5" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[11px] font-black uppercase text-blue-800">
+                            {getHouseLabel(selectedQuickHouse) || 'Cơ sở'}
+                          </p>
+                        </div>
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-[11px] font-black uppercase text-blue-800">
-                          {getHouseLabel(selectedQuickHouse) || 'Cơ sở'}
-                        </p>
-                      </div>
-                      <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform ${hasQuickRoomsToProcess ? 'text-rose-500' : 'text-emerald-600'} ${isQuickHousePickerOpen ? 'rotate-180' : ''}`} />
-                    </button>
-                  ) : (
-                    <div className={`flex h-9 w-full items-center gap-2 rounded-lg border px-2 text-left ${hasQuickRoomsToProcess ? 'border-slate-100 bg-slate-50' : 'border-emerald-100 bg-emerald-50/80'}`}>
-                      <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm ${hasQuickRoomsToProcess ? 'text-slate-500' : 'text-emerald-600'}`}>
-                        <Building2 className="h-3.5 w-3.5" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-[11px] font-black uppercase text-blue-800">
-                          {getHouseLabel(selectedQuickHouse) || 'Cơ sở'}
-                        </p>
-                      </div>
-                    </div>
-                  )}
+                    )}
 
-                  {isQuickHousePickerOpen && (
-                    <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg no-scrollbar" role="listbox">
-                      {visibleQuickQrHouses.map(house => {
-                        const isSelected = String(house.id) === String(selectedQuickHouse?.id);
-                        const incompleteCount = getQuickHouseIncompleteCount(house);
-                        const unpaidAmount = getQuickHouseUnpaidAmount(house);
-                        return (
-                          <button
-                            key={house.id}
-                            type="button"
-                            onClick={() => {
-                              setQuickHouseId(house.id);
-                              setHasManualQuickHouse(true);
-                              setIsQuickHousePickerOpen(false);
-                            }}
-                            className={`flex w-full items-center gap-3 rounded-lg px-2.5 py-2.5 text-left active:scale-[0.99] ${isSelected ? 'bg-rose-50 text-rose-700' : 'text-slate-700 active:bg-slate-50'}`}
-                            role="option"
-                            aria-selected={isSelected}
-                          >
-                            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${isSelected ? 'bg-white text-rose-600 shadow-sm' : 'bg-slate-50 text-slate-500'}`}>
-                              <Building2 className="h-4 w-4" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate text-[11px] font-black uppercase">
-                                {getHouseLabel(house) || 'Cơ sở'}
-                              </p>
-                              {renderQuickHouseComboboxChips(house, '', { includeOccupancyStats: true, dueDaysThreshold: 30 })}
-                            </div>
-                            {incompleteCount > 0 ? (
-                              <div className="flex shrink-0 flex-col items-end gap-1">
-                                <span className="rounded-md bg-rose-100 px-2 py-1 text-[8px] font-black uppercase text-rose-700">
-                                  {incompleteCount} cần xử lý
-                                </span>
-                                {unpaidAmount > 0 && (
-                                  <span className="rounded-md bg-rose-50 px-2 py-0.5 text-[8px] font-black text-rose-700 ring-1 ring-rose-100">
-                                    {formatN(unpaidAmount)} đ
-                                  </span>
-                                )}
+                    {isQuickHousePickerOpen && (
+                      <div className="absolute left-0 right-0 top-full z-50 mt-2 max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg no-scrollbar" role="listbox">
+                        {visibleQuickQrHouses.map(house => {
+                          const isSelected = String(house.id) === String(selectedQuickHouse?.id);
+                          const incompleteCount = getQuickHouseIncompleteCount(house);
+                          const unpaidAmount = getQuickHouseUnpaidAmount(house);
+                          return (
+                            <button
+                              key={house.id}
+                              type="button"
+                              onClick={() => {
+                                setQuickHouseId(house.id);
+                                setHasManualQuickHouse(true);
+                                setIsQuickHousePickerOpen(false);
+                              }}
+                              className={`flex w-full items-center gap-3 rounded-lg px-2.5 py-2.5 text-left active:scale-[0.99] ${isSelected ? 'bg-rose-50 text-rose-700' : 'text-slate-700 active:bg-slate-50'}`}
+                              role="option"
+                              aria-selected={isSelected}
+                            >
+                              <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${isSelected ? 'bg-white text-rose-600 shadow-sm' : 'bg-slate-50 text-slate-500'}`}>
+                                <Building2 className="h-4 w-4" />
                               </div>
-                            ) : (
-                              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-                                <CheckCircle2 className="h-4 w-4" />
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-[11px] font-black uppercase">
+                                  {getHouseLabel(house) || 'Cơ sở'}
+                                </p>
+                                {renderQuickHouseComboboxChips(house, '', { includeOccupancyStats: true, dueDaysThreshold: 30 })}
+                              </div>
+                              {incompleteCount > 0 ? (
+                                <div className="flex shrink-0 flex-col items-end gap-1">
+                                  <span className="rounded-md bg-rose-100 px-2 py-1 text-[8px] font-black uppercase text-rose-700">
+                                    {incompleteCount} cần xử lý
+                                  </span>
+                                  {unpaidAmount > 0 && (
+                                    <span className="rounded-md bg-rose-50 px-2 py-0.5 text-[8px] font-black text-rose-700 ring-1 ring-rose-100">
+                                      {formatN(unpaidAmount)} đ
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                                  <CheckCircle2 className="h-4 w-4" />
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={downloadAllHouseQr}
+                    disabled={!quickRooms.length || isDownloadingHouseQr || roomsLoadingHouseId === selectedQuickHouse?.id}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-100 bg-emerald-50 text-emerald-700 active:scale-95 disabled:opacity-50"
+                    aria-label="Tải toàn bộ QR"
+                    title="Tải toàn bộ QR"
+                  >
+                    {isDownloadingHouseQr || roomsLoadingHouseId === selectedQuickHouse?.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={downloadAllHouseQr}
-                  disabled={!quickRooms.length || isDownloadingHouseQr || roomsLoadingHouseId === selectedQuickHouse?.id}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-100 bg-emerald-50 text-emerald-700 active:scale-95 disabled:opacity-50"
-                  aria-label="Tải toàn bộ QR"
-                  title="Tải toàn bộ QR"
-                >
-                  {isDownloadingHouseQr || roomsLoadingHouseId === selectedQuickHouse?.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                </button>
               </div>}
             </div>
 
@@ -1626,7 +1619,7 @@ const HubView = ({
         )}
 
         {dashboardWarnings.length > 0 && (
-          <section className="overflow-hidden rounded-xl border border-rose-200 bg-white shadow-md shadow-rose-100/70 animate-in zoom-in-95 duration-300">
+          <section className="overflow-hidden rounded-xl border border-rose-200 bg-white shadow-md shadow-rose-100/60 animate-in zoom-in-95 duration-300">
             <div
               role="button"
               tabIndex={0}
@@ -1638,11 +1631,11 @@ const HubView = ({
                 }
               }}
               aria-expanded={isWarningsExpanded}
-              className="flex cursor-pointer items-center justify-between gap-2 border-b border-rose-100 bg-gradient-to-br from-rose-50 via-red-50 to-white p-2.5 text-rose-900 active:bg-rose-50"
+              className="flex cursor-pointer items-center justify-between gap-2 border-b border-rose-100 bg-gradient-to-br from-rose-50 via-red-50 to-white p-0 text-rose-900 active:bg-rose-50"
             >
-              <div className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-lg bg-white/70 px-2.5 py-2 ring-1 ring-rose-100">
+              <div className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-t-[10px] bg-white/80 px-3 py-2.5 ring-1 ring-inset ring-rose-100">
                 <div className="flex min-w-0 items-center gap-2">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-rose-500 text-white shadow-sm shadow-rose-200">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-rose-500 text-white shadow-sm shadow-rose-200">
                     <AlertTriangle className="h-4 w-4" />
                   </span>
                   <div className="min-w-0">
@@ -1676,7 +1669,7 @@ const HubView = ({
           </section>
         )}
 
-        <section className="overflow-hidden rounded-xl border border-blue-200 bg-white shadow-md shadow-blue-100/70">
+        <section className="overflow-hidden rounded-xl border border-blue-200 bg-white shadow-md shadow-blue-100/60">
           <div
             role="button"
             tabIndex={0}
@@ -1688,11 +1681,11 @@ const HubView = ({
               }
             }}
             aria-expanded={isRecentHousesExpanded}
-            className="flex cursor-pointer items-center justify-between gap-2 border-b border-blue-100 bg-gradient-to-br from-blue-50 via-indigo-50 to-white p-2.5 text-blue-900 active:bg-blue-50"
+            className="flex cursor-pointer items-center justify-between gap-2 border-b border-blue-100 bg-gradient-to-br from-blue-50 via-indigo-50 to-white p-0 text-blue-900 active:bg-blue-50"
           >
-            <div className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-lg bg-white/70 px-2.5 py-2 ring-1 ring-blue-100">
+            <div className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-t-[10px] bg-white/80 px-3 py-2.5 ring-1 ring-inset ring-blue-100">
               <div className="flex min-w-0 items-center gap-2">
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm shadow-blue-200">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm shadow-blue-200">
                   <Building2 className="h-4 w-4" />
                 </span>
                 <div className="min-w-0">
