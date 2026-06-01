@@ -2,17 +2,6 @@ import { useCallback, useState } from 'react';
 import { api } from '../services/api';
 import { shareElementImage } from '../utils/imageExport';
 
-const billBaseTotal = (details = {}) => (
-  (details.rent || 0)
-  + (details.elec || 0)
-  + (details.heater || 0)
-  + (details.water || 0)
-  + (details.internet || 0)
-  + (details.service || 0)
-  + (details.ebikes || 0)
-  + (details.monthlyFee || 0)
-);
-
 export const useBills = ({
   bills,
   setBills,
@@ -51,10 +40,8 @@ export const useBills = ({
     if (!targetBill) return;
     if ((targetBill.details.discount || 0) === discount) return;
 
-    const newTotal = Math.max(0, billBaseTotal(targetBill.details) - discount);
     const updatedBillData = {
       ...targetBill,
-      total: newTotal,
       details: { ...targetBill.details, discount },
     };
 
@@ -64,11 +51,7 @@ export const useBills = ({
     }
 
     try {
-      await api.put(`/bill/${billId}/discount`, {
-        discount,
-        total: newTotal,
-        details: updatedBillData.details,
-      });
+      await api.put(`/bill/${billId}/discount`, { discount });
       await loadHouseData(selectedHouse?.id);
     } catch (error) {
       showToast('Đã có lỗi xảy ra ! (' + error.message + ')', 'error');

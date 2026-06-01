@@ -206,6 +206,13 @@ const PublicInvoiceReceipt = ({
   const bill = buildReceiptModel(session, invoice);
   const periodMonths = Number(bill.details.periodMonths) || 1;
   const isMultiMonthBill = periodMonths > 1;
+  const hasMonthlyFee = Number(bill.details.monthlyFee) > 0;
+  const feeItems = hasMonthlyFee ? [] : [
+    { label: 'Tiền nước', val: bill.details.water },
+    { label: 'Phí dịch vụ', val: bill.details.service || 0 },
+    { label: 'Internet', val: bill.details.internet || 0 },
+    { label: 'Xe điện', val: bill.details.ebikes || 0 },
+  ];
   const config = session.config || {};
   const bankBin = config.bankBin || '970422';
   const bankAcc = config.bankAcc || '0';
@@ -279,7 +286,7 @@ const PublicInvoiceReceipt = ({
             <span className="text-[13px] font-black text-slate-800">{formatN(bill.details.elec)}</span>
           </div>
 
-          {bill.heaterMeter && (
+          {bill.heaterMeter && Number(bill.details.heater) > 0 && (
             <div className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200">
               <div className="flex flex-col">
                 <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight leading-tight">Điện BNL Chung</span>
@@ -291,19 +298,14 @@ const PublicInvoiceReceipt = ({
             </div>
           )}
 
-          {[
-            { label: 'Tiền nước', val: bill.details.water },
-            { label: 'Phí dịch vụ', val: bill.details.service || 0 },
-            { label: 'Internet', val: bill.details.internet || 0 },
-            { label: 'Xe điện', val: bill.details.ebikes || 0 },
-          ].map((item) => (
+          {feeItems.map((item) => (
             <div key={item.label} className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200 last:border-0">
               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">{item.label}</span>
               <span className="text-[13px] font-black text-slate-800">{formatN(item.val)}</span>
             </div>
           ))}
 
-          {bill.details.monthlyFee > 0 && (
+          {hasMonthlyFee && (
             <div className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200 last:border-0">
               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Phí DV Hàng tháng (MBKD)</span>
               <span className="text-[13px] font-black text-slate-800">{formatN(bill.details.monthlyFee)}</span>

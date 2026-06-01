@@ -69,6 +69,13 @@ const BillReceipt = ({
     const details = bill.details || {};
     const periodMonths = Number(details.periodMonths) || 1;
     const isMultiMonthBill = periodMonths > 1;
+    const hasMonthlyFee = Number(details.monthlyFee) > 0;
+    const feeItems = hasMonthlyFee ? [] : [
+        { label: "Tiền nước", val: details.water },
+        { label: "Phí dịch vụ", val: details.service || 0 },
+        { label: "Internet", val: details.internet || 0 },
+        { label: "Xe điện", val: details.ebikes || 0 }
+    ];
     const isBillPaid = ['paid', 'completed', 'done'].includes(String(bill.status || '').toLowerCase());
     const canEditPendingBill = !isBillPaid;
     const meterImages = buildMeterImages(bill, API_URL)
@@ -166,7 +173,7 @@ const BillReceipt = ({
                                     <span className="text-[13px] font-black text-slate-800">{formatN(details.elec)}</span>
                                 </div>
 
-                                {bottomSheet.data.heaterMeter && (
+                                {bottomSheet.data.heaterMeter && Number(details.heater) > 0 && (
                                     <div className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200">
                                         <div className="flex flex-col">
                                             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight leading-tight">Điện BNL Chung</span>
@@ -178,19 +185,14 @@ const BillReceipt = ({
                                     </div>
                                 )}
 
-                                {[
-                                    { label: "Tiền nước", val: details.water },
-                                    { label: "Phí dịch vụ", val: details.service || 0 },
-                                    { label: "Internet", val: details.internet || 0 },
-                                    { label: "Xe điện", val: details.ebikes || 0 }
-                                ].map((item, idx) => (
+                                {feeItems.map((item, idx) => (
                                     <div key={idx} className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200 last:border-0">
                                         <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">{item.label}</span>
                                         <span className="text-[13px] font-black text-slate-800">{formatN(item.val)}</span>
                                     </div>
                                 ))}
 
-                                {details.monthlyFee > 0 && (
+                                {hasMonthlyFee && (
                                     <div className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200 last:border-0">
                                         <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Phí DV Hàng tháng (MBKD)</span>
                                         <span className="text-[13px] font-black text-slate-800">{formatN(details.monthlyFee)}</span>

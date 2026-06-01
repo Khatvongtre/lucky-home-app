@@ -107,17 +107,6 @@ const parseBills = (billsData = []) =>
     heaterMeter: bill.heaterMeter || (bill.heaterInfoJson ? JSON.parse(bill.heaterInfoJson) : null),
   }));
 
-const billBaseTotal = (details = {}) => (
-  (details.rent || 0)
-  + (details.elec || 0)
-  + (details.heater || 0)
-  + (details.water || 0)
-  + (details.internet || 0)
-  + (details.service || 0)
-  + (details.ebikes || 0)
-  + (details.monthlyFee || 0)
-);
-
 const billTimestamp = (bill = {}) => {
   const candidates = [bill.updatedAt, bill.createdAt, bill.paidAt, bill.date, bill.generatedAt];
   const timestamp = candidates
@@ -890,10 +879,8 @@ const HubView = ({
     const targetBill = houseBills.find(bill => bill.id === billId) || quickBillSheet?.data;
     if (!targetBill) return;
 
-    const newTotal = Math.max(0, billBaseTotal(targetBill.details) - discount);
     const updatedBillData = {
       ...targetBill,
-      total: newTotal,
       details: { ...targetBill.details, discount },
     };
 
@@ -904,12 +891,12 @@ const HubView = ({
     setQuickBillSheet(prev => prev?.data?.id === billId ? { ...prev, data: updatedBillData } : prev);
 
     try {
-      await api.put(`/bill/${billId}/discount`, {
-        discount,
-        total: newTotal,
-        details: updatedBillData.details,
-      });
-      await loadQuickBills(houseId, true);
+      await api.put(`/bill/${billId}/discount`, { discount });
+      const refreshedBills = await loadQuickBills(houseId, true);
+      const refreshedBill = refreshedBills.find(bill => bill.id === billId);
+      if (refreshedBill) {
+        setQuickBillSheet(prev => prev?.data?.id === billId ? { ...prev, data: refreshedBill } : prev);
+      }
       showToast?.('Đã cập nhật giảm giá hóa đơn.', 'success');
     } catch (error) {
       showToast?.(error.message || 'Không cập nhật được hóa đơn.', 'error');
@@ -1554,7 +1541,7 @@ const HubView = ({
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-[10px] font-black uppercase text-blue-800">
-                            {room.roomType === 'mbkd' ? 'MBKD ' : 'Phòng '}{roomCode}
+                            {room.roomType === 'mbkd' ? roomCode : `Phòng ${roomCode}`}
                           </p>
                           <div className="mt-0.5 flex flex-nowrap gap-1 overflow-x-auto no-scrollbar">
                             {missingBadges.map(badge => (
