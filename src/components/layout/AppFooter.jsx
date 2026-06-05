@@ -13,6 +13,7 @@ const AppFooter = ({
   setShowQuickMenu,
   setIsHubMode,
   selectedHouse,
+  setSelectedHouse,
   setEditingRoom,
   setIsAddRoomModalOpen,
   setIsAddTransactionModalOpen,
@@ -33,6 +34,7 @@ const AppFooter = ({
         setShowQuickMenu={setShowQuickMenu}
         setIsHubMode={setIsHubMode}
         selectedHouse={selectedHouse}
+        setSelectedHouse={setSelectedHouse}
       />
 
       <QuickMenu

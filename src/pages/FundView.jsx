@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CircleDollarSign, PieChart, Plus, TrendingDown, TrendingUp, Wallet, ChevronRight, GraduationCap, HeartHandshake, Plane, X, Settings2, Trash2, ChevronDown, Check, LayoutGrid, List, Search, ArrowRightLeft, Zap } from 'lucide-react';
+import { CircleDollarSign, PieChart, Plus, TrendingDown, TrendingUp, Wallet, ChevronRight, GraduationCap, HeartHandshake, Plane, X, Settings2, Trash2, ChevronDown, Check, LayoutGrid, List, Search, ArrowRightLeft, Zap, Home } from 'lucide-react';
 import { formatN, parseN } from '../utils/formatters';
 import { useFunds } from '../hooks/useFunds';
 
@@ -75,7 +75,7 @@ const getTransferTransactionKeys = (transactions) => {
     return transferKeys;
 };
 
-const FundView = ({ showToast = () => { }, requestConfirm = async () => window.confirm("Xác nhận?"), setActiveTab }) => {
+const FundView = ({ showToast = () => { }, requestConfirm = async () => window.confirm("Xác nhận?"), setActiveTab, setIsHubMode }) => {
     const { funds, transactions, saveFunds, saveTransactions, deleteTransaction } = useFunds({ showToast });
 
     const [isTxModalOpen, setIsTxModalOpen] = useState(false);
@@ -672,14 +672,23 @@ const FundView = ({ showToast = () => { }, requestConfirm = async () => window.c
 
             {/* Nút Nhập Siêu Tốc AI Floating */}
             <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg z-40 pointer-events-none">
-                <div className="bg-gradient-to-t from-slate-50 via-slate-50/95 to-transparent pt-8 pb-6 px-4 flex justify-center">
-                    <button onClick={() => {
-                        window.history.pushState({}, '', '/chitieu');
-                        if (setActiveTab) setActiveTab('fast_input');
-                        else window.location.href = '/chitieu';
-                    }} className="pointer-events-auto bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-8 py-3.5 rounded-full font-black text-[12px] uppercase tracking-widest transition-all flex items-center justify-center gap-2.5 shadow-[0_8px_30px_rgba(59,130,246,0.4)] border border-blue-400/50 active:scale-95 hover:scale-105">
-                        <Zap className="w-5 h-5 fill-yellow-400 text-yellow-400 animate-pulse" /> Nhập Siêu Tốc AI
-                    </button>
+                <div className="bg-gradient-to-t from-slate-50 via-slate-50/95 to-transparent pt-6 pb-4 px-8">
+                    <div className="pointer-events-auto mx-auto grid max-w-sm grid-cols-2 overflow-hidden rounded-full border border-blue-400/40 bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-[0_6px_20px_rgba(59,130,246,0.3)]">
+                        <button
+                            type="button"
+                            onClick={() => setIsHubMode?.(true)}
+                            className="flex items-center justify-center gap-1.5 border-r border-white/25 px-3 py-2.5 text-[9px] font-black uppercase tracking-wide transition-colors hover:bg-white/10 active:bg-white/20"
+                        >
+                            <Home className="h-3.5 w-3.5" /> Trang chủ
+                        </button>
+                        <button onClick={() => {
+                            window.history.pushState({}, '', '/chitieu');
+                            if (setActiveTab) setActiveTab('fast_input');
+                            else window.location.href = '/chitieu';
+                        }} className="flex items-center justify-center gap-1.5 px-3 py-2.5 text-[9px] font-black uppercase tracking-wide transition-colors hover:bg-white/10 active:bg-white/20">
+                            <Zap className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400 animate-pulse" /> Nhập siêu tốc
+                        </button>
+                    </div>
                 </div>
             </div>
 

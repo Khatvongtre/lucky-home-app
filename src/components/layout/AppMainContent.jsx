@@ -92,6 +92,7 @@ const AppMainContent = ({
             setBottomSheet={billsState.setBottomSheet}
             highlightedItemId={highlightedItemId}
             setHighlightedItemId={setHighlightedItemId}
+            setIsHubMode={setIsHubMode}
           />
         )}
 
@@ -161,6 +162,7 @@ const AppMainContent = ({
             setIsAddSavingModalOpen={savingsState.setIsAddSavingModalOpen}
             highlightedItemId={highlightedItemId}
             setHighlightedItemId={setHighlightedItemId}
+            setIsHubMode={setIsHubMode}
           />
         )}
 
@@ -169,6 +171,7 @@ const AppMainContent = ({
             showToast={showToast}
             requestConfirm={requestConfirm}
             setActiveTab={setActiveTab}
+            setIsHubMode={setIsHubMode}
           />
         )}
 
@@ -181,6 +184,7 @@ const AppMainContent = ({
             requestConfirm={requestConfirm}
             showToast={showToast}
             executeAiAction={aiState.executeAiAction}
+            setIsHubMode={setIsHubMode}
           />
         )}
 

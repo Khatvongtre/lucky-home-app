@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { CalendarDays, ChevronDown, PiggyBank, Landmark, X } from 'lucide-react';
+import { CalendarDays, ChevronDown, Home, PiggyBank, Landmark, X } from 'lucide-react';
 import { formatN } from '../utils/formatters';
 import { getSavingMaturityDate } from '../utils/date';
 
@@ -18,7 +18,8 @@ const SavingsView = ({
     setEditingSaving,
     setIsAddSavingModalOpen,
     highlightedItemId,
-    setHighlightedItemId
+    setHighlightedItemId,
+    setIsHubMode
 }) => {
     useEffect(() => {
         let scrollInterval;
@@ -101,7 +102,14 @@ const SavingsView = ({
                                         <input
                                             type={savingMaturityFilter?.to ? "date" : "text"}
                                             value={savingMaturityFilter?.to || ''}
-                                            onFocus={(e) => { e.target.type = 'date'; try { e.target.showPicker?.(); } catch (err) { } }}
+                                            onFocus={(e) => {
+                                                e.target.type = 'date';
+                                                try {
+                                                    e.target.showPicker?.();
+                                                } catch {
+                                                    // Some mobile browsers do not allow opening the picker programmatically.
+                                                }
+                                            }}
                                             onBlur={(e) => { if (!e.target.value) e.target.type = 'text'; }}
                                             onChange={(e) => setSavingMaturityFilter({ to: e.target.value })}
                                             placeholder="Ngày đáo hạn"
@@ -321,6 +329,19 @@ const SavingsView = ({
                         </div>
                     )
                 })}
+            </div>
+
+            <div className="fixed bottom-0 left-1/2 z-40 w-full max-w-lg -translate-x-1/2 pointer-events-none">
+                <div className="bg-gradient-to-t from-slate-50 via-slate-50/95 to-transparent px-8 pb-4 pt-6">
+                    <button
+                        type="button"
+                        onClick={() => setIsHubMode?.(true)}
+                        className="pointer-events-auto mx-auto flex min-w-36 items-center justify-center gap-1.5 rounded-full border border-emerald-400/40 bg-gradient-to-r from-emerald-500 to-teal-600 px-5 py-2.5 text-[9px] font-black uppercase tracking-wide text-white shadow-[0_6px_20px_rgba(16,185,129,0.28)] transition-all hover:brightness-105 active:scale-95"
+                    >
+                        <Home className="h-3.5 w-3.5" />
+                        Trang chủ
+                    </button>
+                </div>
             </div>
         </div>
     );

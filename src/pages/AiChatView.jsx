@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { Loader2, Sparkles, Bot, Trash2 } from 'lucide-react';
 import { api } from '../services/api';
 import AiMessageItem from '../components/ai/AiMessageItem';
@@ -7,9 +7,15 @@ import { INITIAL_AI_MESSAGES } from '../utils/aiChat';
 import '../styles/AiChat.css';
 
 
-const AiChatView = ({ aiMessages, isAiLoading, handleAiChat, setAiMessages, requestConfirm, showToast, executeAiAction }) => {
+const AiChatView = ({ aiMessages, isAiLoading, handleAiChat, setAiMessages, requestConfirm, showToast, executeAiAction, setIsHubMode }) => {
     const messagesEndRef = useRef(null);
     const hasFetched = useRef(false);
+    const homeDragRef = useRef({ startY: 0, startPosition: 50, moved: false });
+    const suppressHomeClickRef = useRef(false);
+    const [homePosition, setHomePosition] = useState(() => {
+        const savedPosition = Number(localStorage.getItem('ai-home-button-position'));
+        return Number.isFinite(savedPosition) && savedPosition >= 12 && savedPosition <= 88 ? savedPosition : 50;
+    });
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -18,6 +24,10 @@ const AiChatView = ({ aiMessages, isAiLoading, handleAiChat, setAiMessages, requ
     useEffect(() => {
         scrollToBottom();
     }, [aiMessages, isAiLoading]);
+
+    useEffect(() => {
+        localStorage.setItem('ai-home-button-position', String(homePosition));
+    }, [homePosition]);
 
     useEffect(() => {
         const fetchHistory = async () => {
@@ -67,6 +77,29 @@ const AiChatView = ({ aiMessages, isAiLoading, handleAiChat, setAiMessages, requ
             }
         } else if (window.confirm("Bạn có chắc muốn xóa lịch sử trò chuyện?")) {
             await performDelete();
+        }
+    };
+
+    const handleHomePointerDown = (event) => {
+        event.currentTarget.setPointerCapture(event.pointerId);
+        homeDragRef.current = { startY: event.clientY, startPosition: homePosition, moved: false };
+    };
+
+    const handleHomePointerMove = (event) => {
+        if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+        const containerHeight = event.currentTarget.parentElement?.getBoundingClientRect().height || window.innerHeight;
+        const deltaPercent = ((event.clientY - homeDragRef.current.startY) / containerHeight) * 100;
+        if (Math.abs(event.clientY - homeDragRef.current.startY) > 4) homeDragRef.current.moved = true;
+        setHomePosition(Math.min(88, Math.max(12, homeDragRef.current.startPosition + deltaPercent)));
+    };
+
+    const handleHomePointerUp = (event) => {
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+        }
+        if (homeDragRef.current.moved) {
+            suppressHomeClickRef.current = true;
+            window.setTimeout(() => { suppressHomeClickRef.current = false; }, 0);
         }
     };
 
@@ -129,6 +162,23 @@ const AiChatView = ({ aiMessages, isAiLoading, handleAiChat, setAiMessages, requ
                 onSubmit={(text, img) => handleAiChat(text, img)}
                 showToast={showToast}
             />
+
+            <button
+                type="button"
+                onClick={() => {
+                    if (!suppressHomeClickRef.current) setIsHubMode?.(true);
+                }}
+                onPointerDown={handleHomePointerDown}
+                onPointerMove={handleHomePointerMove}
+                onPointerUp={handleHomePointerUp}
+                onPointerCancel={handleHomePointerUp}
+                style={{ top: `${homePosition}%` }}
+                className="absolute left-0 z-30 flex -translate-y-1/2 touch-none cursor-ns-resize select-none items-center rounded-r-xl border border-l-0 border-indigo-200 bg-white/95 px-2 py-3 text-[8px] font-black uppercase tracking-widest text-indigo-600 shadow-[4px_4px_16px_rgba(79,70,229,0.18)] backdrop-blur transition-colors hover:bg-indigo-50 active:bg-indigo-100 [writing-mode:vertical-rl]"
+                aria-label="Về trang chủ"
+                title="Trang chủ"
+            >
+                Trang chủ
+            </button>
         </div >
     );
 };

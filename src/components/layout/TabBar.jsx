@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Home, Boxes, FileText, Wallet, Sparkles, Plus } from 'lucide-react';
+import { LayoutDashboard, LayoutGrid, Home, Boxes, FileText, Wallet, Sparkles, Plus } from 'lucide-react';
 
 const TabBar = ({
     activeTab,
@@ -10,13 +10,14 @@ const TabBar = ({
     showQuickMenu,
     setShowQuickMenu,
     setIsHubMode,
-    selectedHouse
+    selectedHouse,
+    setSelectedHouse,
 }) => {
     return (
         <div className="fixed bottom-0 left-1/2 z-[70] w-full max-w-lg -translate-x-1/2 pointer-events-none">
             <div className="h-14 bg-white border-x border-t border-slate-100 flex items-center justify-around px-2 pointer-events-auto shadow-[0_-5px_15px_rgba(0,0,0,0.05)]">
                 {[
-                    { id: 'dashboard', icon: LayoutDashboard, label: 'Trang chủ' },
+                    { id: 'dashboard', icon: LayoutDashboard, label: 'Tổng quan' },
                     shouldShowMeterBanner
                         ? { id: 'meters_list', icon: Boxes, label: 'Chốt số' }
                         : { id: 'rooms', icon: Home, label: 'Phòng' },
@@ -27,14 +28,28 @@ const TabBar = ({
                 ].filter(i => !i.hidden).map((item, i) => (
                     item.id === 'spacer' ? <div key={i} className="w-12" /> : (
                         <button key={item.id} onClick={() => {
+                            if (activeTab === item.id) {
+                                setIsHubMode?.(true);
+                                setSelectedHouse?.(null);
+                                setActiveTab('dashboard');
+                                setSearchQuery("");
+                                setShowQuickMenu(false);
+                                return;
+                            }
                             if (!selectedHouse && item.id !== 'ai' && setIsHubMode) {
                                 setIsHubMode(true);
                             }
                             setActiveTab(item.id);
                             setSearchQuery("");
                         }} className={`flex flex-col items-center justify-center px-1 transition-all ${activeTab === item.id ? 'text-blue-600 scale-105' : 'text-slate-400 opacity-60'}`}>
-                            <div className={`p-1.5 rounded-lg ${activeTab === item.id ? 'bg-blue-50 shadow-inner' : ''} flex items-center justify-center`}><item.icon className="w-4.5 h-4.5" strokeWidth={activeTab === item.id ? 3 : 2} /></div>
-                            <span className={`text-[6px] font-black uppercase mt-1 transition-all ${activeTab === item.id ? 'opacity-100' : 'opacity-0'}`}>{item.label}</span>
+                            <div className={`p-1.5 rounded-lg ${activeTab === item.id ? 'bg-blue-50 shadow-inner' : ''} flex items-center justify-center`}>
+                                {activeTab === item.id
+                                    ? <LayoutGrid className="w-4.5 h-4.5" strokeWidth={3} />
+                                    : <item.icon className="w-4.5 h-4.5" strokeWidth={2} />}
+                            </div>
+                            <span className={`text-[6px] font-black uppercase mt-1 transition-all ${activeTab === item.id ? 'opacity-100' : 'opacity-0'}`}>
+                                {activeTab === item.id ? 'Tổng quan' : item.label}
+                            </span>
                         </button>
                     )
                 ))}

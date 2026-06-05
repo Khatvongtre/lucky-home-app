@@ -2,7 +2,7 @@ import React from 'react';
 import {
   Building2, User, TrendingUp, Sparkles, ChevronRight,
   CircleDollarSign, PiggyBank, PlusCircle, LogOut,
-  AlertTriangle, Zap, Receipt, FileText, QrCode, Loader2, Download, ChevronDown, X, Hexagon, CheckCircle2, Users2, Bike, CreditCard, Smile, Frown, Eye, EyeOff, Info
+  AlertTriangle, Zap, Receipt, FileText, QrCode, Loader2, Download, ChevronDown, X, Hexagon, CheckCircle2, Users2, Bike, CreditCard, Smile, Frown, Info
 } from 'lucide-react';
 import { formatN, parseN } from '../utils/formatters';
 import ToastNotification from '../components/common/Toast';
@@ -1309,28 +1309,33 @@ const HubView = ({
                   item.action();
                 }
               }}
-              className={`${item.tone} flex min-h-[66px] cursor-pointer items-center gap-2 rounded-xl border p-2.5 text-left shadow-md transition-all active:scale-[0.98]`}
+              className={`${item.tone} relative flex min-h-[66px] cursor-pointer items-center gap-2 rounded-xl border p-2.5 text-left shadow-md transition-all active:scale-[0.98]`}
             >
               <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl shadow-sm ${item.iconTone}`}>
                 <item.icon className="h-5 w-5" />
               </div>
-              <div className="min-w-0 flex-1">
-                <h3 className="truncate text-[11px] font-black uppercase leading-tight">{item.label}</h3>
-                <p className="mt-0.5 truncate text-[9px] font-bold opacity-70">{item.desc}</p>
-              </div>
-              {item.isPrivate && (
+              {item.isPrivate ? (
                 <button
                   type="button"
                   onClick={event => {
                     event.stopPropagation();
                     setIsSavingTotalVisible(visible => !visible);
                   }}
-                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/70 text-emerald-700 shadow-sm active:scale-95"
+                  className="flex min-h-10 min-w-0 flex-1 flex-col justify-center rounded-lg px-1 text-left transition-colors active:bg-white/50"
                   aria-label={isSavingTotalVisible ? 'Ẩn số tiền tiết kiệm' : 'Hiện số tiền tiết kiệm'}
-                  title={isSavingTotalVisible ? 'Ẩn số tiền' : 'Hiện số tiền'}
+                  title={isSavingTotalVisible ? 'Bấm để ẩn số tiền' : 'Bấm để hiện số tiền'}
                 >
-                  {isSavingTotalVisible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                  <h3 className="truncate text-[11px] font-black uppercase leading-tight">{item.label}</h3>
+                  <span className="mt-0.5 break-all text-[8px] font-bold leading-tight opacity-70">{item.desc}</span>
+                  <span className="mt-0.5 text-[6px] font-black uppercase tracking-wide opacity-50">
+                    {isSavingTotalVisible ? 'Chạm để ẩn' : 'Chạm để hiện'}
+                  </span>
                 </button>
+              ) : (
+                <div className="min-w-0 flex-1">
+                  <h3 className="truncate text-[11px] font-black uppercase leading-tight">{item.label}</h3>
+                  <p className="mt-0.5 truncate text-[9px] font-bold opacity-70">{item.desc}</p>
+                </div>
               )}
             </div>
           ))}

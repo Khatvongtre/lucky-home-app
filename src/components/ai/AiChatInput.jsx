@@ -83,7 +83,7 @@ const AiChatInput = ({ isAiLoading, onSubmit, showToast }) => {
     };
 
     return (
-        <div className="p-3 pb-6 bg-white border-t border-slate-100 shrink-0 relative z-10 shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.05)]">
+        <div className="px-3 pt-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] bg-white border-t border-slate-100 shrink-0 relative z-10 shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.05)]">
             <div className={`relative flex flex-col gap-2 bg-slate-50 border border-slate-200 rounded-2xl p-1.5 focus-within:border-blue-500 focus-within:ring-4 focus-within:ring-blue-50 transition-all shadow-sm ${imagePreview ? 'pt-2.5' : ''}`}>
                 {imagePreview && (
                     <div className="relative w-16 h-16 ml-2 rounded-xl overflow-hidden border border-slate-200 shadow-sm shrink-0 group">
