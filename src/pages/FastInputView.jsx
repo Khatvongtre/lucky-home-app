@@ -67,12 +67,10 @@ const FastInputView = ({ setActiveTab, setIsHubMode, showToast, isStandalone = f
         return () => { isMounted = false; };
     }, [showToast]);
 
-    // Tự động mở bàn phím số Numpad nếu số tiền đang trống
-    useEffect(() => {
-        if (parsedResult && !parsedResult.amount && !activeField) {
-            setActiveField('amount');
-        }
-    }, [activeField, parsedResult]);
+    const showParsedResult = (result) => {
+        setParsedResult(result);
+        setActiveField(result.amount ? null : 'amount');
+    };
 
     // Xử lý phím bấm trên Numpad ảo
     const handleNumpadClick = (key) => {
@@ -216,7 +214,7 @@ const FastInputView = ({ setActiveTab, setIsHubMode, showToast, isStandalone = f
                 if (found) matchedFundId = found.id;
             }
 
-            setParsedResult({
+            showParsedResult({
                 type: res.type || 'out',
                 amount: res.amount || 0,
                 note: res.note || inputText || 'Giao dịch bóc tách bằng AI',
@@ -352,21 +350,30 @@ const FastInputView = ({ setActiveTab, setIsHubMode, showToast, isStandalone = f
                     </div>
 
                     {/* BOTTOM MANUAL ACTION BAR */}
-                    <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-md bg-slate-800/90 backdrop-blur-xl border border-slate-700 p-2 rounded-2xl flex items-center gap-2 shadow-2xl z-40">
+                    <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-md bg-slate-800/90 backdrop-blur-xl border border-slate-700 p-2 rounded-2xl grid grid-cols-4 gap-1.5 shadow-2xl z-40">
                         <button
                             onClick={handleGoHub}
-                            className="h-10 w-10 bg-white text-blue-700 rounded-full active:scale-95 flex items-center justify-center shrink-0 [-webkit-tap-highlight-color:transparent]"
+                            className="min-w-0 px-1 py-2.5 bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 rounded-xl active:scale-95 flex items-center justify-center gap-1 text-[9px] font-black uppercase tracking-wide transition-colors [-webkit-tap-highlight-color:transparent]"
                             aria-label="Về trang chính"
                             title="Về trang chính"
                         >
-                            <Home className="w-4 h-4" />
+                            <Home className="w-3.5 h-3.5 shrink-0" />
+                            <span className="truncate">Trang chủ</span>
                         </button>
-                        <div className="flex flex-1 gap-2 min-w-0">
-                            <button onClick={() => setParsedResult({ type: 'in', amount: '', note: '', fundId: funds.length > 0 ? funds[0].id : 1, isManual: true })} className="flex-1 px-2 py-2.5 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 rounded-xl active:scale-95 flex items-center justify-center gap-1.5 text-xs font-black uppercase tracking-widest transition-colors">
+                        <div className="contents">
+                            <button onClick={() => showParsedResult({ type: 'in', amount: '', note: '', fundId: funds.length > 0 ? funds[0].id : 1, isManual: true })} className="min-w-0 px-1 py-2.5 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 rounded-xl active:scale-95 flex items-center justify-center text-[9px] font-black uppercase tracking-wide transition-colors">
                                 + Thu
                             </button>
-                            <button onClick={() => setParsedResult({ type: 'out', amount: '', note: '', fundId: funds.length > 0 ? funds[0].id : 1, isManual: true })} className="flex-1 px-2 py-2.5 bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 rounded-xl active:scale-95 flex items-center justify-center gap-1.5 text-xs font-black uppercase tracking-widest transition-colors">
+                            <button onClick={() => showParsedResult({ type: 'out', amount: '', note: '', fundId: funds.length > 0 ? funds[0].id : 1, isManual: true })} className="min-w-0 px-1 py-2.5 bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 rounded-xl active:scale-95 flex items-center justify-center text-[9px] font-black uppercase tracking-wide transition-colors">
                                 - Chi
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleClose}
+                                className="min-w-0 px-1 py-2.5 bg-slate-700/80 text-slate-300 hover:bg-slate-700 rounded-xl active:scale-95 flex items-center justify-center gap-1 text-[9px] font-black uppercase tracking-wide transition-colors"
+                            >
+                                <X className="w-3.5 h-3.5 shrink-0" />
+                                <span className="truncate">Đóng</span>
                             </button>
                         </div>
                     </div>

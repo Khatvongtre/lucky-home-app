@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronLeft, LogOut, Search, Building2, MapPin, Share2, Edit, Trash2, Calendar, PlusCircle, Sparkles, User, UserCheck, FileText, Save } from 'lucide-react';
+import { ChevronLeft, Home, LogOut, Search, Building2, MapPin, Share2, Edit, Trash2, Calendar, PlusCircle, Sparkles, User, UserCheck, FileText, Save } from 'lucide-react';
 import { formatN } from '../utils/formatters';
 import ToastNotification from '../components/common/Toast';
 import ConfirmDialog from '../components/common/ConfirmDialog';
@@ -137,8 +137,11 @@ const HouseSelectionView = ({
                         {/* LEFT */}
                         <div className="flex items-center space-x-2 z-10">
                             <button
+                                type="button"
                                 onClick={() => setIsHubMode(true)}
                                 className="text-slate-600 hover:bg-slate-200 rounded-lg transition-all active:scale-95"
+                                aria-label="Quay lại Hub"
+                                title="Quay lại Hub"
                             >
                                 <ChevronLeft className="w-5 h-5" />
                             </button>
@@ -208,7 +211,7 @@ const HouseSelectionView = ({
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto no-scrollbar px-3 pt-3 pb-28 space-y-2.5 relative">
+                <div className="flex-1 overflow-y-auto no-scrollbar px-3 pt-3 pb-16 space-y-2.5 relative">
                     {filteredHouses.length === 0 && (
                         <p className="text-xs text-slate-400 italic text-center mt-8">Không tìm thấy cơ sở nào.</p>
                     )}
@@ -302,22 +305,37 @@ const HouseSelectionView = ({
                     })}
                 </div>
 
-                <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-slate-50 via-slate-50 to-transparent z-30 pointer-events-none">
-                    <div className="flex flex-col gap-2 pointer-events-auto">
+                <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-slate-50 via-slate-50/95 to-transparent z-30 pointer-events-none">
+                    <div className="grid grid-cols-3 gap-1 rounded-xl border border-slate-200/90 bg-white/95 p-1 shadow-lg shadow-slate-900/10 backdrop-blur-xl pointer-events-auto">
+                        <button
+                            type="button"
+                            onClick={() => setIsHubMode(true)}
+                            className="group min-w-0 rounded-lg border border-blue-100 bg-blue-50 px-1 py-1.5 text-blue-700 transition-all hover:bg-blue-100 active:scale-95"
+                        >
+                            <span className="mx-auto flex h-6 w-6 items-center justify-center rounded-md bg-blue-600 text-white shadow-sm shadow-blue-200">
+                                <Home className="h-3 w-3" />
+                            </span>
+                            <span className="mt-0.5 block truncate text-center text-[7px] font-black uppercase tracking-wide">Trang chủ</span>
+                        </button>
+
                         <button
                             onClick={() => { setEditingHouse(null); setIsAiCreateHouseOpen(true); }}
-                            className="w-full bg-blue-600 text-white py-2.5 rounded-xl flex items-center justify-center active:scale-95 border-b-[3px] border-blue-800 transition-all gap-2"
+                            className="group min-w-0 rounded-lg border border-indigo-100 bg-indigo-50 px-1 py-1.5 text-indigo-700 transition-all hover:bg-indigo-100 active:scale-95"
                         >
-                            <PlusCircle className="w-4 h-4 text-white" />
-                            <span className="font-black text-[10px] uppercase tracking-widest mt-0.5">Thêm cơ sở mới</span>
+                            <span className="mx-auto flex h-6 w-6 items-center justify-center rounded-md bg-indigo-600 text-white shadow-sm shadow-indigo-200">
+                                <PlusCircle className="h-3 w-3" />
+                            </span>
+                            <span className="mt-0.5 block truncate text-center text-[7px] font-black uppercase tracking-wide">Thêm cơ sở</span>
                         </button>
 
                         <button
                             onClick={() => { setIsAiPromptModalOpen(true); setAiPrompt(""); setIsListening(false); }}
-                            className="w-full bg-slate-800 text-white py-2.5 rounded-xl flex items-center justify-center active:scale-95 border-b-[3px] border-slate-900 transition-all gap-2"
+                            className="group min-w-0 rounded-lg border border-violet-100 bg-violet-50 px-1 py-1.5 text-violet-700 transition-all hover:bg-violet-100 active:scale-95"
                         >
-                            <Sparkles className="w-4 h-4 text-indigo-300" />
-                            <span className="font-black text-[10px] uppercase tracking-widest mt-0.5">Tạo nhanh bằng AI</span>
+                            <span className="mx-auto flex h-6 w-6 items-center justify-center rounded-md bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-sm shadow-violet-200">
+                                <Sparkles className="h-3 w-3" />
+                            </span>
+                            <span className="mt-0.5 block truncate text-center text-[7px] font-black uppercase tracking-wide">Tạo bằng AI</span>
                         </button>
                     </div>
                 </div>

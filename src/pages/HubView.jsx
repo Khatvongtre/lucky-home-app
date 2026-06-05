@@ -2,7 +2,7 @@ import React from 'react';
 import {
   Building2, User, TrendingUp, Sparkles, ChevronRight,
   CircleDollarSign, PiggyBank, PlusCircle, LogOut,
-  AlertTriangle, Zap, Receipt, FileText, QrCode, Loader2, Download, ChevronDown, X, Hexagon, CheckCircle2, Share2, Users2, Bike, CreditCard, Smile, Frown
+  AlertTriangle, Zap, Receipt, FileText, QrCode, Loader2, Download, ChevronDown, X, Hexagon, CheckCircle2, Users2, Bike, CreditCard, Smile, Frown, Eye, EyeOff, Info
 } from 'lucide-react';
 import { formatN, parseN } from '../utils/formatters';
 import ToastNotification from '../components/common/Toast';
@@ -11,7 +11,7 @@ import MeterReadingLinkQrModal, { buildMeterReadingQrCardDataUrl } from '../comp
 import BillReceipt from '../components/bills/BillReceipt';
 import { api } from '../services/api';
 import { getApiBaseUrl } from '../services/apiServer';
-import { shareDataUrlImage, shareElementImage } from '../utils/imageExport';
+import { shareElementImage } from '../utils/imageExport';
 import { getMeterReadingDueState } from '../utils/date';
 
 const FE_BASE_URL = (import.meta.env.VITE_FE_URL || window.location.origin).replace(/\/+$/g, '');
@@ -181,7 +181,6 @@ const HubView = ({
   const [linkLoadingRoomId, setLinkLoadingRoomId] = React.useState(null);
   const [readingLoadingRoomId, setReadingLoadingRoomId] = React.useState(null);
   const [billLoadingRoomId, setBillLoadingRoomId] = React.useState(null);
-  const [downloadLoadingRoomId, setDownloadLoadingRoomId] = React.useState(null);
   const [isDownloadingHouseQr, setIsDownloadingHouseQr] = React.useState(false);
   const [isGeneratingBillImage, setIsGeneratingBillImage] = React.useState(false);
   const [isQuickQrExpanded, setIsQuickQrExpanded] = React.useState(false);
@@ -198,6 +197,7 @@ const HubView = ({
   const [hubFunds, setHubFunds] = React.useState([]);
   const [hubSavings, setHubSavings] = React.useState([]);
   const [hubMonthlyStats, setHubMonthlyStats] = React.useState(null);
+  const [isSavingTotalVisible, setIsSavingTotalVisible] = React.useState(false);
 
   const hubStats = houses.reduce((acc, h) => {
     const revenue = Number(h.revenue) || 0;
@@ -957,33 +957,14 @@ const HubView = ({
     }
   };
 
-  const shareRoomQr = async (room) => {
-    try {
-      setDownloadLoadingRoomId(room.id);
-      const link = await getMeterReadingLink(room);
-      const houseLabel = getHouseLabel(selectedQuickHouse);
-      const roomLabel = getRoomCode(room);
-      const { cardDataUrl } = await buildMeterReadingQrCardDataUrl({
-        link,
-        label: getRoomLinkLabel(room, selectedQuickHouse),
-        houseLabel,
-        roomLabel: `Phòng ${roomLabel}`,
-      });
-      const shareMode = await shareDataUrlImage({
-        dataUrl: cardDataUrl,
-        fileName: `${getSafeFileName(houseLabel, `Phòng ${roomLabel}`)}-QR.png`,
-        title: `QR phòng ${roomLabel}`,
-        dialogTitle: 'Chia sẻ QR qua Zalo',
-      });
-      showToast?.(
-        shareMode === 'clipboard' ? 'Đã copy ảnh QR vào clipboard.' : 'Đã mở chia sẻ. Chọn Zalo để gửi QR.',
-        'success'
-      );
-    } catch (error) {
-      showToast?.(error.message || 'Không chia sẻ được QR phòng này.', 'error');
-    } finally {
-      setDownloadLoadingRoomId(null);
-    }
+  const handleOpenRoomDetails = (room) => {
+    if (!selectedQuickHouse) return;
+    setSelectedHouse(selectedQuickHouse);
+    setConfig({ ...selectedQuickHouse });
+    setSearchQuery('');
+    setHighlightedItemId?.(room.id || room.roomCode);
+    setIsHubMode(false);
+    setActiveTab('rooms');
   };
 
   const downloadAllHouseQr = async () => {
@@ -1314,10 +1295,22 @@ const HubView = ({
           {[
             { label: 'Quản lý cơ sở', desc: `${hubStats.totalHouses} cơ sở`, icon: Building2, tone: 'border-blue-200 bg-blue-50 text-blue-800 shadow-blue-100/70', iconTone: 'bg-blue-600 text-white shadow-blue-200', action: () => { setIsHubMode(false); setActiveTab('dashboard'); } },
             { label: 'Sổ chi tiêu', desc: hubFunds.length ? `${formatN(hubFundTotal)} đ` : 'Quản lý sổ quỹ', icon: CircleDollarSign, tone: 'border-amber-200 bg-amber-50 text-amber-900 shadow-amber-100/70', iconTone: 'bg-amber-500 text-white shadow-amber-200', action: () => { setIsHubMode(false); setActiveTab('fund'); setSelectedHouse(null); } },
-            { label: 'Sổ tiết kiệm', desc: hubSavings.length ? `${formatN(hubSavingTotal)} đ` : 'Theo dõi tiền gửi', icon: PiggyBank, tone: 'border-emerald-200 bg-emerald-50 text-emerald-800 shadow-emerald-100/70', iconTone: 'bg-emerald-500 text-white shadow-emerald-200', action: () => { setIsHubMode(false); setActiveTab('savings'); setSelectedHouse(null); } },
+            { label: 'Sổ tiết kiệm', desc: hubSavings.length ? (isSavingTotalVisible ? `${formatN(hubSavingTotal)} đ` : '••••••••') : 'Theo dõi tiền gửi', icon: PiggyBank, tone: 'border-emerald-200 bg-emerald-50 text-emerald-800 shadow-emerald-100/70', iconTone: 'bg-emerald-500 text-white shadow-emerald-200', isPrivate: hubSavings.length > 0, action: () => { setIsHubMode(false); setActiveTab('savings'); setSelectedHouse(null); } },
             { label: 'AI Chat', desc: 'Hỗ trợ thao tác', icon: Sparkles, tone: 'border-indigo-200 bg-indigo-50 text-indigo-800 shadow-indigo-100/70', iconTone: 'bg-indigo-500 text-white shadow-indigo-200', action: () => { setIsHubMode(false); setActiveTab('ai'); setSelectedHouse(null); } }
           ].map(item => (
-            <button key={item.label} type="button" onClick={item.action} className={`${item.tone} flex min-h-[66px] items-center gap-2 rounded-xl border p-2.5 text-left shadow-md transition-all active:scale-[0.98]`}>
+            <div
+              key={item.label}
+              role="button"
+              tabIndex={0}
+              onClick={item.action}
+              onKeyDown={event => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  item.action();
+                }
+              }}
+              className={`${item.tone} flex min-h-[66px] cursor-pointer items-center gap-2 rounded-xl border p-2.5 text-left shadow-md transition-all active:scale-[0.98]`}
+            >
               <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl shadow-sm ${item.iconTone}`}>
                 <item.icon className="h-5 w-5" />
               </div>
@@ -1325,7 +1318,21 @@ const HubView = ({
                 <h3 className="truncate text-[11px] font-black uppercase leading-tight">{item.label}</h3>
                 <p className="mt-0.5 truncate text-[9px] font-bold opacity-70">{item.desc}</p>
               </div>
-            </button>
+              {item.isPrivate && (
+                <button
+                  type="button"
+                  onClick={event => {
+                    event.stopPropagation();
+                    setIsSavingTotalVisible(visible => !visible);
+                  }}
+                  className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white/70 text-emerald-700 shadow-sm active:scale-95"
+                  aria-label={isSavingTotalVisible ? 'Ẩn số tiền tiết kiệm' : 'Hiện số tiền tiết kiệm'}
+                  title={isSavingTotalVisible ? 'Ẩn số tiền' : 'Hiện số tiền'}
+                >
+                  {isSavingTotalVisible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                </button>
+              )}
+            </div>
           ))}
         </section>
 
@@ -1520,7 +1527,6 @@ const HubView = ({
                   const isLoading = linkLoadingRoomId === room.id;
                   const isOpeningReading = readingLoadingRoomId === room.id;
                   const isOpeningBill = billLoadingRoomId === room.id;
-                  const isDownloading = downloadLoadingRoomId === room.id;
                   const roomCode = getRoomCode(room);
                   const roomBill = getQuickRoomBill(room);
                   const roomMeters = getQuickRoomMeters(room);
@@ -1590,12 +1596,13 @@ const HubView = ({
                       </button>
                       <button
                         type="button"
-                        onClick={() => shareRoomQr(room)}
-                        disabled={isLoading || isOpeningReading || isOpeningBill || isDownloading || isDownloadingHouseQr}
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-teal-100 bg-teal-50 text-teal-700 active:scale-95 disabled:opacity-60"
-                        aria-label={`Chia sẻ QR phòng ${roomCode} qua Zalo`}
+                        onClick={() => handleOpenRoomDetails(room)}
+                        disabled={isLoading || isOpeningReading || isOpeningBill || isDownloadingHouseQr}
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-indigo-100 bg-indigo-50 text-indigo-600 shadow-sm active:scale-95 disabled:opacity-60"
+                        aria-label={`Xem chi tiết phòng ${roomCode}`}
+                        title="Xem chi tiết phòng"
                       >
-                        {isDownloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}
+                        <Info className="h-4 w-4" />
                       </button>
                     </div>
                   );

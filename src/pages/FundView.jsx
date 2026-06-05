@@ -29,6 +29,51 @@ const BORDER_BY_TEXT = {
 };
 
 const getFundBorder = (fund) => BORDER_BY_TEXT[fund.text] || 'border-slate-200';
+const hasTransferMarker = (transaction) => (
+    transaction.isTransfer === true
+    || Boolean(transaction.transferId)
+    || transaction.transactionType === 'transfer'
+    || transaction.note?.startsWith('Chuyển sang ')
+    || transaction.note?.startsWith('Nhận từ ')
+);
+
+const getTransactionKey = (transaction, index) => transaction.id ?? `index-${index}`;
+
+const getTransferTransactionKeys = (transactions) => {
+    const transferKeys = new Set();
+
+    transactions.forEach((transaction, index) => {
+        if (hasTransferMarker(transaction)) {
+            transferKeys.add(getTransactionKey(transaction, index));
+        }
+    });
+
+    transactions.forEach((transaction, index) => {
+        const transactionKey = getTransactionKey(transaction, index);
+        if (transferKeys.has(transactionKey)) return;
+
+        const matchingIndex = transactions.findIndex((candidate, candidateIndex) => {
+            if (candidateIndex === index) return false;
+            if (transferKeys.has(getTransactionKey(candidate, candidateIndex))) return false;
+            if (candidate.type === transaction.type || candidate.amount !== transaction.amount) return false;
+            if (String(candidate.fundId) === String(transaction.fundId)) return false;
+            if (!transaction.note || transaction.note !== candidate.note) return false;
+
+            const transactionTime = new Date(transaction.date).getTime();
+            const candidateTime = new Date(candidate.date).getTime();
+            return Number.isFinite(transactionTime)
+                && Number.isFinite(candidateTime)
+                && Math.abs(transactionTime - candidateTime) <= 60_000;
+        });
+
+        if (matchingIndex >= 0) {
+            transferKeys.add(transactionKey);
+            transferKeys.add(getTransactionKey(transactions[matchingIndex], matchingIndex));
+        }
+    });
+
+    return transferKeys;
+};
 
 const FundView = ({ showToast = () => { }, requestConfirm = async () => window.confirm("Xác nhận?"), setActiveTab }) => {
     const { funds, transactions, saveFunds, saveTransactions, deleteTransaction } = useFunds({ showToast });
@@ -56,13 +101,21 @@ const FundView = ({ showToast = () => { }, requestConfirm = async () => window.c
     const txFilterLabels = { all: 'Tất cả', in: 'Thu', out: 'Chi' };
 
     const totalBalance = funds.reduce((sum, fund) => sum + fund.balance, 0);
-    const totalIncome = transactions.filter(t => t.type === 'in').reduce((sum, t) => sum + t.amount, 0);
-    const totalExpense = transactions.filter(t => t.type === 'out').reduce((sum, t) => sum + t.amount, 0);
+    const transferTransactionKeys = getTransferTransactionKeys(transactions);
+    const totalIncome = transactions
+        .filter((t, index) => t.type === 'in' && !transferTransactionKeys.has(getTransactionKey(t, index)))
+        .reduce((sum, t) => sum + t.amount, 0);
+    const totalExpense = transactions
+        .filter((t, index) => t.type === 'out' && !transferTransactionKeys.has(getTransactionKey(t, index)))
+        .reduce((sum, t) => sum + t.amount, 0);
 
-    const fundStats = transactions.reduce((stats, tx) => {
+    const fundStats = transactions.reduce((stats, tx, index) => {
         const current = stats[tx.fundId] || { initial: 0, spent: 0 };
         if (tx.type === 'in') current.initial += tx.amount;
-        if (tx.type === 'out') current.spent += tx.amount;
+        if (tx.type === 'out') {
+            if (transferTransactionKeys.has(getTransactionKey(tx, index))) current.initial -= tx.amount;
+            else current.spent += tx.amount;
+        }
         stats[tx.fundId] = current;
         return stats;
     }, {});
@@ -98,8 +151,10 @@ const FundView = ({ showToast = () => { }, requestConfirm = async () => window.c
                     return showToast(`Hũ ${fromFund.name} không đủ số dư! (Còn ${formatN(fromFund.balance)}đ)`, "error");
                 }
 
-                newTxs.push({ type: 'out', amount: amount, fundId: fromFund.id, note: txForm.note || `Chuyển sang ${toFund.name}` });
-                newTxs.push({ type: 'in', amount: amount, fundId: toFund.id, note: txForm.note || `Nhận từ ${fromFund.name}` });
+                const transferId = `transfer-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+                const transferNote = txForm.note.trim();
+                newTxs.push({ type: 'out', amount: amount, fundId: fromFund.id, note: `Chuyển sang ${toFund.name}${transferNote ? `: ${transferNote}` : ''}`, isTransfer: true, transferId });
+                newTxs.push({ type: 'in', amount: amount, fundId: toFund.id, note: `Nhận từ ${fromFund.name}${transferNote ? `: ${transferNote}` : ''}`, isTransfer: true, transferId });
             } else if (txType === 'in') {
                 if (txForm.isDistribute) {
                     const totalAllocated = Object.values(txForm.allocations).reduce((sum, val) => sum + (Number(val) || 0), 0);
