@@ -337,7 +337,7 @@ const PublicInvoiceReceipt = ({
               {isRefund ? 'Chủ nhà cần trả lại khách' : 'Tổng thanh toán'}
             </p>
             <p className="text-xl font-black leading-none tabular-nums">
-              {formatN(bill.total)}
+              {formatN(isRefund ? Math.abs(bill.total) : bill.total)}
               <span className="text-[11px] opacity-80 font-bold ml-1">đ</span>
             </p>
           </div>

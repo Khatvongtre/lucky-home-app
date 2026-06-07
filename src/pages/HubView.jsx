@@ -413,7 +413,13 @@ const HubView = ({
     }
 
     if (bill && !isPaid) {
-      badges.push({ label: `Cần thanh toán: ${formatN(bill.total || 0)} đ`, className: 'bg-rose-100 text-rose-700' });
+      const billTotal = Number(bill.total) || 0;
+      badges.push({
+        label: billTotal < 0
+          ? `Cần chi hoàn cọc: ${formatN(Math.abs(billTotal))} đ`
+          : `Cần thanh toán: ${formatN(billTotal)} đ`,
+        className: 'bg-rose-100 text-rose-700',
+      });
     }
 
     if (badges.length === 0) {
@@ -449,7 +455,7 @@ const HubView = ({
     const houseBills = billsByHouse[house.id] || [];
     return houseRooms.reduce((total, room) => {
       const bill = getQuickRoomBill(room, houseBills);
-      return bill && !isPaidStatus(bill.status) ? total + (Number(bill.total) || 0) : total;
+      return bill && !isPaidStatus(bill.status) ? total + Math.abs(Number(bill.total) || 0) : total;
     }, 0);
   };
   const totalIncompleteQuickRooms = quickQrHouses.reduce((total, house) => total + getQuickHouseIncompleteCount(house), 0);

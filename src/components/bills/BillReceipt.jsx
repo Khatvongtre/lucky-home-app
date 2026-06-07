@@ -292,7 +292,7 @@ const BillReceipt = ({
                                         {isRefund ? 'Cần trả lại khách' : 'Tổng thanh toán'}
                                     </p>
                                     <p className="text-xl font-black leading-none tabular-nums">
-                                        {formatN(previewTotal)}
+                                        {formatN(isRefund ? Math.abs(previewTotal) : previewTotal)}
                                         <span className="text-[11px] opacity-80 font-bold ml-1">đ</span>
                                     </p>
                                 </div>
