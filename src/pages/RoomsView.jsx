@@ -4,7 +4,6 @@ import {
     Calendar,
     CreditCard,
     Loader2,
-    LucideEdit,
     PlusCircle,
     QrCode,
     Users2,
@@ -276,8 +275,12 @@ const RoomsView = ({
                         <div
                             id={`room-card-${room.id}`}
                             key={room.id}
-                            onClick={() => { if (isHighlighted && setHighlightedItemId) setHighlightedItemId(null); }}
-                            className={`relative overflow-hidden rounded-lg border shadow-sm transition-all active:scale-[0.99] ${cardStyle}`}
+                            onClick={() => {
+                                if (isHighlighted && setHighlightedItemId) setHighlightedItemId(null);
+                                setEditingRoom(room);
+                                setIsAddRoomModalOpen(true);
+                            }}
+                            className={`relative cursor-pointer overflow-hidden rounded-lg border shadow-sm transition-all active:scale-[0.99] ${cardStyle}`}
                         >
                             <div className={`absolute inset-y-0 left-0 w-1 ${statusRail}`} />
 
@@ -321,14 +324,6 @@ const RoomsView = ({
                                             {isLinkLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <QrCode className="h-3.5 w-3.5" />}
                                         </button>
                                     )}
-                                    <button
-                                        type="button"
-                                        onClick={() => { setEditingRoom(room); setIsAddRoomModalOpen(true); }}
-                                        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition-all hover:border-blue-600 hover:bg-blue-600 hover:text-white active:scale-95"
-                                        title="Sửa phòng"
-                                    >
-                                        <LucideEdit className="h-3.5 w-3.5" />
-                                    </button>
                                 </div>
 
                                 <div className="mt-2 flex items-center justify-between gap-2">

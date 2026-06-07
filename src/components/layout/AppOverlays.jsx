@@ -24,7 +24,7 @@ const AppOverlays = ({
     setBottomSheet,
     config,
     isGeneratingImage,
-    handleDiscountUpdate,
+    handleBillUpdate,
     handleShareZaloImage,
     handleDeleteBill,
     handlePayBill,
@@ -122,7 +122,7 @@ const AppOverlays = ({
         isManagerOrAbove={permissions.isManagerOrAbove}
         isOwnerOrAdmin={permissions.isOwnerOrAdmin}
         isGeneratingImage={isGeneratingImage}
-        handleDiscountUpdate={handleDiscountUpdate}
+        handleBillUpdate={handleBillUpdate}
         handleShareZaloImage={handleShareZaloImage}
         handleDeleteBill={handleDeleteBill}
         handlePayBill={handlePayBill}

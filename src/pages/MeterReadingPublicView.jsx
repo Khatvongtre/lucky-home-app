@@ -181,6 +181,8 @@ const buildReceiptModel = (session, invoice) => {
       ebikes: invoiceDetails.ebikes || 0,
       monthlyFee: invoiceDetails.monthlyFee || 0,
       discount: invoiceDetails.discount || 0,
+      additionalCost: invoiceDetails.additionalCost || invoiceDetails.extraCost || invoiceDetails.surcharge || 0,
+      waivedItems: Array.isArray(invoiceDetails.waivedItems) ? invoiceDetails.waivedItems : [],
       periodMonths: invoiceDetails.periodMonths,
       periodFrom: invoiceDetails.periodFrom,
       periodTo: invoiceDetails.periodTo,
@@ -208,12 +210,20 @@ const PublicInvoiceReceipt = ({
   const isMultiMonthBill = periodMonths > 1;
   const hasMonthlyFee = Number(bill.details.monthlyFee) > 0;
   const feeItems = hasMonthlyFee ? [] : [
-    { label: 'Tiền nước', val: bill.details.water },
-    { label: 'Phí dịch vụ', val: bill.details.service || 0 },
-    { label: 'Internet', val: bill.details.internet || 0 },
-    { label: 'Xe điện', val: bill.details.ebikes || 0 },
+    { key: 'water', label: 'Tiền nước', val: bill.details.water },
+    { key: 'service', label: 'Phí dịch vụ', val: bill.details.service || 0 },
+    { key: 'internet', label: 'Internet', val: bill.details.internet || 0 },
+    { key: 'ebikes', label: 'Xe điện', val: bill.details.ebikes || 0 },
   ];
+  const isWaived = key => bill.details.waivedItems.includes(key);
+  const feeAmount = (key, amount) => (
+    <div className="text-right">
+      <span className={`text-[13px] font-black text-slate-800 ${isWaived(key) ? 'line-through decoration-2 opacity-60' : ''}`}>{formatN(amount)}</span>
+      {isWaived(key) && <p className="mt-0.5 text-[8px] font-black uppercase tracking-wider text-emerald-600">Không tính tiền</p>}
+    </div>
+  );
   const config = session.config || {};
+  const isRefund = Number(bill.total || 0) < 0;
   const bankBin = config.bankBin || '970422';
   const bankAcc = config.bankAcc || '0';
   const bankName = config.bankName || 'MB BANK';
@@ -228,7 +238,7 @@ const PublicInvoiceReceipt = ({
     bill.total,
     bill.details.discount || 0,
   ].join('|');
-  const qrSrc = `${API_URL}/vietqr/generate?bankBin=${bankBin}&bankAcc=${bankAcc}&amount=${bill.total}&addInfo=${encodeURIComponent(qrAddInfo)}&t=${encodeURIComponent(qrFingerprint)}`;
+  const qrSrc = `${API_URL}/vietqr/generate?bankBin=${bankBin}&bankAcc=${bankAcc}&amount=${Math.max(bill.total, 0)}&addInfo=${encodeURIComponent(qrAddInfo)}&t=${encodeURIComponent(qrFingerprint)}`;
 
   return (
     <div
@@ -273,7 +283,7 @@ const PublicInvoiceReceipt = ({
                 </p>
               ) : null}
             </div>
-            <span className="text-[13px] font-black text-slate-800">{formatN(bill.details.rent)}</span>
+            {feeAmount('rent', bill.details.rent)}
           </div>
 
           <div className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200">
@@ -283,7 +293,7 @@ const PublicInvoiceReceipt = ({
                 Số: {bill.meter?.old} → {bill.meter?.new} <span className="text-blue-600">({bill.meter?.usage} số)</span>
               </p>
             </div>
-            <span className="text-[13px] font-black text-slate-800">{formatN(bill.details.elec)}</span>
+            {feeAmount('elec', bill.details.elec)}
           </div>
 
           {bill.heaterMeter && Number(bill.details.heater) > 0 && (
@@ -294,21 +304,21 @@ const PublicInvoiceReceipt = ({
                   Số: {bill.heaterMeter.old} → {bill.heaterMeter.new} <span className="text-rose-600">({bill.heaterMeter.usage} số)</span>
                 </p>
               </div>
-              <span className="text-[13px] font-black text-slate-800">{formatN(bill.details.heater)}</span>
+              {feeAmount('heater', bill.details.heater)}
             </div>
           )}
 
           {feeItems.map((item) => (
             <div key={item.label} className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200 last:border-0">
               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">{item.label}</span>
-              <span className="text-[13px] font-black text-slate-800">{formatN(item.val)}</span>
+              {feeAmount(item.key, item.val)}
             </div>
           ))}
 
           {hasMonthlyFee && (
             <div className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200 last:border-0">
               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Phí DV Hàng tháng (MBKD)</span>
-              <span className="text-[13px] font-black text-slate-800">{formatN(bill.details.monthlyFee)}</span>
+              {feeAmount('monthlyFee', bill.details.monthlyFee)}
             </div>
           )}
 
@@ -317,9 +327,14 @@ const PublicInvoiceReceipt = ({
             <span className="text-[13px] font-black text-red-600">-{formatN(bill.details.discount || 0)}</span>
           </div>
 
-          <div className="bg-indigo-600 p-3 rounded-lg text-white mb-2 mt-2 shadow-sm flex items-center justify-between">
+          <div className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200 last:border-0">
+            <span className="text-[11px] font-bold text-amber-600 uppercase tracking-tight">Chi phí phát sinh</span>
+            <span className="text-[13px] font-black text-amber-700">+{formatN(bill.details.additionalCost || 0)}</span>
+          </div>
+
+          <div className={`${isRefund ? 'bg-rose-600' : 'bg-indigo-600'} p-3 rounded-lg text-white mb-2 mt-2 shadow-sm flex items-center justify-between`}>
             <p className="text-[11px] font-bold uppercase tracking-widest opacity-80">
-              Tổng thanh toán
+              {isRefund ? 'Chủ nhà cần trả lại khách' : 'Tổng thanh toán'}
             </p>
             <p className="text-xl font-black leading-none tabular-nums">
               {formatN(bill.total)}
@@ -328,7 +343,7 @@ const PublicInvoiceReceipt = ({
           </div>
         </div>
 
-        <div id="public-invoice-transfer" className="bg-slate-50 border border-slate-200 p-3 rounded-xl flex items-stretch gap-3">
+        {!isRefund && <div id="public-invoice-transfer" className="bg-slate-50 border border-slate-200 p-3 rounded-xl flex items-stretch gap-3">
           <div className="flex-1 flex flex-col justify-between">
             <div className="px-1">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Thông tin chuyển khoản</p>
@@ -345,9 +360,9 @@ const PublicInvoiceReceipt = ({
               crossOrigin="anonymous"
             />
           </div>
-        </div>
+        </div>}
 
-        <div className="grid grid-cols-2 gap-2">
+        {!isRefund && <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
             onClick={onTransferClick}
@@ -365,7 +380,7 @@ const PublicInvoiceReceipt = ({
             {isPaymentNotifying ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
             Đã thanh toán
           </button>
-        </div>
+        </div>}
 
         {paymentNoticeMessage ? (
           <p className="rounded-xl bg-emerald-50 px-3 py-2 text-center text-[11px] font-bold text-emerald-700">

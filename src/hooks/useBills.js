@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { api } from '../services/api';
 import { shareElementImage } from '../utils/imageExport';
+import { applyBillAdjustments, buildBillUpdatePayload, extractBillFromResponse, isRefundBill } from '../utils/bills';
 
 export const useBills = ({
   bills,
@@ -35,15 +36,15 @@ export const useBills = ({
     }
   }, [loadHouseData, selectedHouse?.id, setIsOverwriteModalOpen, showToast]);
 
-  const handleDiscountUpdate = useCallback(async (billId, discount) => {
+  const handleBillUpdate = useCallback(async (billId, adjustments) => {
     const targetBill = bills.find(bill => bill.id === billId);
-    if (!targetBill) return;
-    if ((targetBill.details.discount || 0) === discount) return;
-
-    const updatedBillData = {
-      ...targetBill,
-      details: { ...targetBill.details, discount },
-    };
+    if (!targetBill) return false;
+    const updatedBillData = applyBillAdjustments(targetBill, adjustments);
+    if (
+      Number(targetBill.details?.discount || 0) === updatedBillData.details.discount
+      && Number(targetBill.details?.additionalCost || 0) === updatedBillData.details.additionalCost
+      && JSON.stringify(targetBill.details?.waivedItems || []) === JSON.stringify(updatedBillData.details.waivedItems)
+    ) return true;
 
     setBills(prev => prev.map(bill => bill.id === billId ? updatedBillData : bill));
     if (bottomSheet && bottomSheet.data.id === billId) {
@@ -51,24 +52,37 @@ export const useBills = ({
     }
 
     try {
-      await api.put(`/bill/${billId}/discount`, { discount });
-      await loadHouseData(selectedHouse?.id);
+      const response = await api.put(`/bill/${billId}`, buildBillUpdatePayload(updatedBillData));
+      const savedBill = extractBillFromResponse(response, updatedBillData);
+      setBills(prev => prev.map(bill => bill.id === billId ? savedBill : bill));
+      if (bottomSheet?.data?.id === billId) {
+        setBottomSheet({ ...bottomSheet, data: savedBill });
+      }
+      return true;
     } catch (error) {
+      setBills(prev => prev.map(bill => bill.id === billId ? targetBill : bill));
+      if (bottomSheet?.data?.id === billId) {
+        setBottomSheet({ ...bottomSheet, data: targetBill });
+      }
+      await loadHouseData(selectedHouse?.id);
       showToast('Đã có lỗi xảy ra ! (' + error.message + ')', 'error');
+      return false;
     }
   }, [bills, bottomSheet, loadHouseData, selectedHouse?.id, setBills, setBottomSheet, showToast]);
 
   const handlePayBill = useCallback(async (billId) => {
+    const targetBill = bills.find(bill => bill.id === billId);
     try {
-      await api.post(`/bill/pay/${billId}`);
-      await loadHouseData(selectedHouse?.id);
-      showToast('Gạch nợ & Ghi sổ thành công!', 'success');
+      const response = await api.post(`/bill/pay/${billId}`);
+      const paidBill = extractBillFromResponse(response, targetBill);
+      const isRefund = isRefundBill(paidBill);
+      setBills(prev => prev.map(bill => bill.id === billId ? paidBill : bill));
+      showToast(isRefund ? 'Đã xác nhận trả cọc & ghi phiếu chi!' : 'Gạch nợ & ghi sổ thành công!', 'success');
       setBottomSheet(null);
     } catch (error) {
       showToast('Đã có lỗi xảy ra ! (' + error.message + ')', 'error');
-      setBottomSheet(null);
     }
-  }, [loadHouseData, selectedHouse?.id, setBottomSheet, showToast]);
+  }, [bills, setBills, setBottomSheet, showToast]);
 
   const handleDeleteBill = useCallback(async (billId) => {
     const confirmed = await requestConfirm({
@@ -116,7 +130,7 @@ export const useBills = ({
   return {
     isGeneratingImage,
     executeGenerateBills,
-    handleDiscountUpdate,
+    handleBillUpdate,
     handlePayBill,
     handleDeleteBill,
     handleShareZaloImage,

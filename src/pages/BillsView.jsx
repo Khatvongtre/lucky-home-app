@@ -79,6 +79,7 @@ const BillsView = ({
                         const hId = highlightedItemId ? String(highlightedItemId) : null;
                         const isHighlighted = hId && (String(bill.id) === hId || String(bill.roomId) === hId);
                         const periodLabel = getPeriodLabel(getBillDetails(bill));
+                        const isRefund = Number(bill.total || 0) < 0;
 
                         let cardClasses = `bg-white p-3.5 rounded-xl border-2 shadow-sm flex items-center justify-between active:scale-[0.98] transition-all cursor-pointer ${bill.status === 'paid' ? 'border-emerald-100/60' : 'border-rose-100'}`;
                         if (isHighlighted) cardClasses += " border-red-500 shadow-red-200 animate-pulse bg-red-50 ring-2 ring-red-200";
@@ -102,7 +103,9 @@ const BillsView = ({
                                         </p>
                                         <div className={`text-[7px] sm:text-[8px] font-black px-2 py-0.5 rounded uppercase leading-none whitespace-nowrap inline-flex items-center ${bill.status === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
                                             }`}>
-                                            {bill.status === 'paid' ? 'Đã thu tiền' : 'Chưa thu'}
+                                            {isRefund
+                                                ? (bill.status === 'paid' ? 'Đã chi hoàn cọc' : 'Chờ chi hoàn cọc')
+                                                : (bill.status === 'paid' ? 'Đã thu tiền' : 'Chưa thu')}
                                         </div>
                                         {periodLabel && (
                                             <p className="mt-1 text-[8px] font-bold uppercase tracking-tight text-indigo-500">
@@ -118,7 +121,7 @@ const BillsView = ({
                                         {formatN(bill.total)}
                                     </p>
                                     <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                                        Tổng cộng
+                                        {isRefund ? 'Phiếu chi hoàn cọc' : 'Tổng cộng'}
                                     </p>
                                 </div>
                             </div>

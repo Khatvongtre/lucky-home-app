@@ -12,6 +12,7 @@ import BillReceipt from '../components/bills/BillReceipt';
 import { api } from '../services/api';
 import { getApiBaseUrl } from '../services/apiServer';
 import { shareElementImage } from '../utils/imageExport';
+import { applyBillAdjustments, buildBillUpdatePayload, extractBillFromResponse, isRefundBill, normalizeBill } from '../utils/bills';
 import { getMeterReadingDueState } from '../utils/date';
 
 const FE_BASE_URL = (import.meta.env.VITE_FE_URL || window.location.origin).replace(/\/+$/g, '');
@@ -94,18 +95,7 @@ const downloadDataUrl = (dataUrl, fileName) => {
   anchor.remove();
 };
 
-const parseBills = (billsData = []) =>
-  billsData.map(bill => ({
-    ...bill,
-    roomId: bill.roomCode || bill.roomId,
-    details: typeof bill.details === 'object' && bill.details
-      ? bill.details
-      : JSON.parse(bill.detailsJson || '{}'),
-    meter: typeof bill.meter === 'object' && bill.meter
-      ? bill.meter
-      : JSON.parse(bill.meterInfoJson || '{}'),
-    heaterMeter: bill.heaterMeter || (bill.heaterInfoJson ? JSON.parse(bill.heaterInfoJson) : null),
-  }));
+const parseBills = (billsData = []) => billsData.map(normalizeBill);
 
 const billTimestamp = (bill = {}) => {
   const candidates = [bill.updatedAt, bill.createdAt, bill.paidAt, bill.date, bill.generatedAt];
@@ -873,16 +863,13 @@ const HubView = ({
     }
   };
 
-  const handleQuickDiscountUpdate = async (billId, discount) => {
+  const handleQuickBillUpdate = async (billId, adjustments) => {
     const houseId = selectedQuickHouse?.id;
     const houseBills = billsByHouse[houseId] || [];
     const targetBill = houseBills.find(bill => bill.id === billId) || quickBillSheet?.data;
-    if (!targetBill) return;
+    if (!targetBill) return false;
 
-    const updatedBillData = {
-      ...targetBill,
-      details: { ...targetBill.details, discount },
-    };
+    const updatedBillData = applyBillAdjustments(targetBill, adjustments);
 
     setBillsByHouse(prev => ({
       ...prev,
@@ -891,15 +878,23 @@ const HubView = ({
     setQuickBillSheet(prev => prev?.data?.id === billId ? { ...prev, data: updatedBillData } : prev);
 
     try {
-      await api.put(`/bill/${billId}/discount`, { discount });
-      const refreshedBills = await loadQuickBills(houseId, true);
-      const refreshedBill = refreshedBills.find(bill => bill.id === billId);
-      if (refreshedBill) {
-        setQuickBillSheet(prev => prev?.data?.id === billId ? { ...prev, data: refreshedBill } : prev);
-      }
-      showToast?.('Đã cập nhật giảm giá hóa đơn.', 'success');
+      const response = await api.put(`/bill/${billId}`, buildBillUpdatePayload(updatedBillData));
+      const savedBill = extractBillFromResponse(response, updatedBillData);
+      setBillsByHouse(prev => ({
+        ...prev,
+        [houseId]: (prev[houseId] || []).map(bill => bill.id === billId ? savedBill : bill),
+      }));
+      setQuickBillSheet(prev => prev?.data?.id === billId ? { ...prev, data: savedBill } : prev);
+      showToast?.('Đã cập nhật hóa đơn.', 'success');
+      return true;
     } catch (error) {
+      setBillsByHouse(prev => ({
+        ...prev,
+        [houseId]: (prev[houseId] || []).map(bill => bill.id === billId ? targetBill : bill),
+      }));
+      setQuickBillSheet(prev => prev?.data?.id === billId ? { ...prev, data: targetBill } : prev);
       showToast?.(error.message || 'Không cập nhật được hóa đơn.', 'error');
+      return false;
     }
   };
 
@@ -929,14 +924,20 @@ const HubView = ({
   };
 
   const handleQuickPayBill = async (billId) => {
+    const targetBill = quickBillSheet?.data;
     try {
-      await api.post(`/bill/pay/${billId}`);
-      await loadQuickBills(selectedQuickHouse?.id, true);
-      showToast?.('Gạch nợ & ghi sổ thành công.', 'success');
+      const response = await api.post(`/bill/pay/${billId}`);
+      const paidBill = extractBillFromResponse(response, targetBill);
+      const isRefund = isRefundBill(paidBill);
+      const houseId = selectedQuickHouse?.id;
+      setBillsByHouse(prev => ({
+        ...prev,
+        [houseId]: (prev[houseId] || []).map(bill => bill.id === billId ? paidBill : bill),
+      }));
+      showToast?.(isRefund ? 'Đã xác nhận trả cọc & ghi phiếu chi.' : 'Gạch nợ & ghi sổ thành công.', 'success');
       setQuickBillSheet(null);
     } catch (error) {
       showToast?.(error.message || 'Không xác nhận thu được hóa đơn.', 'error');
-      setQuickBillSheet(null);
     }
   };
 
@@ -1195,7 +1196,9 @@ const HubView = ({
                           if (typeof e.target.showPicker === 'function') {
                             e.target.showPicker();
                           }
-                        } catch (err) { }
+                        } catch {
+                          // Some mobile browsers expose showPicker but reject programmatic calls.
+                        }
                       }}
                       value={`${(viewDate || new Date()).getFullYear()}-${String((viewDate || new Date()).getMonth() + 1).padStart(2, '0')}`}
                       onChange={(e) => {
@@ -1742,7 +1745,7 @@ const HubView = ({
         isManagerOrAbove={quickBillCanEdit}
         isOwnerOrAdmin={quickBillCanManage}
         isGeneratingImage={isGeneratingBillImage}
-        handleDiscountUpdate={handleQuickDiscountUpdate}
+        handleBillUpdate={handleQuickBillUpdate}
         handleShareZaloImage={handleQuickShareBillImage}
         handleDeleteBill={handleQuickDeleteBill}
         handlePayBill={handleQuickPayBill}

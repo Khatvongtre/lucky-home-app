@@ -1,5 +1,5 @@
 import React from 'react';
-import { Wallet, ChevronDown, Check, ArrowRight, Edit } from 'lucide-react';
+import { Wallet, ChevronDown, Check, ArrowRight } from 'lucide-react';
 import { formatN } from '../utils/formatters';
 import { TRANSACTION_CATEGORIES } from '../utils/constants';
 
@@ -106,39 +106,60 @@ const FinanceView = ({
                 {currentTransactions.length === 0 && (
                     <p className="text-xs text-slate-400 italic text-center mt-10">Chưa có giao dịch thu chi nào.</p>
                 )}
-                {currentTransactions.map(t => (
-                    <div key={t.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex items-center justify-between active:scale-[0.98] transition-all">
-                        <div className="flex items-center space-x-3">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-inner ${t.type === 'in' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                                <ArrowRight className={`w-5 h-5 ${t.type === 'in' ? 'rotate-[-45deg]' : 'rotate-[135deg]'}`} />
+                {currentTransactions.map(t => {
+                    const openTransactionForm = () => {
+                        if (!canManageTransactions) return;
+                        setEditingTransaction(t);
+                        setTxType(t.type);
+                        const catKey = Object.keys(TRANSACTION_CATEGORIES).find(k => TRANSACTION_CATEGORIES[k].id === t.category) || 'OTHER';
+                        setSelectedCat(catKey);
+                        setIsAddTransactionModalOpen(true);
+                    };
+
+                    return (
+                    <div
+                        key={t.id}
+                        onClick={openTransactionForm}
+                        className={`bg-white px-2.5 py-2.5 rounded-xl border shadow-sm active:scale-[0.98] transition-all ${
+                            t.type === 'in'
+                                ? 'border-emerald-200 shadow-emerald-100/60'
+                                : 'border-rose-200 shadow-rose-100/60'
+                        } ${
+                            canManageTransactions
+                                ? t.type === 'in'
+                                    ? 'cursor-pointer hover:border-emerald-400 hover:shadow-md'
+                                    : 'cursor-pointer hover:border-rose-400 hover:shadow-md'
+                                : ''
+                        }`}
+                    >
+                        <div className="flex min-w-0 items-center gap-2">
+                            <div className={`w-8 h-8 shrink-0 rounded-lg flex items-center justify-center shadow-inner ${t.type === 'in' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                                <ArrowRight className={`w-4 h-4 ${t.type === 'in' ? 'rotate-[-45deg]' : 'rotate-[135deg]'}`} />
                             </div>
-                            <div>
-                                <p className={`text-[11px] font-black uppercase leading-none mb-1.5 ${t.type === 'in' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                            <div className="min-w-0 flex-1">
+                                <p
+                                    title={t.note}
+                                    className={`overflow-hidden whitespace-nowrap text-[9px] sm:text-[10px] font-black uppercase leading-tight tracking-[-0.02em] ${t.type === 'in' ? 'text-emerald-600' : 'text-rose-600'}`}
+                                >
                                     {t.note}
                                 </p>
-                                <p className="text-[9px] font-bold text-slate-500 uppercase">
-                                    {new Date(t.date).toLocaleDateString('vi-VN')}
-                                </p>
+                                <div className="mt-1 flex items-center justify-between gap-1.5">
+                                    <p className="shrink-0 rounded-md bg-slate-50 px-1.5 py-0.5 text-[8px] font-bold leading-none tabular-nums text-slate-500 ring-1 ring-slate-100">
+                                        {new Date(t.date).toLocaleDateString('vi-VN')}
+                                    </p>
+                                    <p className={`shrink-0 rounded-md border px-2 py-1 text-right text-[10px] sm:text-[11px] font-black leading-none tabular-nums shadow-sm ${
+                                        t.type === 'in'
+                                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                            : 'border-rose-200 bg-rose-50 text-rose-700'
+                                    }`}>
+                                        {t.type === 'in' ? '+' : '-'}{formatN(t.amount)}
+                                    </p>
+                                </div>
                             </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                            <p className={`font-black text-sm text-right tabular-nums ${t.type === 'in' ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                {t.type === 'in' ? '+' : '-'}{formatN(t.amount)}
-                            </p>
-                            {canManageTransactions && (
-                                <button onClick={() => {
-                                    setEditingTransaction(t);
-                                    setTxType(t.type);
-                                    const catKey = Object.keys(TRANSACTION_CATEGORIES).find(k => TRANSACTION_CATEGORIES[k].id === t.category) || 'OTHER';
-                                    setSelectedCat(catKey);
-                                    setIsAddTransactionModalOpen(true);
-                                }} className="p-1.5 bg-slate-50 text-slate-400 rounded-md hover:text-blue-600 transition-colors">
-                                    <Edit className="w-3.5 h-3.5" />
-                                </button>
-                            )}
-                        </div>
                     </div>
-                ))}
+                    );
+                })}
             </div>
         </div>
     );

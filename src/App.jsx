@@ -267,7 +267,7 @@ const MainApp = () => {
   const {
     isGeneratingImage,
     executeGenerateBills,
-    handleDiscountUpdate,
+    handleBillUpdate,
     handlePayBill,
     handleDeleteBill,
     handleShareZaloImage,
@@ -713,7 +713,7 @@ const MainApp = () => {
           setBottomSheet,
           config,
           isGeneratingImage,
-          handleDiscountUpdate,
+          handleBillUpdate,
           handleShareZaloImage,
           handleDeleteBill,
           handlePayBill,

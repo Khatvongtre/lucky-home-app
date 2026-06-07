@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { api } from "../services/api";
+import { normalizeBill } from "../utils/bills";
 
 const emptyBillStats = {
     totalRooms: 0,
@@ -11,25 +12,7 @@ const emptyBillStats = {
 const parseMeters = (metersData = []) =>
     metersData.map(m => ({ ...m, roomIds: JSON.parse(m.roomIdsJson || "[]") }));
 
-const parseJsonField = (value, fallback) => {
-    if (!value) return fallback;
-    if (typeof value === "object") return value;
-
-    try {
-        return JSON.parse(value);
-    } catch {
-        return fallback;
-    }
-};
-
-const parseBills = (billsData = []) =>
-    billsData.map(b => ({
-        ...b,
-        roomId: b.roomCode || b.roomId,
-        details: parseJsonField(b.detailsJson, b.details || {}),
-        meter: parseJsonField(b.meterInfoJson, b.meter || {}),
-        heaterMeter: b.heaterInfoJson ? parseJsonField(b.heaterInfoJson, b.heaterMeter || null) : (b.heaterMeter || null),
-    }));
+const parseBills = (billsData = []) => billsData.map(normalizeBill);
 
 const isPaidStatus = (status) => ["paid", "completed", "done"].includes(String(status || "").toLowerCase());
 
