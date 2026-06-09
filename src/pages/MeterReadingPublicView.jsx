@@ -17,6 +17,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { formatN, parseN } from '../utils/formatters';
+import { getBillElectricMeters } from '../utils/bills';
 import { authStorage } from '../services/authStorage';
 import { fetchFromApi, getApiBaseUrl } from '../services/apiServer';
 
@@ -117,12 +118,21 @@ const parseJsonField = (value, fallback) => {
 const normalizeBill = (bill) => {
   if (!bill) return null;
 
+  const meters = [
+    bill.meters,
+    bill.metersJson,
+    bill.meterInfosJson,
+    bill.meterInfoListJson,
+    bill.meterInfoJson,
+  ].map(value => parseJsonField(value, [])).find(value => Array.isArray(value) && value.length > 0) || [];
+
   return {
     ...bill,
     roomId: bill.roomId || bill.roomCode,
     currentMonthFull: bill.currentMonthFull || bill.period,
     details: parseJsonField(bill.detailsJson, bill.details || {}),
     meter: parseJsonField(bill.meterInfoJson, bill.meter || {}),
+    meters: Array.isArray(meters) ? meters : [],
     heaterMeter: bill.heaterInfoJson ? parseJsonField(bill.heaterInfoJson, bill.heaterMeter || null) : (bill.heaterMeter || null),
   };
 };
@@ -138,6 +148,15 @@ const extractBillFromResponse = (result) => {
   if (directBill) return normalizeBill(directBill);
 
   return null;
+};
+
+const getMeterUsage = meter => {
+  const usage = Number(meter?.usage);
+  if (Number.isFinite(usage)) return usage;
+
+  const oldValue = Number(meter?.old);
+  const newValue = Number(meter?.new);
+  return Number.isFinite(oldValue) && Number.isFinite(newValue) ? newValue - oldValue : 0;
 };
 
 const compressImageFile = (file, { maxSize = 1400, quality = 0.82 } = {}) => new Promise((resolve, reject) => {
@@ -170,6 +189,7 @@ const buildReceiptModel = (session, invoice) => {
     total: invoice.total || 0,
     status: invoice.status || 'pending',
     meter: invoice.meter || {},
+    meters: invoice.meters || [],
     heaterMeter: invoice.heaterMeter || null,
     details: {
       rent: invoiceDetails.rent || 0,
@@ -215,6 +235,7 @@ const PublicInvoiceReceipt = ({
     { key: 'internet', label: 'Internet', val: bill.details.internet || 0 },
     { key: 'ebikes', label: 'Xe điện', val: bill.details.ebikes || 0 },
   ];
+  const electricMeters = getBillElectricMeters(bill);
   const isWaived = key => bill.details.waivedItems.includes(key);
   const feeAmount = (key, amount) => (
     <div className="text-right">
@@ -289,9 +310,12 @@ const PublicInvoiceReceipt = ({
           <div className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200">
             <div className="flex flex-col">
               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight leading-tight">Tiền điện riêng</span>
-              <p className="text-[9px] text-blue-500 font-semibold leading-tight mt-0.5">
-                Số: {bill.meter?.old} → {bill.meter?.new} <span className="text-blue-600">({bill.meter?.usage} số)</span>
-              </p>
+              {electricMeters.map((meter, index) => (
+                <p key={meter.id || meter.name || index} className="text-[9px] text-blue-500 font-semibold leading-tight mt-0.5">
+                  {electricMeters.length > 1 && <span className="font-black">{meter.name || `Công tơ ${index + 1}`}: </span>}
+                  Số: {meter.old} → {meter.new} <span className="text-blue-600">({getMeterUsage(meter)} số)</span>
+                </p>
+              ))}
             </div>
             {feeAmount('elec', bill.details.elec)}
           </div>

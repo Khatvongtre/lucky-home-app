@@ -24,6 +24,32 @@ const parseJsonField = (value, fallback) => {
   }
 };
 
+const parseBillMeters = (bill = {}) => {
+  const candidates = [
+    bill.meters,
+    bill.metersJson,
+    bill.meterInfosJson,
+    bill.meterInfoListJson,
+    bill.meterInfoJson,
+  ];
+
+  for (const candidate of candidates) {
+    const meters = parseJsonField(candidate, []);
+    if (Array.isArray(meters) && meters.length > 0) return meters;
+  }
+
+  return [];
+};
+
+export const getBillElectricMeters = (bill = {}) => {
+  const meters = parseBillMeters(bill).filter(meter => (
+    !['heater', 'water_heater', 'bnl'].includes(String(meter?.type || '').toLowerCase())
+  ));
+
+  if (meters.length > 0) return meters;
+  return bill.meter && !Array.isArray(bill.meter) && Object.keys(bill.meter).length > 0 ? [bill.meter] : [];
+};
+
 export const getBillAdditionalCost = (details = {}) =>
   toAmount(details.additionalCost ?? details.extraCost ?? details.surcharge);
 
@@ -77,6 +103,7 @@ export const normalizeBill = (bill = {}) => {
       waivedItems: getBillWaivedItems(details),
     },
     meter: parseJsonField(bill.meter, parseJsonField(bill.meterInfoJson, {})),
+    meters: parseBillMeters(bill),
     heaterMeter: parseJsonField(bill.heaterMeter, parseJsonField(bill.heaterInfoJson, null)),
   };
 };

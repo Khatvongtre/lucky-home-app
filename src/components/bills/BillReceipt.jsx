@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Loader2, Image as ImageIcon, Trash2, CheckCircle2, X } from 'lucide-react';
 import { formatN, parseN } from '../../utils/formatters';
 import { useSwipeBack } from '../../hooks/useSwipeBack';
-import { applyBillAdjustments, getBillAdditionalCost, getBillWaivedItems } from '../../utils/bills';
+import { applyBillAdjustments, getBillAdditionalCost, getBillElectricMeters, getBillWaivedItems } from '../../utils/bills';
 
 const resolveBackendAssetUrl = (src, API_URL) => {
     if (!src || typeof src !== 'string') return src;
@@ -35,6 +35,15 @@ const buildMeterImages = (bill, API_URL) => {
             src: resolveBackendAssetUrl(bill.heaterMeter?.imageUrl || bill.heaterMeter?.imageDataUrl || bill.heaterImageUrl, API_URL),
         },
     ];
+};
+
+const getMeterUsage = meter => {
+    const usage = Number(meter?.usage);
+    if (Number.isFinite(usage)) return usage;
+
+    const oldValue = Number(meter?.old);
+    const newValue = Number(meter?.new);
+    return Number.isFinite(oldValue) && Number.isFinite(newValue) ? newValue - oldValue : 0;
 };
 
 const BillReceipt = ({
@@ -103,6 +112,7 @@ const BillReceipt = ({
     const canEditPendingBill = !isBillPaid;
     const canToggleFee = canEditPendingBill && isManagerOrAbove && !isGeneratingImage;
     const isWaived = key => localWaivedItems.includes(key);
+    const electricMeters = getBillElectricMeters(bill);
     const toggleWaivedItem = async key => {
         if (!canToggleFee) return;
         const nextWaivedItems = isWaived(key)
@@ -220,9 +230,12 @@ const BillReceipt = ({
                                 <button type="button" onClick={() => toggleWaivedItem('elec')} className={feeRowClass('elec')}>
                                     <div className="flex flex-col">
                                         <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight leading-tight">Tiền điện riêng</span>
-                                        <p className="text-[9px] text-blue-500 font-semibold leading-tight mt-0.5">
-                                            Số: {bottomSheet.data.meter?.old} → {bottomSheet.data.meter?.new} <span className="text-blue-600">({bottomSheet.data.meter?.new - bottomSheet.data.meter?.old} số)</span>
-                                        </p>
+                                        {electricMeters.map((meter, index) => (
+                                            <p key={meter.id || meter.name || index} className="text-[9px] text-blue-500 font-semibold leading-tight mt-0.5">
+                                                {electricMeters.length > 1 && <span className="font-black">{meter.name || `Công tơ ${index + 1}`}: </span>}
+                                                Số: {meter.old} → {meter.new} <span className="text-blue-600">({getMeterUsage(meter)} số)</span>
+                                            </p>
+                                        ))}
                                     </div>
                                     {feeAmount('elec', details.elec)}
                                 </button>
