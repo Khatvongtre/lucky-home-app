@@ -648,6 +648,8 @@ const MainApp = () => {
           changePasswordForm,
           setChangePasswordForm,
           handleChangePassword,
+          requestConfirm,
+          showToast,
         }}
         roomsState={{
           currentRooms,

@@ -1,6 +1,7 @@
 import React from 'react';
 import { User, Lock, LogOut } from 'lucide-react';
 import AppUpdatePanel from '../components/common/AppUpdatePanel';
+import AccessDevicesPanel from '../components/auth/AccessDevicesPanel';
 
 const ProfileView = ({
     user,
@@ -8,7 +9,9 @@ const ProfileView = ({
     handleLogout,
     changePasswordForm,
     setChangePasswordForm,
-    handleChangePassword
+    handleChangePassword,
+    requestConfirm,
+    showToast,
 }) => {
     return (
         <div className="min-h-[calc(100vh-170px)] flex flex-col animate-in fade-in pb-6">
@@ -26,6 +29,10 @@ const ProfileView = ({
                         </p>
                     </div>
                 </div>
+            </div>
+
+            <div className="mb-4">
+                <AccessDevicesPanel requestConfirm={requestConfirm} showToast={showToast} />
             </div>
 
             <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">

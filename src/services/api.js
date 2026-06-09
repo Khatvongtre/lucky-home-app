@@ -1,10 +1,12 @@
 import { authStorage } from "./authStorage";
 import { fetchFromApi } from "./apiServer";
+import { getDeviceHeaders } from "./deviceInfo";
 
-const getHeaders = () => {
+const getHeaders = ({ skipDeviceHeaders = false } = {}) => {
     const token = authStorage.getToken();
     return {
         "Content-Type": "application/json",
+        ...(token && !skipDeviceHeaders && getDeviceHeaders()),
         ...(token && { Authorization: `Bearer ${token}` }),
     };
 };
@@ -53,33 +55,52 @@ const handleError = (error) => {
 };
 
 const request = async (url, options = {}) => {
+    const { skipDeviceHeaders, ...fetchOptions } = options;
+
     try {
         const res = await fetchFromApi(url, {
-            ...options,
+            ...fetchOptions,
             cache: "no-store",
             headers: {
-                ...getHeaders(),
-                ...options.headers,
+                ...getHeaders({ skipDeviceHeaders }),
+                ...fetchOptions.headers,
             },
         });
         return await handleResponse(res);
     } catch (error) {
+        if (
+            !skipDeviceHeaders
+            && authStorage.getToken()
+            && error.message.includes("Failed to fetch")
+        ) {
+            const retryRes = await fetchFromApi(url, {
+                ...fetchOptions,
+                cache: "no-store",
+                headers: {
+                    ...getHeaders({ skipDeviceHeaders: true }),
+                    ...fetchOptions.headers,
+                },
+            });
+            return await handleResponse(retryRes);
+        }
+
         handleError(error);
     }
 };
 
-const jsonRequest = (method, url, body) => request(url, {
+const jsonRequest = (method, url, body, options = {}) => request(url, {
+    ...options,
     method,
     body: body === undefined ? null : JSON.stringify(body),
 });
 
 export const api = {
-    get: (url) => request(url),
-    post: (url, body) => jsonRequest("POST", url, body),
-    put: (url, body) => jsonRequest("PUT", url, body),
-    delete: (url, body) => (
+    get: (url, options) => request(url, options),
+    post: (url, body, options) => jsonRequest("POST", url, body, options),
+    put: (url, body, options) => jsonRequest("PUT", url, body, options),
+    delete: (url, body, options) => (
         body === undefined
-            ? request(url, { method: "DELETE" })
-            : jsonRequest("DELETE", url, body)
+            ? request(url, { ...options, method: "DELETE" })
+            : jsonRequest("DELETE", url, body, options)
     ),
 };

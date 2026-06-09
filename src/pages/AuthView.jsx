@@ -2,12 +2,27 @@ import React, { useState } from 'react';
 import { Building2, Mail, User, Lock, Loader2 } from 'lucide-react';
 import { api } from '../services/api';
 import { authStorage } from '../services/authStorage';
+import { getDeviceHeaders } from '../services/deviceInfo';
 
 const AuthView = ({ setIsLoggedIn, setUser, showToast }) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [authForm, setAuthForm] = useState({ fullName: '', username: '', password: '' });
+
+  const loginWithDeviceFallback = async () => {
+    try {
+      return await api.post('/auth/login', authForm, {
+        headers: getDeviceHeaders({ includeName: true }),
+      });
+    } catch (error) {
+      if (!error.message?.includes('Backend')) throw error;
+
+      return api.post('/auth/login', authForm, {
+        skipDeviceHeaders: true,
+      });
+    }
+  };
 
   const handleAuth = async (e, type) => {
     e.preventDefault();
@@ -23,7 +38,7 @@ const AuthView = ({ setIsLoggedIn, setUser, showToast }) => {
         showToast("Đã gửi yêu cầu khôi phục mật khẩu. Vui lòng kiểm tra email/SĐT.", "success");
         setIsForgotPassword(false);
       } else {
-        const res = await api.post('/auth/login', authForm);
+        const res = await loginWithDeviceFallback();
         authStorage.setSession({ token: res.token, user: res.user });
         setUser(res.user);
         setIsLoggedIn(true);
