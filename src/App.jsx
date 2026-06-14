@@ -513,6 +513,8 @@ const MainApp = () => {
   const foregroundNotificationPopup = (
     <ForegroundNotificationPopup
       notification={foregroundNotification}
+      houses={houses}
+      selectedHouse={selectedHouse}
       onClose={dismissForegroundNotification}
       onOpen={openForegroundNotification}
     />

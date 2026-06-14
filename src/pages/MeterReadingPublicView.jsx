@@ -308,12 +308,15 @@ const PublicInvoiceReceipt = ({
           </div>
 
           <div className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200">
-            <div className="flex flex-col">
+            <div className="flex min-w-0 flex-col pr-2">
               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight leading-tight">Tiền điện riêng</span>
               {electricMeters.map((meter, index) => (
                 <p key={meter.id || meter.name || index} className="text-[9px] text-blue-500 font-semibold leading-tight mt-0.5">
-                  {electricMeters.length > 1 && <span className="font-black">{meter.name || `Công tơ ${index + 1}`}: </span>}
-                  Số: {meter.old} → {meter.new} <span className="text-blue-600">({getMeterUsage(meter)} số)</span>
+                  {electricMeters.length > 1 && <span className="block font-black">{meter.name || `Công tơ ${index + 1}`}:</span>}
+                  <span className="inline-flex whitespace-nowrap tabular-nums">
+                    Số: {meter.old}&nbsp;→&nbsp;{meter.new}&nbsp;
+                    <span className="text-blue-600">({getMeterUsage(meter)} số)</span>
+                  </span>
                 </p>
               ))}
             </div>
@@ -322,10 +325,13 @@ const PublicInvoiceReceipt = ({
 
           {bill.heaterMeter && Number(bill.details.heater) > 0 && (
             <div className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200">
-              <div className="flex flex-col">
+              <div className="flex min-w-0 flex-col pr-2">
                 <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight leading-tight">Điện BNL Chung</span>
                 <p className="text-[9px] text-rose-500 font-semibold leading-tight mt-0.5">
-                  Số: {bill.heaterMeter.old} → {bill.heaterMeter.new} <span className="text-rose-600">({bill.heaterMeter.usage} số)</span>
+                  <span className="inline-flex whitespace-nowrap tabular-nums">
+                    Số: {bill.heaterMeter.old}&nbsp;→&nbsp;{bill.heaterMeter.new}&nbsp;
+                    <span className="text-rose-600">({bill.heaterMeter.usage} số)</span>
+                  </span>
                 </p>
               </div>
               {feeAmount('heater', bill.details.heater)}
@@ -346,15 +352,19 @@ const PublicInvoiceReceipt = ({
             </div>
           )}
 
-          <div className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200 last:border-0">
-            <span className="text-[11px] font-bold text-red-500 uppercase tracking-tight">Giảm giá</span>
-            <span className="text-[13px] font-black text-red-600">-{formatN(bill.details.discount || 0)}</span>
-          </div>
+          {Number(bill.details.discount) > 0 && (
+            <div className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200 last:border-0">
+              <span className="text-[11px] font-bold text-red-500 uppercase tracking-tight">Giảm giá</span>
+              <span className="text-[13px] font-black text-red-600">-{formatN(bill.details.discount)}</span>
+            </div>
+          )}
 
-          <div className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200 last:border-0">
-            <span className="text-[11px] font-bold text-amber-600 uppercase tracking-tight">Chi phí phát sinh</span>
-            <span className="text-[13px] font-black text-amber-700">+{formatN(bill.details.additionalCost || 0)}</span>
-          </div>
+          {Number(bill.details.additionalCost) > 0 && (
+            <div className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200 last:border-0">
+              <span className="text-[11px] font-bold text-amber-600 uppercase tracking-tight">Chi phí phát sinh</span>
+              <span className="text-[13px] font-black text-amber-700">+{formatN(bill.details.additionalCost)}</span>
+            </div>
+          )}
 
           <div className={`${isRefund ? 'bg-rose-600' : 'bg-indigo-600'} p-3 rounded-lg text-white mb-2 mt-2 shadow-sm flex items-center justify-between`}>
             <p className="text-[11px] font-bold uppercase tracking-widest opacity-80">

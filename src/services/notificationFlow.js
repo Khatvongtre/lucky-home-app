@@ -52,6 +52,7 @@ export const normalizePushNotification = (payload = {}) => {
     message: getPayloadValue(payload, 'message', 'body') || notificationPayload.body || '',
     navigateTo: getPayloadValue(payload, 'navigateTo', 'navigate_to'),
     houseId: getPayloadValue(payload, 'houseId', 'house_id'),
+    houseName: getPayloadValue(payload, 'houseName', 'house_name'),
     billId: getPayloadValue(payload, 'billId', 'bill_id'),
     roomId: getPayloadValue(payload, 'roomId', 'room_id'),
     metadataJson: typeof metadata === 'string' ? metadata : JSON.stringify(metadata || {}),
@@ -62,7 +63,33 @@ export const normalizePushNotification = (payload = {}) => {
 export const getNotificationTargetHouseId = (notification) => {
   const metadata = parseNotificationMetadata(notification?.metadataJson);
   const target = parseNotificationNavigateTarget(notification?.navigateTo);
-  return notification?.houseId || target.houseId || metadata.houseId || '';
+  return notification?.houseId || target.houseId || metadata.houseId || metadata.HouseId || '';
+};
+
+const getHouseName = (house) => (
+  house?.houseName || house?.name || house?.title || ''
+);
+
+export const getNotificationHouseName = (notification, houses = [], selectedHouse = null) => {
+  const metadata = parseNotificationMetadata(notification?.metadataJson);
+  const payloadHouseName = (
+    notification?.houseName
+    || notification?.HouseName
+    || metadata.houseName
+    || metadata.HouseName
+    || metadata.houseLabel
+  );
+  if (payloadHouseName) return payloadHouseName;
+
+  const targetHouseId = getNotificationTargetHouseId(notification);
+  const matchedHouse = houses.find(house => String(house.id) === String(targetHouseId));
+  if (matchedHouse) return getHouseName(matchedHouse);
+
+  if (targetHouseId && String(selectedHouse?.id) === String(targetHouseId)) {
+    return getHouseName(selectedHouse);
+  }
+
+  return '';
 };
 
 export const navigateToNotification = (notification, {

@@ -228,12 +228,15 @@ const BillReceipt = ({
                                 </button>
 
                                 <button type="button" onClick={() => toggleWaivedItem('elec')} className={feeRowClass('elec')}>
-                                    <div className="flex flex-col">
+                                    <div className="flex min-w-0 flex-col pr-2">
                                         <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight leading-tight">Tiền điện riêng</span>
                                         {electricMeters.map((meter, index) => (
                                             <p key={meter.id || meter.name || index} className="text-[9px] text-blue-500 font-semibold leading-tight mt-0.5">
-                                                {electricMeters.length > 1 && <span className="font-black">{meter.name || `Công tơ ${index + 1}`}: </span>}
-                                                Số: {meter.old} → {meter.new} <span className="text-blue-600">({getMeterUsage(meter)} số)</span>
+                                                {electricMeters.length > 1 && <span className="block font-black">{meter.name || `Công tơ ${index + 1}`}:</span>}
+                                                <span className="inline-flex whitespace-nowrap tabular-nums">
+                                                    Số: {meter.old}&nbsp;→&nbsp;{meter.new}&nbsp;
+                                                    <span className="text-blue-600">({getMeterUsage(meter)} số)</span>
+                                                </span>
                                             </p>
                                         ))}
                                     </div>
@@ -242,10 +245,13 @@ const BillReceipt = ({
 
                                 {bottomSheet.data.heaterMeter && Number(details.heater) > 0 && (
                                     <button type="button" onClick={() => toggleWaivedItem('heater')} className={feeRowClass('heater')}>
-                                        <div className="flex flex-col">
+                                        <div className="flex min-w-0 flex-col pr-2">
                                             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight leading-tight">Điện BNL Chung</span>
                                             <p className="text-[9px] text-rose-500 font-semibold leading-tight mt-0.5">
-                                                Số: {bottomSheet.data.heaterMeter.old} → {bottomSheet.data.heaterMeter.new} <span className="text-rose-600">({bottomSheet.data.heaterMeter.new - bottomSheet.data.heaterMeter.old} số)</span>
+                                                <span className="inline-flex whitespace-nowrap tabular-nums">
+                                                    Số: {bottomSheet.data.heaterMeter.old}&nbsp;→&nbsp;{bottomSheet.data.heaterMeter.new}&nbsp;
+                                                    <span className="text-rose-600">({bottomSheet.data.heaterMeter.new - bottomSheet.data.heaterMeter.old} số)</span>
+                                                </span>
                                             </p>
                                         </div>
                                         {feeAmount('heater', details.heater)}

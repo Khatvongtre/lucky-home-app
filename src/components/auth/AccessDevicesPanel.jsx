@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   Ban,
@@ -132,11 +132,15 @@ const EmptyState = ({ icon: Icon = History, title, children }) => (
 );
 
 const AccessDevicesPanel = ({ requestConfirm, showToast }) => {
+  const LOG_PAGE_SIZE = 3;
   const [activeTab, setActiveTab] = useState('devices');
   const [devices, setDevices] = useState([]);
   const [logs, setLogs] = useState([]);
+  const [visibleLogCount, setVisibleLogCount] = useState(LOG_PAGE_SIZE);
   const [isLoading, setIsLoading] = useState(false);
   const [actionId, setActionId] = useState('');
+  const logListRef = useRef(null);
+  const logLoadMoreRef = useRef(null);
 
   const loadAccessData = useCallback(async () => {
     setIsLoading(true);
@@ -147,6 +151,7 @@ const AccessDevicesPanel = ({ requestConfirm, showToast }) => {
       ]);
       setDevices(normalizeList(deviceResult));
       setLogs(normalizeList(logResult));
+      setVisibleLogCount(LOG_PAGE_SIZE);
     } catch (error) {
       showToast?.(error.message || 'Không thể tải thông tin thiết bị', 'error');
     } finally {
@@ -167,6 +172,7 @@ const AccessDevicesPanel = ({ requestConfirm, showToast }) => {
         if (!isMounted) return;
         setDevices(normalizeList(deviceResult));
         setLogs(normalizeList(logResult));
+        setVisibleLogCount(LOG_PAGE_SIZE);
       } catch (error) {
         if (isMounted) showToast?.(error.message || 'Không thể tải thông tin thiết bị', 'error');
       } finally {
@@ -230,6 +236,26 @@ const AccessDevicesPanel = ({ requestConfirm, showToast }) => {
     () => devices.some(device => !device.isCurrent && !device.isRevoked),
     [devices],
   );
+  const visibleLogs = useMemo(
+    () => logs.slice(0, visibleLogCount),
+    [logs, visibleLogCount],
+  );
+  const hasMoreLogs = visibleLogCount < logs.length;
+
+  useEffect(() => {
+    if (activeTab !== 'logs' || !hasMoreLogs || !logLoadMoreRef.current) return undefined;
+
+    const observer = new IntersectionObserver((entries) => {
+      if (!entries[0]?.isIntersecting) return;
+      setVisibleLogCount(count => Math.min(count + LOG_PAGE_SIZE, logs.length));
+    }, {
+      root: logListRef.current,
+      rootMargin: '0px 0px 80px',
+    });
+
+    observer.observe(logLoadMoreRef.current);
+    return () => observer.disconnect();
+  }, [activeTab, hasMoreLogs, logs.length]);
 
   return (
     <section className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
@@ -361,8 +387,8 @@ const AccessDevicesPanel = ({ requestConfirm, showToast }) => {
               </EmptyState>
             )}
 
-            <div className="space-y-3">
-              {logs.map((log, index) => {
+            <div ref={logListRef} className="max-h-[420px] space-y-3 overflow-y-auto pr-1 no-scrollbar">
+              {visibleLogs.map((log, index) => {
                 const meta = actionStyles[log.action] || {
                   icon: AlertTriangle,
                   dot: 'bg-slate-400',
@@ -415,6 +441,11 @@ const AccessDevicesPanel = ({ requestConfirm, showToast }) => {
                   </article>
                 );
               })}
+              {hasMoreLogs && (
+                <div ref={logLoadMoreRef} className="flex h-10 items-center justify-center text-slate-400">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                </div>
+              )}
             </div>
           </div>
         )}

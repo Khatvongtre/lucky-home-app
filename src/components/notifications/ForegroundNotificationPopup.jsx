@@ -1,7 +1,16 @@
-import { Bell, X } from 'lucide-react';
+import { Bell, Building2, X } from 'lucide-react';
+import { getNotificationHouseName } from '../../services/notificationFlow';
 
-const ForegroundNotificationPopup = ({ notification, onClose, onOpen }) => {
+const ForegroundNotificationPopup = ({
+  notification,
+  houses = [],
+  selectedHouse,
+  onClose,
+  onOpen,
+}) => {
   if (!notification) return null;
+
+  const houseName = getNotificationHouseName(notification, houses, selectedHouse);
 
   return (
     <div className="fixed left-0 right-0 top-4 z-[9998] flex justify-center px-4 pointer-events-none">
@@ -22,6 +31,12 @@ const ForegroundNotificationPopup = ({ notification, onClose, onOpen }) => {
             {notification.message && (
               <span className="mt-1 block text-[12px] font-semibold leading-snug text-slate-500">
                 {notification.message}
+              </span>
+            )}
+            {houseName && (
+              <span className="mt-2 inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2 py-1 text-[9px] font-black uppercase text-indigo-700 ring-1 ring-indigo-100">
+                <Building2 className="h-3 w-3" />
+                {houseName}
               </span>
             )}
           </span>

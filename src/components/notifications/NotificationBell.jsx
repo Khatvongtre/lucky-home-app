@@ -1,9 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Bell, CheckCheck, Circle, Loader2, RefreshCw } from 'lucide-react';
+import { Bell, Building2, CheckCheck, Circle, Loader2, RefreshCw } from 'lucide-react';
 import { api } from '../../services/api';
 import { getApiBaseUrl } from '../../services/apiServer';
 import {
   NOTIFICATION_REFRESH_EVENT,
+  getNotificationHouseName,
   markNotificationRead,
   navigateToNotification,
   parseNotificationMetadata,
@@ -281,6 +282,7 @@ const NotificationBell = ({
             {notifications.map(notification => {
               const unread = !notification.isRead;
               const metadata = parseNotificationMetadata(notification.metadataJson);
+              const houseName = getNotificationHouseName(notification, houses, selectedHouse);
               const imageUrl = resolveBackendAssetUrl(metadata.imageUrl);
               const showImage = imageUrl && !failedImageUrls[imageUrl];
 
@@ -309,8 +311,14 @@ const NotificationBell = ({
                       <p className="mt-1 text-[11px] font-semibold leading-snug text-slate-500">
                         {notification.message}
                       </p>
-                      {(metadata.roomCode || metadata.period || metadata.total) && (
+                      {(houseName || metadata.roomCode || metadata.period || metadata.total) && (
                         <div className="mt-2 flex flex-wrap gap-1.5">
+                          {houseName && (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-white px-2 py-1 text-[9px] font-black uppercase text-indigo-700 ring-1 ring-indigo-100">
+                              <Building2 className="h-3 w-3" />
+                              {houseName}
+                            </span>
+                          )}
                           {metadata.roomCode && <span className="rounded-md bg-white px-2 py-1 text-[9px] font-black uppercase text-blue-700 ring-1 ring-blue-100">Phòng {metadata.roomCode}</span>}
                           {metadata.period && <span className="rounded-md bg-white px-2 py-1 text-[9px] font-black uppercase text-slate-500 ring-1 ring-slate-100">{metadata.period}</span>}
                           {metadata.total && <span className="rounded-md bg-white px-2 py-1 text-[9px] font-black uppercase text-emerald-700 ring-1 ring-emerald-100">{Number(metadata.total).toLocaleString('vi-VN')} đ</span>}

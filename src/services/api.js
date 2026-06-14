@@ -2,11 +2,11 @@ import { authStorage } from "./authStorage";
 import { fetchFromApi } from "./apiServer";
 import { getDeviceHeaders } from "./deviceInfo";
 
-const getHeaders = ({ skipDeviceHeaders = false } = {}) => {
+const getHeaders = async ({ includeDeviceHeaders = false } = {}) => {
     const token = authStorage.getToken();
     return {
         "Content-Type": "application/json",
-        ...(token && !skipDeviceHeaders && getDeviceHeaders()),
+        ...(includeDeviceHeaders && await getDeviceHeaders()),
         ...(token && { Authorization: `Bearer ${token}` }),
     };
 };
@@ -55,35 +55,20 @@ const handleError = (error) => {
 };
 
 const request = async (url, options = {}) => {
-    const { skipDeviceHeaders, ...fetchOptions } = options;
+    const token = authStorage.getToken();
+    const includeDeviceHeaders = Boolean(token) || url === "/auth/login";
 
     try {
         const res = await fetchFromApi(url, {
-            ...fetchOptions,
+            ...options,
             cache: "no-store",
             headers: {
-                ...getHeaders({ skipDeviceHeaders }),
-                ...fetchOptions.headers,
+                ...await getHeaders({ includeDeviceHeaders }),
+                ...options.headers,
             },
         });
         return await handleResponse(res);
     } catch (error) {
-        if (
-            !skipDeviceHeaders
-            && authStorage.getToken()
-            && error.message.includes("Failed to fetch")
-        ) {
-            const retryRes = await fetchFromApi(url, {
-                ...fetchOptions,
-                cache: "no-store",
-                headers: {
-                    ...getHeaders({ skipDeviceHeaders: true }),
-                    ...fetchOptions.headers,
-                },
-            });
-            return await handleResponse(retryRes);
-        }
-
         handleError(error);
     }
 };
