@@ -96,6 +96,7 @@ jobs:
       - name: Copy Lucky Home APK
         shell: pwsh
         run: |
+          New-Item -ItemType Directory -Path apk -Force | Out-Null
           $apkPath = 'android/app/build/outputs/apk/release/app-release.apk'
           if (!(Test-Path -LiteralPath $apkPath)) {
             throw "Lucky Home APK was not created at $apkPath."
