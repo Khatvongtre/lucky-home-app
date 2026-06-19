@@ -387,7 +387,7 @@ const MainApp = () => {
     resetAppAfterLogout();
   }, [clearAuthSession, deleteCurrentFcmToken, resetAppAfterLogout]);
 
-  useUnauthorizedLogout(handleLogout);
+  useUnauthorizedLogout(handleLogout, showToast);
 
   const {
     currentRooms,

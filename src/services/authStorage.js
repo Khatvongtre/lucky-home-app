@@ -1,27 +1,94 @@
+import { resetSessionExpiredNotification } from './authEvents';
+
 const TOKEN_KEY = 'smartstay_token';
+const REFRESH_TOKEN_KEY = 'smartstay_refresh_token';
 const USER_KEY = 'smartstay_user';
+const STORAGE_KIND_KEY = 'smartstay_auth_storage';
+
+const STORAGE_KIND_LOCAL = 'local';
+const STORAGE_KIND_SESSION = 'session';
+
+const getStorageByKind = (kind) => (
+  kind === STORAGE_KIND_SESSION ? sessionStorage : localStorage
+);
+
+const getActiveStorageKind = () => {
+  const savedKind = localStorage.getItem(STORAGE_KIND_KEY);
+  if (savedKind === STORAGE_KIND_LOCAL || savedKind === STORAGE_KIND_SESSION) {
+    return savedKind;
+  }
+
+  if (
+    sessionStorage.getItem(TOKEN_KEY)
+    || sessionStorage.getItem(USER_KEY)
+    || sessionStorage.getItem(REFRESH_TOKEN_KEY)
+  ) {
+    return STORAGE_KIND_SESSION;
+  }
+
+  return STORAGE_KIND_LOCAL;
+};
+
+const getActiveStorage = () => getStorageByKind(getActiveStorageKind());
+
+const readItem = (key) => {
+  const activeStorage = getActiveStorage();
+  const activeValue = activeStorage.getItem(key);
+  if (activeValue) return activeValue;
+
+  const fallbackStorage = activeStorage === localStorage ? sessionStorage : localStorage;
+  return fallbackStorage.getItem(key);
+};
+
+const parseStoredUser = (value) => {
+  if (!value) return null;
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+};
+
+const clearStorage = (storage) => {
+  storage.removeItem(TOKEN_KEY);
+  storage.removeItem(REFRESH_TOKEN_KEY);
+  storage.removeItem(USER_KEY);
+};
 
 export const authStorage = {
-    getToken: () => localStorage.getItem(TOKEN_KEY),
+  getToken: () => readItem(TOKEN_KEY),
 
-    getUser: () => {
-        const savedUser = localStorage.getItem(USER_KEY);
-        if (!savedUser) return null;
+  getRefreshToken: () => readItem(REFRESH_TOKEN_KEY),
 
-        try {
-            return JSON.parse(savedUser);
-        } catch {
-            return null;
-        }
-    },
+  getUser: () => parseStoredUser(readItem(USER_KEY)),
 
-    setSession: ({ token, user }) => {
-        if (token) localStorage.setItem(TOKEN_KEY, token);
-        if (user) localStorage.setItem(USER_KEY, JSON.stringify(user));
-    },
+  getSession: () => ({
+    token: authStorage.getToken(),
+    refreshToken: authStorage.getRefreshToken(),
+    user: authStorage.getUser(),
+    persist: getActiveStorageKind() === STORAGE_KIND_LOCAL,
+  }),
 
-    clearSession: () => {
-        localStorage.removeItem(TOKEN_KEY);
-        localStorage.removeItem(USER_KEY);
-    },
+  setSession: ({ token, refreshToken, user, persist = true }) => {
+    const targetKind = persist ? STORAGE_KIND_LOCAL : STORAGE_KIND_SESSION;
+    const targetStorage = getStorageByKind(targetKind);
+    const otherStorage = targetStorage === localStorage ? sessionStorage : localStorage;
+
+    clearStorage(targetStorage);
+    clearStorage(otherStorage);
+
+    if (token) targetStorage.setItem(TOKEN_KEY, token);
+    if (refreshToken) targetStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+    if (user) targetStorage.setItem(USER_KEY, JSON.stringify(user));
+
+    localStorage.setItem(STORAGE_KIND_KEY, targetKind);
+    resetSessionExpiredNotification();
+  },
+
+  clearSession: () => {
+    clearStorage(localStorage);
+    clearStorage(sessionStorage);
+    localStorage.removeItem(STORAGE_KIND_KEY);
+  },
 };

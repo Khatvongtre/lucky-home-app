@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Building2, Mail, User, Lock, Loader2 } from 'lucide-react';
 import { api } from '../services/api';
 import { authStorage } from '../services/authStorage';
+import { AUTH_LOGIN_ENDPOINT } from '../services/authRefresh';
 
 const AuthView = ({ setIsLoggedIn, setUser, showToast }) => {
   const [isRegistering, setIsRegistering] = useState(false);
@@ -23,8 +24,12 @@ const AuthView = ({ setIsLoggedIn, setUser, showToast }) => {
         showToast("Đã gửi yêu cầu khôi phục mật khẩu. Vui lòng kiểm tra email/SĐT.", "success");
         setIsForgotPassword(false);
       } else {
-        const res = await api.post('/auth/login', authForm);
-        authStorage.setSession({ token: res.token, user: res.user });
+        const res = await api.post(AUTH_LOGIN_ENDPOINT, authForm);
+        authStorage.setSession({
+          token: res.token,
+          refreshToken: res.refreshToken,
+          user: res.user,
+        });
         setUser(res.user);
         setIsLoggedIn(true);
       }
