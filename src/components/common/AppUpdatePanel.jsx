@@ -5,8 +5,8 @@ import { Download, Loader2, RefreshCw, Smartphone } from 'lucide-react';
 const APP_VARIANT = import.meta.env.VITE_APP_VARIANT || 'home';
 const CURRENT_BUILD_NUMBER = Number(import.meta.env.VITE_APP_BUILD_NUMBER || 0);
 const CURRENT_BUILD_DATE = import.meta.env.VITE_APP_BUILD_DATE || '';
-const UPDATE_MANIFEST_URL = import.meta.env.VITE_APP_UPDATE_MANIFEST_URL
-  || 'https://github.com/Khatvongtre/lucky-home-app/releases/download/android-latest/update.json';
+const UPDATE_RELEASE_API_URL = import.meta.env.VITE_APP_UPDATE_RELEASE_API_URL
+  || 'https://api.github.com/repos/Khatvongtre/lucky-home-app/releases/tags/android-latest';
 
 const formatBuildDate = (value) => {
   if (!value) return '';
@@ -25,6 +25,35 @@ const openDownload = (url) => {
   anchor.remove();
 };
 
+const extractReleaseField = (body, label) => {
+  const pattern = new RegExp(`^${label}:\\s*(.+)$`, 'im');
+  const matched = String(body || '').match(pattern);
+  return matched?.[1]?.trim() || '';
+};
+
+const buildManifestFromRelease = (releaseData) => {
+  const assets = Array.isArray(releaseData?.assets) ? releaseData.assets : [];
+  const apkAsset = assets.find(asset => asset?.name === 'lucky-home.apk');
+  if (!apkAsset?.browser_download_url) {
+    throw new Error('Chưa có file APK cho bản app này.');
+  }
+
+  const buildNumber = Number(extractReleaseField(releaseData?.body, 'Build')) || 0;
+  const generatedAt = extractReleaseField(releaseData?.body, 'Generated at') || releaseData?.published_at || '';
+
+  return {
+    buildNumber,
+    generatedAt,
+    variants: {
+      [APP_VARIANT]: {
+        label: 'Lucky Home',
+        apkName: apkAsset.name,
+        downloadUrl: apkAsset.browser_download_url,
+      },
+    },
+  };
+};
+
 const AppUpdatePanel = () => {
   const [state, setState] = React.useState({
     status: 'checking',
@@ -37,11 +66,17 @@ const AppUpdatePanel = () => {
     setState(prev => ({ ...prev, status: 'checking', error: '' }));
 
     try {
-      const separator = UPDATE_MANIFEST_URL.includes('?') ? '&' : '?';
-      const response = await fetch(`${UPDATE_MANIFEST_URL}${separator}t=${Date.now()}`, { cache: 'no-store' });
-      if (!response.ok) throw new Error(`Không tải được danh sách cập nhật (${response.status}).`);
+      const separator = UPDATE_RELEASE_API_URL.includes('?') ? '&' : '?';
+      const response = await fetch(`${UPDATE_RELEASE_API_URL}${separator}t=${Date.now()}`, {
+        cache: 'no-store',
+        headers: {
+          Accept: 'application/vnd.github+json',
+        },
+      });
+      if (!response.ok) throw new Error(`Không tải được thông tin cập nhật (${response.status}).`);
 
-      const manifest = await response.json();
+      const releaseData = await response.json();
+      const manifest = buildManifestFromRelease(releaseData);
       const release = manifest?.variants?.[APP_VARIANT];
       if (!release?.downloadUrl) throw new Error('Chưa có file APK cho bản app này.');
 
