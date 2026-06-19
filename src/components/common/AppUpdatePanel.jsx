@@ -6,7 +6,7 @@ const APP_VARIANT = import.meta.env.VITE_APP_VARIANT || 'home';
 const CURRENT_BUILD_NUMBER = Number(import.meta.env.VITE_APP_BUILD_NUMBER || 0);
 const CURRENT_BUILD_DATE = import.meta.env.VITE_APP_BUILD_DATE || '';
 const UPDATE_MANIFEST_URL = import.meta.env.VITE_APP_UPDATE_MANIFEST_URL
-  || 'https://raw.githubusercontent.com/Khatvongtre/lucky-home-app/main/apk/update.json';
+  || 'https://github.com/Khatvongtre/lucky-home-app/releases/download/android-latest/update.json';
 
 const formatBuildDate = (value) => {
   if (!value) return '';

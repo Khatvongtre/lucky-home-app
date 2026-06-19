@@ -19,12 +19,14 @@ If you are developing a production application, we recommend using TypeScript wi
 
 The `Build Android APK` GitHub Action runs after pushes to `main` and can also be started manually from the Actions tab.
 
-Each run builds the `home` release APK variant, signs it with a stable Android keystore, copies it into `apk/` with a fixed file name, uploads it as an artifact, then commits the download file back to `main`:
+Each run builds the `home` release APK variant, signs it with a stable Android keystore, uploads the APK as a workflow artifact, and publishes the latest Android assets to the fixed GitHub Release tag `android-latest`.
 
-- `apk/lucky-home.apk`
-- `apk/update.json`
+Published release assets:
 
-The app reads `apk/update.json` through the stable GitHub raw URL, compares the current APK build number with the latest server build, and downloads the matching variant from the Profile or Settings update panel. Open a successful workflow run in GitHub Actions when an artifact download is needed instead.
+- `lucky-home.apk`
+- `update.json`
+
+The app reads `update.json` from the fixed release URL, compares the current APK build number with the latest published build, and downloads the matching variant from the Profile or Settings update panel. This avoids creating extra bot commits on `main` after each build.
 
 Required GitHub secrets for installable updates:
 

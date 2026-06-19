@@ -5,8 +5,26 @@ on:
   push:
     branches:
       - main
-    paths-ignore:
-      - apk/**
+    paths:
+      - '.github/workflows/build-android-apk.yml'
+      - 'android/**'
+      - 'public/**'
+      - 'scripts/**'
+      - 'src/**'
+      - '.env.home'
+      - 'capacitor.config.json'
+      - 'capacitor.lucky-home.json'
+      - 'eslint.config.js'
+      - 'index.html'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'postcss.config.js'
+      - 'tailwind.config.js'
+      - 'vite.config.js'
+
+concurrency:
+  group: build-android-apk-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -19,6 +37,7 @@ jobs:
       VITE_APP_BUILD_NUMBER: ${{ github.run_number }}
       ANDROID_VERSION_CODE: ${{ github.run_number }}
       ANDROID_VERSION_NAME: 1.0.${{ github.run_number }}
+      RELEASE_TAG: android-latest
 
     steps:
       - name: Checkout source
@@ -35,6 +54,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
+          cache: gradle
 
       - name: Set build metadata
         shell: pwsh
@@ -85,6 +105,7 @@ jobs:
       - name: Update APK manifest
         shell: pwsh
         run: |
+          $releaseBaseUrl = "https://github.com/${{ github.repository }}/releases/download/$env:RELEASE_TAG"
           $manifest = [ordered]@{
             schemaVersion = 1
             generatedAt = $env:VITE_APP_BUILD_DATE
@@ -93,7 +114,7 @@ jobs:
               home = [ordered]@{
                 label = 'Lucky Home'
                 apkName = 'lucky-home.apk'
-                downloadUrl = 'https://raw.githubusercontent.com/Khatvongtre/lucky-home-app/main/apk/lucky-home.apk'
+                downloadUrl = "$releaseBaseUrl/lucky-home.apk"
               }
             }
           }
@@ -105,19 +126,22 @@ jobs:
         with:
           name: lucky-home.apk
           path: apk/lucky-home.apk
+          compression-level: 0
           if-no-files-found: error
           retention-days: 14
 
-      - name: Publish APK downloads
-        shell: pwsh
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add apk/lucky-home.apk apk/update.json
-          git diff --cached --quiet
-          if ($LASTEXITCODE -eq 0) {
-            Write-Host 'APK downloads already match this build.'
-            exit 0
-          }
-          git commit -m 'chore: update Android APK downloads [skip ci]'
-          git push
+      - name: Publish Android release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: Android Latest
+          body: |
+            Automated Android APK release assets for Lucky Home.
+            Build: ${{ env.VITE_APP_BUILD_NUMBER }}
+            Generated at: ${{ env.VITE_APP_BUILD_DATE }}
+          draft: false
+          prerelease: false
+          make_latest: true
+          files: |
+            apk/lucky-home.apk
+            apk/update.json
