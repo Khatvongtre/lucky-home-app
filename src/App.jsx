@@ -458,6 +458,8 @@ const MainApp = () => {
         setIsListening,
         handleLogout,
         dashboardWarnings,
+        loadHouses,
+        loadWarnings,
         setHighlightedItemId,
         setViewDate,
         viewDate,

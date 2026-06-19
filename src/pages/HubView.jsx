@@ -154,13 +154,20 @@ const HubView = ({
   setConfig, setSearchQuery, setEditingHouse, setIsAiCreateHouseOpen,
   setIsAiPromptModalOpen, setAiPrompt, setIsListening, showToast,
   handleLogout, toast, dashboardWarnings = [],
+  loadHouses,
+  loadWarnings,
   setHighlightedItemId,
   setViewDate,
   viewDate,
   isManagerOrAbove = false,
   requestConfirm,
 }) => {
+  const PULL_REFRESH_THRESHOLD = 72;
+  const PULL_REFRESH_MAX = 108;
   const API_URL = getApiBaseUrl();
+  const scrollContainerRef = React.useRef(null);
+  const pullStartYRef = React.useRef(0);
+  const isPullingRef = React.useRef(false);
   const [quickHouseId, setQuickHouseId] = React.useState(houses[0]?.id || '');
   const [roomsByHouse, setRoomsByHouse] = React.useState({});
   const [metersByHouse, setMetersByHouse] = React.useState({});
@@ -188,6 +195,8 @@ const HubView = ({
   const [hubSavings, setHubSavings] = React.useState([]);
   const [hubMonthlyStats, setHubMonthlyStats] = React.useState(null);
   const [isSavingTotalVisible, setIsSavingTotalVisible] = React.useState(false);
+  const [pullDistance, setPullDistance] = React.useState(0);
+  const [isPullRefreshing, setIsPullRefreshing] = React.useState(false);
 
   const hubStats = houses.reduce((acc, h) => {
     const revenue = Number(h.revenue) || 0;
@@ -231,6 +240,8 @@ const HubView = ({
   const quickBillCanEdit = ['SuperAdmin', 'Owner', 'Manager'].includes(selectedQuickHouse?.userRole || user?.role)
     || ['SuperAdmin', 'Owner'].includes(user?.role);
   const quickBillCanPay = quickBillCanEdit;
+  const visiblePullDistance = isPullRefreshing ? PULL_REFRESH_THRESHOLD : pullDistance;
+  const isPullReady = pullDistance >= PULL_REFRESH_THRESHOLD;
 
   const getQuickHouseRoomStats = (house) => {
     const houseRooms = roomsByHouse[house?.id] || [];
@@ -522,9 +533,9 @@ const HubView = ({
     setBillsByHouse({});
   }, [quickQrHouseIdsKey, viewDate]);
 
-  const loadQuickRooms = async (house, { silent = false } = {}) => {
+  const loadQuickRooms = async (house, { silent = false, force = false } = {}) => {
     if (!house?.id) return [];
-    if (roomsByHouse[house.id]) return roomsByHouse[house.id];
+    if (!force && roomsByHouse[house.id]) return roomsByHouse[house.id];
 
     try {
       if (!silent) setRoomsLoadingHouseId(house.id);

@@ -13,8 +13,10 @@
     "android:sync": "npm run build && cap sync android",
     "android:sync:home": "powershell -ExecutionPolicy Bypass -File scripts/prepare-android-variant.ps1 -Variant home && npm run build:home && cap sync android",
     "android:sync:hu-chi-tieu": "powershell -ExecutionPolicy Bypass -File scripts/prepare-android-variant.ps1 -Variant hu-chi-tieu && npm run build:hu-chi-tieu && cap sync android",
-    "android:apk:home": "npm run android:sync:home && cd android && java -jar gradle\\wrapper\\gradle-wrapper.jar assembleDebug",
-    "android:apk:hu-chi-tieu": "npm run android:sync:hu-chi-tieu && cd android && java -jar gradle\\wrapper\\gradle-wrapper.jar assembleDebug",
+    "android:apk:home": "npm run android:sync:home && cd android && java -jar gradle\\wrapper\\gradle-wrapper.jar assembleRelease",
+    "android:apk:hu-chi-tieu": "npm run android:sync:hu-chi-tieu && cd android && java -jar gradle\\wrapper\\gradle-wrapper.jar assembleRelease",
+    "android:apk:home:debug": "npm run android:sync:home && cd android && java -jar gradle\\wrapper\\gradle-wrapper.jar assembleDebug",
+    "android:apk:hu-chi-tieu:debug": "npm run android:sync:hu-chi-tieu && cd android && java -jar gradle\\wrapper\\gradle-wrapper.jar assembleDebug",
     "android:open": "cap open android"
   },
   "dependencies": {

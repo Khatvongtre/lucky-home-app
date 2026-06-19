@@ -1,14 +1,65 @@
 apply plugin: 'com.android.application'
 
+import java.util.Properties
+
+def readTextValue = { value ->
+    def normalized = value == null ? '' : String.valueOf(value).trim()
+    normalized ? normalized : null
+}
+
+def envOrProperty = { name, fallback = null ->
+    def propertyValue = readTextValue(project.findProperty(name))
+    if (propertyValue) return propertyValue
+
+    def envValue = readTextValue(System.getenv(name))
+    if (envValue) return envValue
+
+    fallback
+}
+
+def parseIntValue = { value, fallback ->
+    try {
+        Integer.parseInt(String.valueOf(value).trim())
+    } catch (ignored) {
+        fallback
+    }
+}
+
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('keystore.properties')
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withInputStream { stream ->
+        keystoreProperties.load(stream)
+    }
+}
+
+def releaseStoreFile = readTextValue(keystoreProperties.getProperty('storeFile')) ?: envOrProperty('ANDROID_KEYSTORE_FILE')
+def releaseStorePassword = readTextValue(keystoreProperties.getProperty('storePassword')) ?: envOrProperty('ANDROID_KEYSTORE_PASSWORD')
+def releaseKeyAlias = readTextValue(keystoreProperties.getProperty('keyAlias')) ?: envOrProperty('ANDROID_KEY_ALIAS')
+def releaseKeyPassword = readTextValue(keystoreProperties.getProperty('keyPassword')) ?: envOrProperty('ANDROID_KEY_PASSWORD')
+def hasReleaseSigning = [releaseStoreFile, releaseStorePassword, releaseKeyAlias, releaseKeyPassword].every { it }
+def resolvedVersionCode = parseIntValue(envOrProperty('ANDROID_VERSION_CODE', envOrProperty('VITE_APP_BUILD_NUMBER', '1')), 1)
+def resolvedVersionName = envOrProperty('ANDROID_VERSION_NAME', envOrProperty('VITE_APP_VERSION_NAME', envOrProperty('npm_package_version', '1.0.0')))
+
 android {
     namespace = "com.luckyhome.app"
     compileSdk = rootProject.ext.compileSdkVersion
+    signingConfigs {
+        if (hasReleaseSigning) {
+            release {
+                storeFile file(releaseStoreFile)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
     defaultConfig {
         applicationId "com.luckyhome.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode resolvedVersionCode
+        versionName resolvedVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -18,10 +69,15 @@ android {
     }
     buildTypes {
         release {
+            signingConfig hasReleaseSigning ? signingConfigs.release : signingConfigs.debug
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+}
+
+if (!hasReleaseSigning) {
+    logger.lifecycle('Release signing is not configured. Falling back to debug signing for release builds; APK updates may fail to install over an existing app.')
 }
 
 repositories {

@@ -2,20 +2,21 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
   Ban,
-  CalendarDays,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   Clock3,
-  Globe2,
   History,
   Laptop,
   Loader2,
-  MapPin,
-  RefreshCw,
   ShieldCheck,
   Trash2,
   XCircle,
 } from 'lucide-react';
 import { api } from '../../services/api';
+
+const DEVICE_PAGE_SIZE = 4;
+const LOG_PAGE_SIZE = 5;
 
 const actionLabels = {
   login_success: 'Đăng nhập thành công',
@@ -69,6 +70,27 @@ const formatVietnamTime = (value) => {
   }).format(date);
 };
 
+const normalizeIpAddress = (value) => {
+  const ipAddress = String(value || '').trim();
+  if (!ipAddress) return '-';
+  return ipAddress.split(',')[0].trim() || ipAddress;
+};
+
+const getIpVersion = (value) => {
+  const ipAddress = normalizeIpAddress(value);
+  if (ipAddress === '-') return 'IP';
+  return ipAddress.includes(':') ? 'IPv6' : 'IPv4';
+};
+
+const formatIpAddress = (value) => {
+  const ipAddress = normalizeIpAddress(value);
+  if (ipAddress === '-' || !ipAddress.includes(':')) return ipAddress;
+
+  const parts = ipAddress.split(':').filter(Boolean);
+  if (parts.length <= 4) return ipAddress;
+  return `${parts.slice(0, 4).join(':')}...`;
+};
+
 const getDeviceTitle = (device) => (
   device.deviceName
   || [device.browser, device.operatingSystem].filter(Boolean).join(' trên ')
@@ -77,68 +99,81 @@ const getDeviceTitle = (device) => (
 
 const getDeviceDescription = (device) => {
   const browserOs = [device.browser, device.operatingSystem].filter(Boolean).join(' / ');
-  return browserOs || device.deviceType || '-';
+  return browserOs || device.deviceType || 'Không rõ nền tảng';
 };
 
 const getDeviceTone = (device) => {
   if (device.isRevoked) {
     return {
-      iconClass: 'bg-red-50 text-red-600 border-red-100',
-      ringClass: 'border-red-100 bg-red-50/50',
+      iconClass: 'text-red-600',
+      cardClass: 'border-red-100 bg-white',
     };
   }
   if (device.isCurrent) {
     return {
-      iconClass: 'bg-blue-50 text-blue-600 border-blue-100',
-      ringClass: 'border-blue-100 bg-blue-50/50',
+      iconClass: 'text-blue-600',
+      cardClass: 'border-blue-100 bg-white',
     };
   }
   if (device.isTrusted) {
     return {
-      iconClass: 'bg-emerald-50 text-emerald-600 border-emerald-100',
-      ringClass: 'border-emerald-100 bg-emerald-50/40',
+      iconClass: 'text-emerald-600',
+      cardClass: 'border-emerald-100 bg-white',
     };
   }
   return {
-    iconClass: 'bg-slate-50 text-slate-600 border-slate-100',
-    ringClass: 'border-slate-100 bg-white',
+    iconClass: 'text-slate-500',
+    cardClass: 'border-slate-100 bg-white',
   };
 };
 
 const StatusBadge = ({ children, className }) => (
-  <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[8px] font-black uppercase tracking-widest ${className}`}>
+  <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[9px] font-black leading-none ${className}`}>
     {children}
   </span>
 );
 
-const MetricPill = ({ icon: Icon, label, value }) => (
-  <div className="min-w-0 rounded-lg border border-slate-100 bg-white px-3 py-2">
-    <div className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest text-slate-400">
-      {React.createElement(Icon, { className: 'w-3 h-3' })}
-      {label}
-    </div>
-    <p className="mt-1 text-[11px] font-bold leading-snug text-slate-700 break-words">{value || '-'}</p>
+const IpValue = ({ value }) => {
+  const fullIp = normalizeIpAddress(value);
+  const ipVersion = getIpVersion(fullIp);
+
+  return (
+    <span className="inline-flex min-w-0 max-w-full items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-[10px] font-bold text-slate-700" title={fullIp}>
+      <span className="shrink-0 text-[9px] font-black text-slate-400">{ipVersion}</span>
+      <span className="min-w-0 truncate font-mono leading-none">{formatIpAddress(fullIp)}</span>
+    </span>
+  );
+};
+
+const InfoLine = ({ icon: Icon, label, value }) => (
+  <div className="inline-flex min-w-0 items-center gap-1.5 text-[10px] font-bold text-slate-500">
+    <Icon className="h-3 w-3 shrink-0 text-slate-400" />
+    {label && <span className="shrink-0">{label}</span>}
+    <span className="min-w-0 truncate text-slate-800">{value || '-'}</span>
   </div>
 );
 
 const EmptyState = ({ icon: Icon = History, title, children }) => (
-  <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center">
-    <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl border border-slate-100 bg-white text-slate-400">
+  <div className="rounded-xl border border-dashed border-slate-200 bg-white p-5 text-center shadow-[0_4px_12px_rgba(0,0,0,0.04)]">
+    <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-100 bg-slate-50 text-slate-400">
       {React.createElement(Icon, { className: 'w-5 h-5' })}
     </div>
-    <h5 className="text-xs font-black uppercase tracking-widest text-slate-500">{title}</h5>
+    <h5 className="text-xs font-black text-slate-700">{title}</h5>
     {children && <p className="mt-1 text-[11px] font-bold leading-relaxed text-slate-400">{children}</p>}
   </div>
 );
 
 const AccessDevicesPanel = ({ requestConfirm, showToast }) => {
-  const LOG_PAGE_SIZE = 3;
   const [activeTab, setActiveTab] = useState('devices');
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const [devices, setDevices] = useState([]);
   const [logs, setLogs] = useState([]);
+  const [visibleDeviceCount, setVisibleDeviceCount] = useState(DEVICE_PAGE_SIZE);
   const [visibleLogCount, setVisibleLogCount] = useState(LOG_PAGE_SIZE);
   const [isLoading, setIsLoading] = useState(false);
   const [actionId, setActionId] = useState('');
+  const deviceListRef = useRef(null);
+  const deviceLoadMoreRef = useRef(null);
   const logListRef = useRef(null);
   const logLoadMoreRef = useRef(null);
 
@@ -151,6 +186,7 @@ const AccessDevicesPanel = ({ requestConfirm, showToast }) => {
       ]);
       setDevices(normalizeList(deviceResult));
       setLogs(normalizeList(logResult));
+      setVisibleDeviceCount(DEVICE_PAGE_SIZE);
       setVisibleLogCount(LOG_PAGE_SIZE);
     } catch (error) {
       showToast?.(error.message || 'Không thể tải thông tin thiết bị', 'error');
@@ -172,6 +208,7 @@ const AccessDevicesPanel = ({ requestConfirm, showToast }) => {
         if (!isMounted) return;
         setDevices(normalizeList(deviceResult));
         setLogs(normalizeList(logResult));
+        setVisibleDeviceCount(DEVICE_PAGE_SIZE);
         setVisibleLogCount(LOG_PAGE_SIZE);
       } catch (error) {
         if (isMounted) showToast?.(error.message || 'Không thể tải thông tin thiết bị', 'error');
@@ -236,95 +273,107 @@ const AccessDevicesPanel = ({ requestConfirm, showToast }) => {
     () => devices.some(device => !device.isCurrent && !device.isRevoked),
     [devices],
   );
+  const visibleDevices = useMemo(
+    () => devices.slice(0, visibleDeviceCount),
+    [devices, visibleDeviceCount],
+  );
+  const hasMoreDevices = visibleDeviceCount < devices.length;
   const visibleLogs = useMemo(
     () => logs.slice(0, visibleLogCount),
     [logs, visibleLogCount],
   );
   const hasMoreLogs = visibleLogCount < logs.length;
 
+  const handleTabClick = useCallback((tab) => {
+    if (activeTab === tab) {
+      setIsCollapsed(value => !value);
+      return;
+    }
+
+    setActiveTab(tab);
+    setIsCollapsed(false);
+  }, [activeTab]);
+
+  const loadMoreDevices = useCallback(() => {
+    setVisibleDeviceCount(count => Math.min(count + DEVICE_PAGE_SIZE, devices.length));
+  }, [devices.length]);
+
+  const loadMoreLogs = useCallback(() => {
+    setVisibleLogCount(count => Math.min(count + LOG_PAGE_SIZE, logs.length));
+  }, [logs.length]);
+
+  const handleDeviceScroll = useCallback((event) => {
+    if (!hasMoreDevices) return;
+    const { scrollTop, scrollHeight, clientHeight } = event.currentTarget;
+    if (scrollHeight - scrollTop - clientHeight <= 48) {
+      loadMoreDevices();
+    }
+  }, [hasMoreDevices, loadMoreDevices]);
+
   useEffect(() => {
-    if (activeTab !== 'logs' || !hasMoreLogs || !logLoadMoreRef.current) return undefined;
+    if (activeTab !== 'devices' || !hasMoreDevices || !deviceLoadMoreRef.current) return undefined;
 
     const observer = new IntersectionObserver((entries) => {
       if (!entries[0]?.isIntersecting) return;
-      setVisibleLogCount(count => Math.min(count + LOG_PAGE_SIZE, logs.length));
+      loadMoreDevices();
     }, {
-      root: logListRef.current,
-      rootMargin: '0px 0px 80px',
+      root: deviceListRef.current,
+      rootMargin: '0px 0px 72px',
     });
 
-    observer.observe(logLoadMoreRef.current);
+    observer.observe(deviceLoadMoreRef.current);
     return () => observer.disconnect();
-  }, [activeTab, hasMoreLogs, logs.length]);
+  }, [activeTab, hasMoreDevices, loadMoreDevices]);
 
   return (
     <section className="overflow-hidden rounded-xl border border-slate-100 bg-white shadow-sm">
-      <div className="border-b border-slate-100 bg-slate-950 px-5 py-4 text-white">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h4 className="text-[10px] font-black uppercase tracking-widest">Thiết bị truy cập</h4>
-            <p className="mt-1 text-[10px] font-bold leading-relaxed text-slate-300">
-              Theo dõi phiên đăng nhập, IP và hoạt động bảo mật gần đây.
-            </p>
-          </div>
+      <button
+        type="button"
+        onClick={() => setIsCollapsed(value => !value)}
+        aria-expanded={!isCollapsed}
+        className="flex w-full items-center justify-between bg-blue-600 px-5 py-4 text-left transition-colors duration-[180ms] hover:bg-blue-700"
+      >
+        <h4 className="text-[10px] font-black uppercase tracking-widest text-white">Quản lý phiên đăng nhập</h4>
+        {isCollapsed ? <ChevronDown className="h-4 w-4 shrink-0 text-white" /> : <ChevronUp className="h-4 w-4 shrink-0 text-white" />}
+      </button>
+
+      {!isCollapsed && (
+        <div className="bg-[#f8fafc] p-3">
+          <div className="mb-3 grid h-10 grid-cols-2 rounded-xl bg-slate-100 p-1">
           <button
             type="button"
-            onClick={loadAccessData}
-            disabled={isLoading}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/10 text-white transition-all active:scale-95 disabled:opacity-60"
-            title="Làm mới"
-          >
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          </button>
-        </div>
-
-        <div className="mt-4 grid grid-cols-3 gap-2">
-          <div className="rounded-lg bg-white/10 px-3 py-2">
-            <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">Tổng</p>
-            <p className="mt-1 text-lg font-black leading-none">{devices.length}</p>
-          </div>
-          <div className="rounded-lg bg-white/10 px-3 py-2">
-            <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">Đang dùng</p>
-            <p className="mt-1 text-lg font-black leading-none">{activeDevices}</p>
-          </div>
-          <div className="rounded-lg bg-white/10 px-3 py-2">
-            <p className="text-[8px] font-black uppercase tracking-widest text-slate-400">Log</p>
-            <p className="mt-1 text-lg font-black leading-none">{logs.length}</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="p-4">
-        <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1">
-          <button
-            type="button"
-            onClick={() => setActiveTab('devices')}
-            className={`flex items-center justify-center gap-2 rounded-lg py-3 text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'devices' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-500'}`}
+            onClick={() => handleTabClick('devices')}
+            aria-expanded={activeTab === 'devices' && !isCollapsed}
+            className={`flex items-center justify-center gap-1.5 rounded-lg text-[11px] font-black transition-all duration-[180ms] active:scale-[0.98] ${activeTab === 'devices' ? 'bg-white text-slate-950 shadow-[0_4px_12px_rgba(0,0,0,0.04)]' : 'text-slate-500 hover:text-slate-700'}`}
           >
             <Laptop className="h-3.5 w-3.5" />
             Thiết bị
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('logs')}
-            className={`flex items-center justify-center gap-2 rounded-lg py-3 text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'logs' ? 'bg-white text-slate-950 shadow-sm' : 'text-slate-500'}`}
+            onClick={() => handleTabClick('logs')}
+            aria-expanded={activeTab === 'logs' && !isCollapsed}
+            className={`flex items-center justify-center gap-1.5 rounded-lg text-[11px] font-black transition-all duration-[180ms] active:scale-[0.98] ${activeTab === 'logs' ? 'bg-white text-slate-950 shadow-[0_4px_12px_rgba(0,0,0,0.04)]' : 'text-slate-500 hover:text-slate-700'}`}
           >
             <History className="h-3.5 w-3.5" />
             Lịch sử
           </button>
-        </div>
+          </div>
 
-        {activeTab === 'devices' && (
-          <div className="mt-4 space-y-3">
-            <button
-              type="button"
-              onClick={revokeOtherDevices}
-              disabled={!hasRevokableDevice || actionId === 'others'}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 py-3.5 text-[10px] font-black uppercase tracking-widest text-white shadow-sm transition-all active:scale-[0.99] disabled:bg-slate-200 disabled:text-slate-400"
-            >
-              {actionId === 'others' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ban className="h-4 w-4" />}
-              Thu hồi các thiết bị khác
-            </button>
+          {activeTab === 'devices' && (
+            <div className="flex h-[420px] min-h-0 flex-col">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h4 className="min-w-0 truncate text-sm font-black text-slate-950">Thiết bị đang đăng nhập</h4>
+              <button
+                type="button"
+                onClick={revokeOtherDevices}
+                disabled={!hasRevokableDevice || actionId === 'others'}
+                className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-lg bg-[#2563eb] px-2.5 py-2 text-[10px] font-black text-white shadow-[0_4px_12px_rgba(37,99,235,0.18)] transition-all duration-[180ms] hover:bg-blue-700 active:scale-[0.98] disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none"
+              >
+                {actionId === 'others' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Ban className="h-3.5 w-3.5" />}
+                Thu hồi thiết bị khác
+              </button>
+            </div>
 
             {!isLoading && devices.length === 0 && (
               <EmptyState icon={Laptop} title="Chưa có thiết bị">
@@ -332,62 +381,85 @@ const AccessDevicesPanel = ({ requestConfirm, showToast }) => {
               </EmptyState>
             )}
 
-            {devices.map(device => {
-              const tone = getDeviceTone(device);
-              const isDisabled = device.isCurrent || device.isRevoked || actionId === device.id;
+            <div
+              ref={deviceListRef}
+              onScroll={handleDeviceScroll}
+              className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 no-scrollbar"
+            >
+              {visibleDevices.map(device => {
+                const tone = getDeviceTone(device);
+                const isDisabled = device.isCurrent || device.isRevoked || actionId === device.id;
 
-              return (
-                <article key={device.id || device.deviceId} className={`rounded-xl border p-4 ${tone.ringClass}`}>
-                  <div className="flex items-start gap-3">
-                    <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border ${tone.iconClass}`}>
-                      <Laptop className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <h5 className="truncate text-sm font-black text-slate-950">{getDeviceTitle(device)}</h5>
-                          <p className="mt-1 text-[10px] font-bold text-slate-500">{getDeviceDescription(device)}</p>
+                return (
+                  <article
+                    key={device.id || device.deviceId}
+                    className={`min-h-[96px] rounded-xl border px-3 py-2.5 shadow-[0_4px_12px_rgba(0,0,0,0.04)] transition-all duration-[180ms] hover:border-slate-300 hover:bg-white active:scale-[0.995] ${tone.cardClass}`}
+                  >
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-50 ${tone.iconClass}`}>
+                        <Laptop className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex min-w-0 items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                              <h5 className="min-w-0 truncate text-[14px] font-black leading-5 text-slate-950">{getDeviceTitle(device)}</h5>
+                              {device.isCurrent && <StatusBadge className="bg-blue-50 text-[#2563eb]">Hiện tại</StatusBadge>}
+                              {device.isRevoked && <StatusBadge className="bg-red-50 text-red-600">Đã thu hồi</StatusBadge>}
+                              {device.isTrusted && <StatusBadge className="bg-emerald-50 text-emerald-700">Tin cậy</StatusBadge>}
+                            </div>
+                            <p className="mt-0.5 truncate text-[11px] font-semibold leading-4 text-slate-500">{getDeviceDescription(device)}</p>
+                          </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => revokeDevice(device)}
-                          disabled={isDisabled}
-                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-red-100 bg-white text-red-600 transition-all active:scale-95 disabled:border-slate-100 disabled:text-slate-300"
-                          title="Thu hồi thiết bị"
-                        >
-                          {actionId === device.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                        </button>
-                      </div>
 
-                      <div className="mt-3 flex flex-wrap gap-1.5">
-                        {device.isCurrent && <StatusBadge className="border-blue-100 bg-blue-50 text-blue-700">Thiết bị hiện tại</StatusBadge>}
-                        {device.isRevoked && <StatusBadge className="border-red-100 bg-red-50 text-red-700">Đã thu hồi</StatusBadge>}
-                        {device.isTrusted && <StatusBadge className="border-emerald-100 bg-emerald-50 text-emerald-700">Tin cậy</StatusBadge>}
+                        <div className="mt-2 flex min-w-0 flex-wrap items-center gap-1.5">
+                          <IpValue value={device.ipAddress} />
+                          <InfoLine icon={Clock3} value={formatVietnamTime(device.lastLoginAt || device.lastActivityAt)} />
+                        </div>
                       </div>
-
-                      <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                        <MetricPill icon={MapPin} label="IP gần nhất" value={device.ipAddress || '-'} />
-                        <MetricPill icon={CalendarDays} label="Lần đầu thấy" value={formatVietnamTime(device.firstSeenAt)} />
-                        <MetricPill icon={Clock3} label="Đăng nhập gần nhất" value={formatVietnamTime(device.lastLoginAt)} />
-                        <MetricPill icon={Globe2} label="Hoạt động gần nhất" value={formatVietnamTime(device.lastActivityAt)} />
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => revokeDevice(device)}
+                        disabled={isDisabled}
+                        className="flex h-8 w-8 shrink-0 items-center justify-center self-center rounded-full text-slate-400 transition-all duration-[180ms] hover:bg-red-50 hover:text-red-600 active:scale-95 disabled:text-slate-300"
+                        title="Thu hồi thiết bị"
+                      >
+                        {actionId === device.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                      </button>
                     </div>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        )}
+                  </article>
+                );
+              })}
 
-        {activeTab === 'logs' && (
-          <div className="mt-4">
+              {hasMoreDevices && (
+                <div ref={deviceLoadMoreRef} className="flex h-10 items-center justify-center">
+                  <button
+                    type="button"
+                    onClick={loadMoreDevices}
+                    className="rounded-lg bg-white px-3 py-2 text-[10px] font-black text-slate-500 shadow-[0_4px_12px_rgba(0,0,0,0.04)] transition-all duration-[180ms] hover:text-[#2563eb] active:scale-[0.98]"
+                  >
+                    Xem thêm thiết bị
+                  </button>
+                </div>
+              )}
+            </div>
+            </div>
+          )}
+
+          {activeTab === 'logs' && (
+            <div className="flex h-[420px] min-h-0 flex-col">
+            <h4 className="mb-2 text-sm font-black text-slate-950">Lịch sử đăng nhập</h4>
+
             {!isLoading && logs.length === 0 && (
               <EmptyState icon={History} title="Chưa có lịch sử">
                 Lịch sử đăng nhập và thu hồi thiết bị sẽ hiển thị tại đây.
               </EmptyState>
             )}
 
-            <div ref={logListRef} className="max-h-[420px] space-y-3 overflow-y-auto pr-1 no-scrollbar">
+            <div
+              ref={logListRef}
+              className="min-h-0 flex-1 overflow-y-auto rounded-xl bg-white px-3 pr-2 no-scrollbar"
+            >
               {visibleLogs.map((log, index) => {
                 const meta = actionStyles[log.action] || {
                   icon: AlertTriangle,
@@ -396,60 +468,51 @@ const AccessDevicesPanel = ({ requestConfirm, showToast }) => {
                   badgeClass: 'bg-slate-50 text-slate-700 border-slate-100',
                 };
                 const ActionIcon = meta.icon;
+                const isLastVisible = index === visibleLogs.length - 1 && !hasMoreLogs;
 
                 return (
-                  <article key={log.id || `${log.createdAt}-${index}`} className="relative rounded-xl border border-slate-100 bg-white p-4 shadow-sm">
-                    <div className="flex gap-3">
-                      <div className="relative shrink-0">
-                        <div className={`flex h-10 w-10 items-center justify-center rounded-xl border ${meta.iconClass}`}>
-                          <ActionIcon className="h-5 w-5" />
-                        </div>
-                        <span className={`absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full border-2 border-white ${meta.dot}`} />
+                  <article
+                    key={log.id || `${log.createdAt}-${index}`}
+                    className={`flex min-h-[66px] min-w-0 items-center gap-2.5 py-2.5 transition-colors duration-[180ms] hover:bg-slate-50 ${isLastVisible ? '' : 'border-b border-[#e5e7eb]'}`}
+                  >
+                    <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${log.action === 'login_success' ? 'bg-emerald-50 text-[#16a34a]' : log.action === 'login_failed' ? 'bg-red-50 text-red-500' : 'bg-amber-50 text-amber-600'}`}>
+                      <ActionIcon className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                        <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-black leading-none ${meta.badgeClass}`}>
+                          {actionLabels[log.action] || log.action || 'Hoạt động'}
+                        </span>
+                        <h5 className="min-w-0 truncate text-[13px] font-black leading-5 text-slate-950">
+                          {log.deviceName || 'Thiết bị không xác định'}
+                        </h5>
                       </div>
-
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <StatusBadge className={meta.badgeClass}>
-                              {actionLabels[log.action] || log.action || 'Hoạt động'}
-                            </StatusBadge>
-                            <h5 className="mt-2 truncate text-sm font-black text-slate-950">
-                              {log.deviceName || 'Thiết bị không xác định'}
-                            </h5>
-                          </div>
-                          <div className="flex items-center gap-1 rounded-lg bg-slate-50 px-2.5 py-1.5 text-[9px] font-black text-slate-500">
-                            <Clock3 className="h-3 w-3" />
-                            {formatVietnamTime(log.createdAt)}
-                          </div>
-                        </div>
-
-                        <div className="mt-3 grid grid-cols-1 gap-2">
-                          <MetricPill icon={MapPin} label="IP" value={log.ipAddress || '-'} />
-                          <MetricPill icon={Globe2} label="User agent" value={log.userAgent || '-'} />
-                        </div>
-
-                        {log.metadataJson && (
-                          <details className="mt-3 rounded-lg border border-slate-100 bg-slate-50 p-3">
-                            <summary className="cursor-pointer text-[9px] font-black uppercase tracking-widest text-slate-500">
-                              Debug metadata
-                            </summary>
-                            <pre className="mt-2 whitespace-pre-wrap break-words text-[10px] font-mono text-slate-600">{log.metadataJson}</pre>
-                          </details>
-                        )}
+                      <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[10px] font-bold text-slate-500">
+                        <span className="shrink-0">{formatVietnamTime(log.createdAt)}</span>
+                        <span className="text-slate-300">•</span>
+                        <IpValue value={log.ipAddress} />
                       </div>
                     </div>
                   </article>
                 );
               })}
+
               {hasMoreLogs && (
-                <div ref={logLoadMoreRef} className="flex h-10 items-center justify-center text-slate-400">
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                <div ref={logLoadMoreRef} className="flex h-10 items-center justify-center">
+                  <button
+                    type="button"
+                    onClick={loadMoreLogs}
+                    className="rounded-lg bg-slate-50 px-3 py-2 text-[10px] font-black text-slate-500 transition-all duration-[180ms] hover:text-[#2563eb] active:scale-[0.98]"
+                  >
+                    Xem thêm lịch sử
+                  </button>
                 </div>
               )}
             </div>
-          </div>
-        )}
-      </div>
+            </div>
+          )}
+        </div>
+      )}
     </section>
   );
 };
