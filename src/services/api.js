@@ -44,12 +44,13 @@ const normalizeNetworkError = (error) => {
 
 const isLoginRequest = (url) => url === AUTH_LOGIN_ENDPOINT || url === LEGACY_LOGIN_ENDPOINT;
 const isRefreshRequest = (url) => url === AUTH_REFRESH_ENDPOINT;
+const isFormDataBody = (body) => typeof FormData !== 'undefined' && body instanceof FormData;
 
-const buildHeaders = async ({ url, headers: customHeaders, token }) => {
+const buildHeaders = async ({ url, headers: customHeaders, token, body }) => {
   const headers = new Headers(customHeaders || {});
   const includeDeviceHeaders = Boolean(token) || isLoginRequest(url);
 
-  if (!headers.has('Content-Type')) {
+  if (!isFormDataBody(body) && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
 
@@ -121,6 +122,7 @@ const request = async (url, options = {}, retryCount = 0) => {
         url,
         headers: options.headers,
         token,
+        body: options.body,
       }),
     });
 
@@ -140,9 +142,16 @@ const jsonRequest = (method, url, body, options = {}) => request(url, {
   body: body === undefined ? null : JSON.stringify(body),
 });
 
+const formRequest = (method, url, body, options = {}) => request(url, {
+  ...options,
+  method,
+  body,
+});
+
 export const api = {
   get: (url, options) => request(url, options),
   post: (url, body, options) => jsonRequest('POST', url, body, options),
+  postForm: (url, body, options) => formRequest('POST', url, body, options),
   put: (url, body, options) => jsonRequest('PUT', url, body, options),
   delete: (url, body, options) => (
     body === undefined

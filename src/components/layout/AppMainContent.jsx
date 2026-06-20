@@ -200,6 +200,8 @@ const AppMainContent = ({
             changePasswordForm={profileState.changePasswordForm}
             setChangePasswordForm={profileState.setChangePasswordForm}
             handleChangePassword={profileState.handleChangePassword}
+            isAvatarUploading={profileState.isAvatarUploading}
+            handleUploadAvatar={profileState.handleUploadAvatar}
             requestConfirm={profileState.requestConfirm}
             showToast={profileState.showToast}
           />

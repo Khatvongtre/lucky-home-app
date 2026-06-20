@@ -1,6 +1,7 @@
-import { ChevronDown, Loader2, Lock, LogOut, QrCode, Save, User } from 'lucide-react';
+import { ChevronDown, Loader2, Lock, LogOut, QrCode, Save } from 'lucide-react';
 import { formatN, parseN } from '../utils/formatters';
 import AppUpdatePanel from '../components/common/AppUpdatePanel';
+import UserAvatar from '../components/common/UserAvatar';
 
 const SettingsSection = ({ title, isExpanded, onToggle, children }) => (
   <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
@@ -58,9 +59,12 @@ const SettingsView = ({
     <div className="space-y-4 animate-in fade-in pb-20">
       <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm flex items-center justify-between mb-2">
         <div className="flex items-center space-x-4">
-          <div className="w-12 h-12 rounded-full bg-blue-600 border-4 border-white shadow-lg flex items-center justify-center text-white">
-            <User className="w-6 h-6" />
-          </div>
+          <UserAvatar
+            user={user}
+            className="h-12 w-12 rounded-full border-4 border-white shadow-lg"
+            fallbackClassName="text-sm"
+            iconClassName="w-6 h-6"
+          />
           <div>
             <h3 className="font-black text-sm uppercase text-slate-800 leading-none">{user.fullName || 'ADMIN'}</h3>
             <p className="text-[8px] font-black text-blue-600 uppercase tracking-widest mt-1.5 bg-blue-50 px-3 py-0.5 rounded-full w-fit">Chủ cơ sở</p>

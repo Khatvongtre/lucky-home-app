@@ -4,6 +4,7 @@ const TOKEN_KEY = 'smartstay_token';
 const REFRESH_TOKEN_KEY = 'smartstay_refresh_token';
 const USER_KEY = 'smartstay_user';
 const STORAGE_KIND_KEY = 'smartstay_auth_storage';
+export const AUTH_SESSION_CHANGED_EVENT = 'auth:session-changed';
 
 const STORAGE_KIND_LOCAL = 'local';
 const STORAGE_KIND_SESSION = 'session';
@@ -56,6 +57,11 @@ const clearStorage = (storage) => {
   storage.removeItem(USER_KEY);
 };
 
+const notifySessionChanged = () => {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(AUTH_SESSION_CHANGED_EVENT));
+};
+
 export const authStorage = {
   getToken: () => readItem(TOKEN_KEY),
 
@@ -84,11 +90,13 @@ export const authStorage = {
 
     localStorage.setItem(STORAGE_KIND_KEY, targetKind);
     resetSessionExpiredNotification();
+    notifySessionChanged();
   },
 
   clearSession: () => {
     clearStorage(localStorage);
     clearStorage(sessionStorage);
     localStorage.removeItem(STORAGE_KIND_KEY);
+    notifySessionChanged();
   },
 };

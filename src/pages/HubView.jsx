@@ -14,6 +14,7 @@ import { getApiBaseUrl } from '../services/apiServer';
 import { shareElementImage } from '../utils/imageExport';
 import { applyBillAdjustments, buildBillUpdatePayload, extractBillFromResponse, isRefundBill, normalizeBill } from '../utils/bills';
 import { getMeterReadingDueState } from '../utils/date';
+import UserAvatar from '../components/common/UserAvatar';
 
 const FE_BASE_URL = (import.meta.env.VITE_FE_URL || window.location.origin).replace(/\/+$/g, '');
 
@@ -1156,9 +1157,6 @@ const HubView = ({
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <div className="flex min-w-0 items-center gap-1.5">
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 ring-1 ring-indigo-100">
-                <User className="h-3.5 w-3.5" />
-              </span>
               <h1 className="truncate text-base font-black tracking-tight text-indigo-700">
                 {user?.fullName || 'Lucky Home'}
               </h1>
@@ -1180,8 +1178,13 @@ const HubView = ({
               buttonClassName="w-9 h-9 rounded-full bg-slate-50 border border-slate-200 text-slate-600 flex items-center justify-center active:scale-95 transition-all"
               panelAlign="right-0"
             />
-            <button type="button" onClick={() => { setIsHubMode(false); setActiveTab('profile'); setSelectedHouse(null); }} className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-sm active:scale-95 transition-all" aria-label="Tài khoản">
-              <User className="w-4.5 h-4.5" />
+            <button type="button" onClick={() => { setIsHubMode(false); setActiveTab('profile'); setSelectedHouse(null); }} className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-sm active:scale-95 transition-all overflow-hidden" aria-label="Tài khoản">
+              <UserAvatar
+                user={user}
+                className="h-full w-full rounded-full"
+                fallbackClassName="bg-blue-600 text-white text-[10px]"
+                iconClassName="w-4.5 h-4.5"
+              />
             </button>
           </div>
         </div>

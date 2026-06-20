@@ -143,6 +143,8 @@ const MainApp = () => {
     setChangePasswordForm,
     handleLogout: clearAuthSession,
     handleChangePassword,
+    isAvatarUploading,
+    handleUploadAvatar,
   } = useAuthSession({ showToast });
   useNativePushNotifications({ isLoggedIn });
   const fcmToken = useFcmToken();
@@ -652,6 +654,8 @@ const MainApp = () => {
           changePasswordForm,
           setChangePasswordForm,
           handleChangePassword,
+          isAvatarUploading,
+          handleUploadAvatar,
           requestConfirm,
           showToast,
         }}
