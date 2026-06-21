@@ -57,6 +57,7 @@ const AppEntryRoutes = ({
             viewDate={hubState.viewDate}
             isManagerOrAbove={hubState.isManagerOrAbove}
             requestConfirm={hubState.requestConfirm}
+            openTransactionComposer={hubState.openTransactionComposer}
           />
           <ConfirmDialog
             dialog={hubState.confirmDialog}

@@ -67,6 +67,8 @@ const AddTransactionForm = ({
   canManageTransactions,
   selectedHouse,
   rooms = [],
+  transactionDraft,
+  setTransactionDraft,
   txType,
   setTxType,
   selectedCat,
@@ -109,6 +111,16 @@ const AddTransactionForm = ({
     setOtherPresetKey('');
     setRefundRoomId('');
   }, [editingTransaction]);
+
+  React.useEffect(() => {
+    if (!transactionDraft || editingTransaction) return;
+
+    setAmountInput(transactionDraft.amount > 0 ? formatN(transactionDraft.amount) : '');
+    setNote(transactionDraft.note || '');
+    setOtherPresetKey('');
+    setRefundRoomId('');
+    setTransactionDraft?.(null);
+  }, [editingTransaction, setTransactionDraft, transactionDraft]);
 
   React.useEffect(() => {
     if (Array.isArray(rooms) && rooms.length > 0) setRefundRooms(rooms);

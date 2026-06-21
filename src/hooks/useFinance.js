@@ -14,6 +14,7 @@ export const useFinance = ({
   const [txType, setTxType] = useState('in');
   const [selectedCat, setSelectedCat] = useState('OTHER');
   const [isCatOpen, setIsCatOpen] = useState(false);
+  const [transactionDraft, setTransactionDraft] = useState(null);
 
   const resetTransactionForm = useCallback(() => {
     setIsAddTransactionModalOpen(false);
@@ -21,6 +22,20 @@ export const useFinance = ({
     setTxType('in');
     setSelectedCat('OTHER');
     setIsCatOpen(false);
+    setTransactionDraft(null);
+  }, []);
+
+  const openTransactionComposer = useCallback((draft = {}) => {
+    setEditingTransaction(null);
+    setTxType(draft.txType || 'in');
+    setSelectedCat(draft.selectedCat || 'OTHER');
+    setIsCatOpen(false);
+    setTransactionDraft({
+      amount: Number(draft.amount) || 0,
+      note: draft.note || '',
+      stamp: Date.now(),
+    });
+    setIsAddTransactionModalOpen(true);
   }, []);
 
   const handleAddTx = useCallback(async (e) => {
@@ -88,6 +103,9 @@ export const useFinance = ({
     setSelectedCat,
     isCatOpen,
     setIsCatOpen,
+    transactionDraft,
+    setTransactionDraft,
+    openTransactionComposer,
     resetTransactionForm,
     handleAddTx,
     handleDeleteTransaction,

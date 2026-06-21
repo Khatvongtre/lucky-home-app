@@ -38,6 +38,17 @@ const getHouseLabel = (house) => (
   house?.houseName || house?.name || house?.title || ''
 );
 
+const normalizeWarningType = (type) => {
+  switch (type) {
+    case 'HOUSE_PAYMENT_DUE':
+      return 'RENT_DUE';
+    case 'HOUSE_PAYMENT_OVERDUE':
+      return 'RENT_OVERDUE';
+    default:
+      return type;
+  }
+};
+
 const getRoomCode = (room) => (
   room?.roomCode || room?.code || room?.name || room?.id || ''
 );
@@ -163,6 +174,7 @@ const HubView = ({
   viewDate,
   isManagerOrAbove = false,
   requestConfirm,
+  openTransactionComposer,
 }) => {
   const PULL_REFRESH_THRESHOLD = 72;
   const PULL_REFRESH_MAX = 108;
@@ -332,6 +344,13 @@ const HubView = ({
     const daysLeft = Math.ceil((dueDate - today) / (1000 * 60 * 60 * 24));
     return { daysLeft, dueDate };
   };
+
+  const normalizedDashboardWarnings = React.useMemo(() => (
+    (dashboardWarnings || []).map((warning) => ({
+      ...warning,
+      type: normalizeWarningType(warning?.type),
+    }))
+  ), [dashboardWarnings]);
 
   const getQuickHouseComboboxChips = (house, { includeOccupancyStats = false, dueDaysThreshold = 5 } = {}) => {
     const dueInfo = getQuickHouseRentDueInfo(house);
@@ -1126,6 +1145,18 @@ const HubView = ({
       setActiveTab('savings');
       setSelectedHouse(null);
       if (setHighlightedItemId) setHighlightedItemId(warning.savingId || warning.targetId || warning.id);
+    } else if (warning.type === 'RENT_DUE' || warning.type === 'RENT_OVERDUE') {
+      const house = displayHouses.find(h => String(h.id) === String(warning.houseId));
+      const fullHouse = houses.find(h => String(h.id) === String(warning.houseId)) || house;
+      if (fullHouse) {
+        setSelectedHouse(fullHouse);
+        setConfig({ ...fullHouse });
+        setIsHubMode(false);
+        setActiveTab('finance');
+        openRentWarningTransaction(fullHouse, warning);
+      } else {
+        showToast("KhÃ´ng tÃ¬m tháº¥y thÃ´ng tin cÆ¡ sá»Ÿ tÆ°Æ¡ng á»©ng", "error");
+      }
     } else if (warning.houseId) {
       const house = displayHouses.find(h => h.id === warning.houseId);
       if (house) {
@@ -1217,6 +1248,8 @@ const HubView = ({
     switch (type) {
       case 'SAVING': return { icon: PiggyBank, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100', borderL: 'border-l-emerald-500', lightBg: 'bg-emerald-50/50' };
       case 'SAVING_OVERDUE': return { icon: AlertTriangle, color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-100', borderL: 'border-l-rose-500', lightBg: 'bg-rose-50/50' };
+      case 'RENT_DUE': return { icon: CreditCard, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100', borderL: 'border-l-orange-500', lightBg: 'bg-orange-50/60' };
+      case 'RENT_OVERDUE': return { icon: AlertTriangle, color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-100', borderL: 'border-l-rose-500', lightBg: 'bg-rose-50/50' };
       case 'METER': return { icon: Zap, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100', borderL: 'border-l-amber-500', lightBg: 'bg-amber-50/50' };
       case 'BILL': return { icon: Receipt, color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-100', borderL: 'border-l-rose-500', lightBg: 'bg-rose-50/50' };
       case 'CONTRACT': return { icon: FileText, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100', borderL: 'border-l-blue-500', lightBg: 'bg-blue-50/50' };
@@ -1224,14 +1257,53 @@ const HubView = ({
     }
   };
 
-  const hubGreeting = dashboardWarnings.length > 0
-    ? `Xin Chào, Có ${dashboardWarnings.length} việc cần chú ý hôm nay !`
+  const openRentWarningTransaction = React.useCallback((house, warning) => {
+    if (!house || !openTransactionComposer) return;
+
+    const paymentPeriod = Math.max(
+      1,
+      Number(
+        warning?.paymentPeriod
+        ?? warning?.periodMonths
+        ?? warning?.months
+        ?? house?.paymentPeriod
+      ) || 1
+    );
+    const directAmount = [
+      warning?.Amount,
+      warning?.amount,
+      warning?.totalAmount,
+      warning?.total,
+      warning?.rentAmount,
+      warning?.paymentAmount,
+    ]
+      .map(value => Number(value) || 0)
+      .find(value => value > 0) || 0;
+    const monthlyRent = [
+      warning?.monthlyRent,
+      warning?.rentPrice,
+      house?.rentPrice,
+    ]
+      .map(value => Number(value) || 0)
+      .find(value => value > 0) || 0;
+    const amount = directAmount > 0 ? directAmount : (monthlyRent * paymentPeriod);
+
+    openTransactionComposer({
+      txType: 'out',
+      selectedCat: 'HOUSE',
+      amount,
+      note: `Đóng ${paymentPeriod} tháng tiền nhà`,
+    });
+  }, [openTransactionComposer]);
+
+  const hubGreeting = normalizedDashboardWarnings.length > 0
+    ? `Xin Chào, Có ${normalizedDashboardWarnings.length} việc cần chú ý hôm nay !`
     : 'Xin Chào, Mọi thứ đang ổn, cùng kiểm tra nhanh nhé!';
-  const hubGreetingTone = dashboardWarnings.length > 0
+  const hubGreetingTone = normalizedDashboardWarnings.length > 0
     ? 'from-rose-50 via-red-50 to-white text-rose-700 ring-rose-100'
     : 'from-indigo-50 via-blue-50 to-white text-indigo-700 ring-indigo-100';
-  const HubGreetingIcon = dashboardWarnings.length > 0 ? Frown : Smile;
-  const shouldShowWarningsSection = warningsLoadedRef.current || isWarningsLoading || dashboardWarnings.length > 0;
+  const HubGreetingIcon = normalizedDashboardWarnings.length > 0 ? Frown : Smile;
+  const shouldShowWarningsSection = warningsLoadedRef.current || isWarningsLoading || normalizedDashboardWarnings.length > 0;
 
   return (
     <div className="h-screen bg-slate-100 text-slate-700 font-sans flex flex-col max-w-lg mx-auto w-full relative border-x border-slate-200 shadow-2xl overflow-hidden">
@@ -1751,25 +1823,25 @@ const HubView = ({
                 </div>
                 <div className="flex shrink-0 items-center justify-end gap-2">
                   <span className="rounded-md bg-rose-500 px-2 py-0.5 text-[10px] font-black leading-none text-white shadow-sm">
-                    {isWarningsLoading && dashboardWarnings.length === 0 ? 'Đang tải' : `${dashboardWarnings.length} cảnh báo`}
+                    {isWarningsLoading && normalizedDashboardWarnings.length === 0 ? 'Đang tải' : `${normalizedDashboardWarnings.length} cảnh báo`}
                   </span>
                 </div>
               </div>
             </div>
             {isWarningsExpanded && <div className="divide-y divide-rose-100/80 max-h-[300px] overflow-y-auto no-scrollbar">
-              {isWarningsLoading && dashboardWarnings.length === 0 && (
+              {isWarningsLoading && normalizedDashboardWarnings.length === 0 && (
                 <div className="flex items-center justify-center gap-2 p-5 text-xs font-bold text-rose-400">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Đang tải cảnh báo
                 </div>
               )}
-              {!isWarningsLoading && dashboardWarnings.length === 0 && (
+              {!isWarningsLoading && normalizedDashboardWarnings.length === 0 && (
                 <div className="p-5 text-center">
                   <CheckCircle2 className="mx-auto mb-2 h-8 w-8 text-emerald-400" />
                   <p className="text-xs font-bold text-slate-600">Hiện chưa có cảnh báo nào cần xử lý.</p>
                 </div>
               )}
-              {dashboardWarnings.map((w, idx) => {
+              {normalizedDashboardWarnings.map((w, idx) => {
                 const config = getWarningConfig(w.type);
                 const Icon = config.icon;
                 return (
