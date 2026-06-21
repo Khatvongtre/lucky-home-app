@@ -39,12 +39,15 @@ const AppOverlays = ({
     handleAddTx,
     handleDeleteTransaction,
     editingTransaction,
+    transactionDraft,
+    setTransactionDraft,
     txType,
     setTxType,
     selectedCat,
     setSelectedCat,
     isCatOpen,
     setIsCatOpen,
+    resetTransactionForm,
   } = financeState;
 
   const {
@@ -106,6 +109,8 @@ const AppOverlays = ({
             canManageTransactions={permissions.canManageTransactions}
             selectedHouse={selectedHouse}
             rooms={rooms}
+            transactionDraft={transactionDraft}
+            setTransactionDraft={setTransactionDraft}
             txType={txType}
             setTxType={setTxType}
             selectedCat={selectedCat}
