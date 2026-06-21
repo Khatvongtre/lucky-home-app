@@ -102,16 +102,10 @@ export const useAppDataLoader = ({
   }, [isLoggedIn, setActiveTab, setIsHubMode]);
 
   useEffect(() => {
-    if (isLoggedIn && isHubMode) {
-      loadWarnings();
-    }
-  }, [isLoggedIn, isHubMode, loadWarnings]);
-
-  useEffect(() => {
-    if (isLoggedIn && !selectedHouse) {
+    if (isLoggedIn && !selectedHouse && !isHubMode) {
       loadHouses().catch(error => showToast(error.message, 'error'));
     }
-  }, [isLoggedIn, loadHouses, selectedHouse, showToast]);
+  }, [isHubMode, isLoggedIn, loadHouses, selectedHouse, showToast]);
 
   useEffect(() => {
     if (isLoggedIn && activeTab !== 'finance') {

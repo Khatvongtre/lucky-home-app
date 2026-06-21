@@ -1,5 +1,5 @@
 import React from 'react';
-import { Camera, Loader2, Lock, LogOut } from 'lucide-react';
+import { Camera, ChevronDown, Eye, EyeOff, Loader2, Lock, LogOut } from 'lucide-react';
 import AppUpdatePanel from '../components/common/AppUpdatePanel';
 import AccessDevicesPanel from '../components/auth/AccessDevicesPanel';
 import UserAvatar from '../components/common/UserAvatar';
@@ -90,6 +90,12 @@ const ProfileView = ({
   const [cropZoom, setCropZoom] = React.useState(1);
   const [cropOffset, setCropOffset] = React.useState({ x: 0, y: 0 });
   const [imageBounds, setImageBounds] = React.useState({ width: 0, height: 0 });
+  const [isPasswordSectionExpanded, setIsPasswordSectionExpanded] = React.useState(false);
+  const [passwordVisibility, setPasswordVisibility] = React.useState({
+    oldPassword: false,
+    newPassword: false,
+    confirmNewPassword: false,
+  });
   const previewImageStyle = React.useMemo(() => {
     if (!imageBounds.width || !imageBounds.height) {
       return {
@@ -226,6 +232,10 @@ const ProfileView = ({
     }
   };
 
+  const togglePasswordVisibility = React.useCallback((field) => {
+    setPasswordVisibility(prev => ({ ...prev, [field]: !prev[field] }));
+  }, []);
+
   return (
     <>
       <div className="min-h-[calc(100vh-170px)] flex flex-col animate-in fade-in pb-6">
@@ -276,28 +286,74 @@ const ProfileView = ({
         </div>
 
         <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-          <div className="bg-blue-600 px-5 py-4">
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => setIsPasswordSectionExpanded(prev => !prev)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                setIsPasswordSectionExpanded(prev => !prev);
+              }
+            }}
+            aria-expanded={isPasswordSectionExpanded}
+            className="flex cursor-pointer items-center justify-between gap-3 bg-blue-600 px-5 py-4 active:bg-blue-700"
+          >
             <h4 className="text-[10px] font-black text-white uppercase tracking-widest">Đổi mật khẩu</h4>
+            <ChevronDown className={`h-4 w-4 shrink-0 text-white transition-transform duration-300 ${isPasswordSectionExpanded ? 'rotate-180' : ''}`} />
           </div>
-          <form onSubmit={handleChangePassword} className="p-5">
+          {isPasswordSectionExpanded && <form onSubmit={handleChangePassword} className="p-5">
             <div className="grid grid-cols-1 gap-4">
               <div className="space-y-1">
                 <label className="text-[8px] font-black text-slate-400 uppercase px-1">Mật khẩu cũ</label>
-                <input type="password" value={changePasswordForm.oldPassword || ''} onChange={e => setChangePasswordForm({ ...changePasswordForm, oldPassword: e.target.value })} className="w-full bg-slate-50 p-3 rounded-xl font-bold text-xs outline-none focus:border-rose-600 border border-transparent transition-all" required />
+                <div className="relative">
+                  <input type={passwordVisibility.oldPassword ? 'text' : 'password'} value={changePasswordForm.oldPassword || ''} onChange={e => setChangePasswordForm({ ...changePasswordForm, oldPassword: e.target.value })} className="w-full bg-slate-50 p-3 pr-11 rounded-xl font-bold text-xs outline-none focus:border-rose-600 border border-transparent transition-all" required />
+                  <button
+                    type="button"
+                    onClick={() => togglePasswordVisibility('oldPassword')}
+                    className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-slate-400 transition-colors active:scale-95"
+                    aria-label={passwordVisibility.oldPassword ? 'Ẩn mật khẩu cũ' : 'Hiện mật khẩu cũ'}
+                    title={passwordVisibility.oldPassword ? 'Ẩn mật khẩu cũ' : 'Hiện mật khẩu cũ'}
+                  >
+                    {passwordVisibility.oldPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
               <div className="space-y-1">
                 <label className="text-[8px] font-black text-slate-400 uppercase px-1">Mật khẩu mới</label>
-                <input type="password" value={changePasswordForm.newPassword || ''} onChange={e => setChangePasswordForm({ ...changePasswordForm, newPassword: e.target.value })} className="w-full bg-slate-50 p-3 rounded-xl font-bold text-xs outline-none focus:border-rose-600 border border-transparent transition-all" required />
+                <div className="relative">
+                  <input type={passwordVisibility.newPassword ? 'text' : 'password'} value={changePasswordForm.newPassword || ''} onChange={e => setChangePasswordForm({ ...changePasswordForm, newPassword: e.target.value })} className="w-full bg-slate-50 p-3 pr-11 rounded-xl font-bold text-xs outline-none focus:border-rose-600 border border-transparent transition-all" required />
+                  <button
+                    type="button"
+                    onClick={() => togglePasswordVisibility('newPassword')}
+                    className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-slate-400 transition-colors active:scale-95"
+                    aria-label={passwordVisibility.newPassword ? 'Ẩn mật khẩu mới' : 'Hiện mật khẩu mới'}
+                    title={passwordVisibility.newPassword ? 'Ẩn mật khẩu mới' : 'Hiện mật khẩu mới'}
+                  >
+                    {passwordVisibility.newPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
               <div className="space-y-1">
                 <label className="text-[8px] font-black text-slate-400 uppercase px-1">Xác nhận mật khẩu mới</label>
-                <input type="password" value={changePasswordForm.confirmNewPassword || ''} onChange={e => setChangePasswordForm({ ...changePasswordForm, confirmNewPassword: e.target.value })} className="w-full bg-slate-50 p-3 rounded-xl font-bold text-xs outline-none focus:border-rose-600 border border-transparent transition-all" required />
+                <div className="relative">
+                  <input type={passwordVisibility.confirmNewPassword ? 'text' : 'password'} value={changePasswordForm.confirmNewPassword || ''} onChange={e => setChangePasswordForm({ ...changePasswordForm, confirmNewPassword: e.target.value })} className="w-full bg-slate-50 p-3 pr-11 rounded-xl font-bold text-xs outline-none focus:border-rose-600 border border-transparent transition-all" required />
+                  <button
+                    type="button"
+                    onClick={() => togglePasswordVisibility('confirmNewPassword')}
+                    className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-slate-400 transition-colors active:scale-95"
+                    aria-label={passwordVisibility.confirmNewPassword ? 'Ẩn xác nhận mật khẩu mới' : 'Hiện xác nhận mật khẩu mới'}
+                    title={passwordVisibility.confirmNewPassword ? 'Ẩn xác nhận mật khẩu mới' : 'Hiện xác nhận mật khẩu mới'}
+                  >
+                    {passwordVisibility.confirmNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
               <button type="submit" className="w-full bg-rose-600 text-white py-4 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 border-b-1 border-rose-800 active:translate-y-1 transition-all">
                 <Lock className="w-4 h-4" /> Xác nhận đổi mật khẩu
               </button>
             </div>
-          </form>
+          </form>}
         </div>
 
         <div className="mt-4">

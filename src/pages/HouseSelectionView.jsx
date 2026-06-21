@@ -7,6 +7,7 @@ import Modal from '../components/common/Modal';
 import AddHouseForm from '../components/houses/AddHouseForm';
 import ShareHouseModal from '../components/houses/ShareHouseModal';
 import AiPromptModal from '../components/houses/AiPromptModal';
+import UserAvatar from '../components/common/UserAvatar';
 
 const getAdvancedDueInfo = (startDate, paymentDay, paymentPeriod) => {
     const today = new Date();
@@ -157,6 +158,15 @@ const HouseSelectionView = ({
                             <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-1 rounded-md uppercase">
                                 {user?.role}
                             </span>
+
+                            <div className="h-8 w-8 overflow-hidden rounded-full border border-slate-200 bg-white shadow-sm">
+                                <UserAvatar
+                                    user={user}
+                                    className="h-full w-full rounded-full"
+                                    fallbackClassName="bg-blue-600 text-white text-[9px]"
+                                    iconClassName="w-4 h-4"
+                                />
+                            </div>
 
                             <button
                                 onClick={handleLogout}
