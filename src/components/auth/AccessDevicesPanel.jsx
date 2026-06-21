@@ -17,6 +17,8 @@ import { api } from '../../services/api';
 
 const DEVICE_PAGE_SIZE = 4;
 const LOG_PAGE_SIZE = 5;
+let accessDataCache = null;
+let accessDataInFlight = null;
 
 const actionLabels = {
   login_success: 'Đăng nhập thành công',
@@ -163,6 +165,30 @@ const EmptyState = ({ icon: Icon = History, title, children }) => (
   </div>
 );
 
+const requestAccessData = async ({ force = false } = {}) => {
+  if (!force && accessDataCache) return accessDataCache;
+  if (accessDataInFlight) return accessDataInFlight;
+
+  const request = Promise.all([
+    api.get('/auth/devices'),
+    api.get('/auth/access-logs?take=50'),
+  ])
+    .then(([deviceResult, logResult]) => {
+      const nextData = {
+        devices: normalizeList(deviceResult),
+        logs: normalizeList(logResult),
+      };
+      accessDataCache = nextData;
+      return nextData;
+    })
+    .finally(() => {
+      accessDataInFlight = null;
+    });
+
+  accessDataInFlight = request;
+  return request;
+};
+
 const AccessDevicesPanel = ({ requestConfirm, showToast }) => {
   const [activeTab, setActiveTab] = useState('devices');
   const [isCollapsed, setIsCollapsed] = useState(true);
@@ -172,6 +198,7 @@ const AccessDevicesPanel = ({ requestConfirm, showToast }) => {
   const [visibleLogCount, setVisibleLogCount] = useState(LOG_PAGE_SIZE);
   const [isLoading, setIsLoading] = useState(false);
   const [actionId, setActionId] = useState('');
+  const [hasLoaded, setHasLoaded] = useState(false);
   const deviceListRef = useRef(null);
   const deviceLoadMoreRef = useRef(null);
   const logListRef = useRef(null);
@@ -196,6 +223,7 @@ const AccessDevicesPanel = ({ requestConfirm, showToast }) => {
   }, [showToast]);
 
   useEffect(() => {
+    if (isCollapsed || hasLoaded) return undefined;
     let isMounted = true;
 
     const load = async () => {
@@ -210,6 +238,7 @@ const AccessDevicesPanel = ({ requestConfirm, showToast }) => {
         setLogs(normalizeList(logResult));
         setVisibleDeviceCount(DEVICE_PAGE_SIZE);
         setVisibleLogCount(LOG_PAGE_SIZE);
+        setHasLoaded(true);
       } catch (error) {
         if (isMounted) showToast?.(error.message || 'Không thể tải thông tin thiết bị', 'error');
       } finally {
@@ -221,7 +250,7 @@ const AccessDevicesPanel = ({ requestConfirm, showToast }) => {
     return () => {
       isMounted = false;
     };
-  }, [showToast]);
+  }, [hasLoaded, isCollapsed, showToast]);
 
   const revokeDevice = useCallback(async (device) => {
     if (!device?.id || device.isCurrent || device.isRevoked) return;

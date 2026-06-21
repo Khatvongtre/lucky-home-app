@@ -1,6 +1,7 @@
 import React from 'react';
-import { ChevronLeft, User } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
 import NotificationBell from '../notifications/NotificationBell';
+import UserAvatar from '../common/UserAvatar';
 
 const TAB_TITLES = {
     dashboard: 'Trang chủ',
@@ -16,6 +17,7 @@ const TAB_TITLES = {
 };
 
 const Header = ({
+    user,
     selectedHouse,
     activeTab,
     isGlobalTab,
@@ -76,7 +78,12 @@ const Header = ({
                 </div>
                 {isOwnerOrAdmin && selectedHouse && (
                     <div onClick={() => setActiveTab('settings')} className="w-8 h-8 rounded-full border border-white/30 overflow-hidden cursor-pointer active:scale-90 shadow-sm bg-white flex items-center justify-center">
-                        <User className="w-5 h-5 text-blue-600" />
+                        <UserAvatar
+                            user={user}
+                            className="h-full w-full rounded-full"
+                            fallbackClassName="bg-blue-600 text-white text-[9px]"
+                            iconClassName="w-4 h-4"
+                        />
                     </div>
                 )}
             </div>

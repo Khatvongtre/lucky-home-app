@@ -546,6 +546,7 @@ const MainApp = () => {
 
       {/* HEADER */}
       <Header
+        user={user}
         selectedHouse={selectedHouse}
         activeTab={activeTab}
         isGlobalTab={isGlobalTab}

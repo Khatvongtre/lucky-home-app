@@ -15,6 +15,8 @@ import { shareElementImage } from '../utils/imageExport';
 import { applyBillAdjustments, buildBillUpdatePayload, extractBillFromResponse, isRefundBill, normalizeBill } from '../utils/bills';
 import { getMeterReadingDueState } from '../utils/date';
 import UserAvatar from '../components/common/UserAvatar';
+import { useHubDashboard } from '../hooks/useHubDashboard';
+import { buildHubHouseDetailCacheKey } from '../utils/hub';
 
 const FE_BASE_URL = (import.meta.env.VITE_FE_URL || window.location.origin).replace(/\/+$/g, '');
 
@@ -155,7 +157,6 @@ const HubView = ({
   setConfig, setSearchQuery, setEditingHouse, setIsAiCreateHouseOpen,
   setIsAiPromptModalOpen, setAiPrompt, setIsListening, showToast,
   handleLogout, toast, dashboardWarnings = [],
-  loadHouses,
   loadWarnings,
   setHighlightedItemId,
   setViewDate,
@@ -169,6 +170,11 @@ const HubView = ({
   const scrollContainerRef = React.useRef(null);
   const pullStartYRef = React.useRef(0);
   const isPullingRef = React.useRef(false);
+  const warningsLoadedRef = React.useRef(false);
+  const warningsRequestRef = React.useRef(null);
+  const quickRoomsRequestRef = React.useRef(new Map());
+  const quickMetersRequestRef = React.useRef(new Map());
+  const quickBillsRequestRef = React.useRef(new Map());
   const [quickHouseId, setQuickHouseId] = React.useState(houses[0]?.id || '');
   const [roomsByHouse, setRoomsByHouse] = React.useState({});
   const [metersByHouse, setMetersByHouse] = React.useState({});
@@ -183,6 +189,7 @@ const HubView = ({
   const [isGeneratingBillImage, setIsGeneratingBillImage] = React.useState(false);
   const [isQuickQrExpanded, setIsQuickQrExpanded] = React.useState(false);
   const [isWarningsExpanded, setIsWarningsExpanded] = React.useState(false);
+  const [isWarningsLoading, setIsWarningsLoading] = React.useState(false);
   const [isRecentHousesExpanded, setIsRecentHousesExpanded] = React.useState(false);
   const [isQuickHousePickerOpen, setIsQuickHousePickerOpen] = React.useState(false);
   const [showAllQuickRooms, setShowAllQuickRooms] = React.useState(false);
@@ -192,14 +199,30 @@ const HubView = ({
   const [isQuickMeterSaving, setIsQuickMeterSaving] = React.useState(false);
   const [quickBillSheet, setQuickBillSheet] = React.useState(null);
   const [qrLinkInfo, setQrLinkInfo] = React.useState(null);
-  const [hubFunds, setHubFunds] = React.useState([]);
-  const [hubSavings, setHubSavings] = React.useState([]);
-  const [hubMonthlyStats, setHubMonthlyStats] = React.useState(null);
   const [isSavingTotalVisible, setIsSavingTotalVisible] = React.useState(false);
   const [pullDistance, setPullDistance] = React.useState(0);
   const [isPullRefreshing, setIsPullRefreshing] = React.useState(false);
+  const {
+    month,
+    hubSummary,
+    hubQuickActions,
+    hubHouseDetailsById,
+    loadingSummary,
+    loadingQuickActions,
+    loadingHouseDetailId,
+    hasLoadedSummary,
+    hasLoadedQuickActions,
+    quickActionsError,
+    ensureHouseDetail,
+  } = useHubDashboard({ viewDate, showToast });
 
-  const hubStats = houses.reduce((acc, h) => {
+  const displayHouses = hasLoadedQuickActions && Array.isArray(hubQuickActions?.houses)
+    ? hubQuickActions.houses
+    : houses;
+  const usingHubSummaryApi = hasLoadedSummary && !loadingSummary && !hubSummary ? false : Boolean(hubSummary);
+  const usingHubQuickActionsApi = hasLoadedQuickActions && !loadingQuickActions && !quickActionsError && Array.isArray(hubQuickActions?.houses);
+  const shouldUseLegacyQuickData = hasLoadedQuickActions && !loadingQuickActions && !usingHubQuickActionsApi;
+  const hubStats = displayHouses.reduce((acc, h) => {
     const revenue = Number(h.revenue) || 0;
     const expense = Number(h.expense) || 0;
     const fixedCosts = (Number(h.rentPrice) || 0) + (Number(h.internetFee) || 0) + (Number(h.otherFees) || 0);
@@ -214,23 +237,38 @@ const HubView = ({
     return acc;
   }, { totalHouses: 0, totalRooms: 0, emptyRooms: 0, revenue: 0, expense: 0, fixedCosts: 0, txExp: 0, profit: 0 });
 
-  const rentedRooms = Math.max(0, hubStats.totalRooms - hubStats.emptyRooms);
-  const occupancyRate = hubStats.totalRooms > 0
-    ? Math.round((rentedRooms / hubStats.totalRooms) * 100)
-    : 0;
+  const summaryOverview = hubSummary?.overview || null;
+  const summaryOperation = hubSummary?.operation || null;
+  const summaryMoney = hubSummary?.money || null;
+  const rentedRooms = Number(summaryOverview?.rentedRooms ?? Math.max(0, hubStats.totalRooms - hubStats.emptyRooms));
+  const occupancyRate = Number(summaryOverview?.occupancyRate ?? (hubStats.totalRooms > 0
+    ? Math.round((Math.max(0, hubStats.totalRooms - hubStats.emptyRooms) / hubStats.totalRooms) * 100)
+    : 0));
   const targetViewDate = viewDate || new Date();
   const operationPeriod = `${String(targetViewDate.getMonth() + 1).padStart(2, '0')}/${targetViewDate.getFullYear()}`;
-  const hubFundTotal = hubFunds.reduce((total, fund) => total + (Number(fund.balance) || 0), 0);
-  const hubSavingTotal = hubSavings.reduce((total, saving) => total + (Number(saving.amount) || 0), 0);
-  const operationStats = hubMonthlyStats || hubStats;
+  const hubFundTotal = Number(summaryMoney?.fundBalance ?? 0);
+  const hubSavingTotal = Number(summaryMoney?.savingBalance ?? 0);
+  const operationStats = {
+    revenue: Number(summaryOperation?.recognizedRevenue ?? hubStats.revenue),
+    fixedCosts: Number(summaryOperation?.fixedCosts ?? hubStats.fixedCosts),
+    txExp: Number(summaryOperation?.variableCosts ?? hubStats.txExp),
+    profit: Number(summaryOperation?.profit ?? hubStats.profit),
+  };
   const canManageHouseQr = (house) => (
     ['SuperAdmin', 'Owner', 'Manager'].includes(house?.userRole || user?.role)
     || ['SuperAdmin', 'Owner'].includes(user?.role)
   );
-  const quickQrHouses = houses.filter(canManageHouseQr);
+  const quickQrHouses = displayHouses.filter(canManageHouseQr);
   const quickQrHouseIdsKey = quickQrHouses.map(house => house.id).join('|');
   const selectedQuickHouse = quickQrHouses.find(h => String(h.id) === String(quickHouseId)) || quickQrHouses[0] || null;
-  const quickRooms = selectedQuickHouse ? roomsByHouse[selectedQuickHouse.id] || [] : [];
+  const selectedQuickHouseDetail = selectedQuickHouse
+    ? hubHouseDetailsById[buildHubHouseDetailCacheKey(selectedQuickHouse.id, month)] || null
+    : null;
+  const quickRooms = selectedQuickHouse
+    ? (usingHubQuickActionsApi
+      ? (showAllQuickRooms ? (selectedQuickHouseDetail?.rooms || []) : (selectedQuickHouse.pendingRooms || []))
+      : (roomsByHouse[selectedQuickHouse.id] || []))
+    : [];
   const quickMeters = selectedQuickHouse ? metersByHouse[selectedQuickHouse.id] || [] : [];
   const quickBills = selectedQuickHouse ? billsByHouse[selectedQuickHouse.id] || [] : [];
   const activeQuickRoomMeters = quickMeterRoom
@@ -349,6 +387,16 @@ const HubView = ({
   };
 
   const getQuickRoomBill = (room, bills = quickBills) => {
+    if (usingHubQuickActionsApi) {
+      if (!room?.billStatus) return null;
+      return {
+        id: room.billId || null,
+        status: room.billStatus,
+        total: Number(room.billTotal) || 0,
+        roomId: room.id,
+        roomCode: room.roomCode,
+      };
+    }
     const roomCode = String(getRoomCode(room));
     return bills.find(item => String(item.roomCode || item.roomId) === roomCode || String(item.roomId) === String(room.id));
   };
@@ -360,11 +408,28 @@ const HubView = ({
       : 'border-rose-100 bg-rose-50 text-rose-700';
   };
 
-  const getQuickRoomMeters = (room, meters = quickMeters) => (
-    meters.filter(meter => (meter.roomIds || []).map(String).includes(String(room.id)))
-  );
+  const getQuickRoomMeters = (room, meters = quickMeters) => {
+    if (usingHubQuickActionsApi) {
+      if (!room?.hasAssignedMeter) return [];
+      return [{
+        id: `quick-meter-${room.id}`,
+        newVal: room.hasMissingReading ? null : 1,
+      }];
+    }
+    return meters.filter(meter => (meter.roomIds || []).map(String).includes(String(room.id)));
+  };
 
   const getQuickRoomMeterDueState = (room, bill, house = selectedQuickHouse) => {
+    if (usingHubQuickActionsApi) {
+      if (room?.daysFromDue === null || room?.daysFromDue === undefined) {
+        return { isInWindow: false, daysFromDue: -999, dueDate: null };
+      }
+      return {
+        isInWindow: Number(room.daysFromDue) >= -5,
+        daysFromDue: Number(room.daysFromDue),
+        dueDate: true,
+      };
+    }
     const targetDate = viewDate || new Date();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -455,14 +520,20 @@ const HubView = ({
     return isMeterPending || hasUnpaidBill;
   };
 
-  const incompleteQuickRooms = quickRooms.filter(isQuickRoomIncomplete);
-  const visibleQuickRooms = showAllQuickRooms ? quickRooms : incompleteQuickRooms;
+  const incompleteQuickRooms = usingHubQuickActionsApi
+    ? (selectedQuickHouse?.pendingRooms || [])
+    : quickRooms.filter(isQuickRoomIncomplete);
+  const visibleQuickRooms = usingHubQuickActionsApi
+    ? quickRooms
+    : (showAllQuickRooms ? quickRooms : incompleteQuickRooms);
   const hasQuickRoomsToProcess = incompleteQuickRooms.length > 0;
   const getQuickHouseIncompleteCount = (house) => {
+    if (usingHubQuickActionsApi) return Number(house?.summary?.incompleteRoomCount) || 0;
     const houseRooms = roomsByHouse[house.id] || [];
     return houseRooms.filter(room => isQuickRoomIncomplete(room, house)).length;
   };
   const getQuickHouseUnpaidAmount = (house) => {
+    if (usingHubQuickActionsApi) return Number(house?.summary?.unpaidAmount) || 0;
     const houseRooms = roomsByHouse[house.id] || [];
     const houseBills = billsByHouse[house.id] || [];
     return houseRooms.reduce((total, room) => {
@@ -470,9 +541,20 @@ const HubView = ({
       return bill && !isPaidStatus(bill.status) ? total + Math.abs(Number(bill.total) || 0) : total;
     }, 0);
   };
-  const totalIncompleteQuickRooms = quickQrHouses.reduce((total, house) => total + getQuickHouseIncompleteCount(house), 0);
-  const totalQuickUnpaidAmount = quickQrHouses.reduce((total, house) => total + getQuickHouseUnpaidAmount(house), 0);
+  const totalIncompleteQuickRooms = Number(
+    usingHubQuickActionsApi
+      ? hubQuickActions?.alerts?.incompleteRoomCount
+      : quickQrHouses.reduce((total, house) => total + getQuickHouseIncompleteCount(house), 0),
+  ) || 0;
+  const totalQuickUnpaidAmount = Number(
+    usingHubQuickActionsApi
+      ? hubQuickActions?.alerts?.unpaidAmount
+      : quickQrHouses.reduce((total, house) => total + getQuickHouseUnpaidAmount(house), 0),
+  ) || 0;
   const selectedQuickHouseUnpaidAmount = selectedQuickHouse ? getQuickHouseUnpaidAmount(selectedQuickHouse) : 0;
+  const quickRoomTotalCount = usingHubQuickActionsApi
+    ? Number(selectedQuickHouseDetail?.rooms?.length ?? selectedQuickHouse?.totalRooms ?? quickRooms.length)
+    : quickRooms.length;
   const visibleQuickQrHouses = showAllQuickRooms
     ? quickQrHouses
     : quickQrHouses.filter(house => getQuickHouseIncompleteCount(house) > 0);
@@ -537,8 +619,12 @@ const HubView = ({
   const loadQuickRooms = async (house, { silent = false, force = false } = {}) => {
     if (!house?.id) return [];
     if (!force && roomsByHouse[house.id]) return roomsByHouse[house.id];
+    const requestKey = String(house.id);
+    const activeRequest = quickRoomsRequestRef.current.get(requestKey);
+    if (activeRequest && !force) return activeRequest;
 
-    try {
+    const request = (async () => {
+      try {
       if (!silent) setRoomsLoadingHouseId(house.id);
       const data = await api.get(`/room/${house.id}`);
       const parsedRooms = (data || []).map(room => ({
@@ -551,25 +637,34 @@ const HubView = ({
     } catch (error) {
       if (!silent) showToast?.(error.message || 'Không tải được danh sách phòng.', 'error');
       return [];
-    } finally {
-      if (!silent) setRoomsLoadingHouseId(null);
-    }
+      } finally {
+        quickRoomsRequestRef.current.delete(requestKey);
+        if (!silent) setRoomsLoadingHouseId(null);
+      }
+    })();
+
+    quickRoomsRequestRef.current.set(requestKey, request);
+    return request;
   };
 
   React.useEffect(() => {
-    if (!selectedQuickHouse?.id || roomsByHouse[selectedQuickHouse.id]) return;
+    if (!isQuickQrExpanded || !shouldUseLegacyQuickData || !selectedQuickHouse?.id || roomsByHouse[selectedQuickHouse.id]) return;
     loadQuickRooms(selectedQuickHouse);
-  }, [roomsByHouse, selectedQuickHouse]);
+  }, [isQuickQrExpanded, roomsByHouse, selectedQuickHouse, shouldUseLegacyQuickData]);
 
   const loadQuickMeters = async (houseId = selectedQuickHouse?.id, force = false, { silent = false } = {}) => {
     if (!houseId) return [];
     if (!force && metersByHouse[houseId]) return metersByHouse[houseId];
+    const requestKey = `${houseId}-${viewDate?.getFullYear?.() || 'all'}-${(viewDate?.getMonth?.() ?? -1) + 1}`;
+    const activeRequest = quickMetersRequestRef.current.get(requestKey);
+    if (activeRequest && !force) return activeRequest;
 
     const meterDate = viewDate || new Date();
     const month = meterDate.getMonth() + 1;
     const year = meterDate.getFullYear();
 
-    try {
+    const request = (async () => {
+      try {
       if (!silent) setMetersLoadingHouseId(houseId);
       const data = await api.get(`/meter/${houseId}?year=${year}&month=${month}`);
       const parsedMeters = (data || []).map(meter => ({
@@ -581,20 +676,29 @@ const HubView = ({
     } catch (error) {
       if (!silent) showToast?.(error.message || 'Không tải được danh sách công tơ.', 'error');
       return [];
-    } finally {
-      if (!silent) setMetersLoadingHouseId(null);
-    }
+      } finally {
+        quickMetersRequestRef.current.delete(requestKey);
+        if (!silent) setMetersLoadingHouseId(null);
+      }
+    })();
+
+    quickMetersRequestRef.current.set(requestKey, request);
+    return request;
   };
 
   const loadQuickBills = async (houseId = selectedQuickHouse?.id, force = false) => {
     if (!houseId) return [];
     if (!force && billsByHouse[houseId]) return billsByHouse[houseId];
+    const requestKey = `${houseId}-${viewDate?.getFullYear?.() || 'all'}-${(viewDate?.getMonth?.() ?? -1) + 1}`;
+    const activeRequest = quickBillsRequestRef.current.get(requestKey);
+    if (activeRequest && !force) return activeRequest;
 
     const billDate = viewDate || new Date();
     const month = billDate.getMonth() + 1;
     const year = billDate.getFullYear();
 
-    try {
+    const request = (async () => {
+      try {
       const result = await api.get(`/bill/${houseId}?year=${year}&month=${month}`);
       const billsData = Array.isArray(result) ? result : (result?.bills || []);
       const parsedBills = dedupeBills(parseBills(billsData));
@@ -603,21 +707,27 @@ const HubView = ({
     } catch (error) {
       showToast?.(error.message || 'Không tải được hóa đơn.', 'error');
       return [];
-    }
+      } finally {
+        quickBillsRequestRef.current.delete(requestKey);
+      }
+    })();
+
+    quickBillsRequestRef.current.set(requestKey, request);
+    return request;
   };
 
   React.useEffect(() => {
-    if (!selectedQuickHouse?.id || !quickRooms.length || billsByHouse[selectedQuickHouse.id]) return;
+    if (!isQuickQrExpanded || !shouldUseLegacyQuickData || !selectedQuickHouse?.id || !quickRooms.length || billsByHouse[selectedQuickHouse.id]) return;
     loadQuickBills(selectedQuickHouse.id);
-  }, [billsByHouse, quickRooms.length, selectedQuickHouse]);
+  }, [billsByHouse, isQuickQrExpanded, quickRooms.length, selectedQuickHouse, shouldUseLegacyQuickData]);
 
   React.useEffect(() => {
-    if (!selectedQuickHouse?.id || !quickRooms.length || metersByHouse[selectedQuickHouse.id]) return;
+    if (!isQuickQrExpanded || !shouldUseLegacyQuickData || !selectedQuickHouse?.id || !quickRooms.length || metersByHouse[selectedQuickHouse.id]) return;
     loadQuickMeters(selectedQuickHouse.id);
-  }, [metersByHouse, quickRooms.length, selectedQuickHouse]);
+  }, [isQuickQrExpanded, metersByHouse, quickRooms.length, selectedQuickHouse, shouldUseLegacyQuickData]);
 
   React.useEffect(() => {
-    if (!quickQrHouses.length) return;
+    if (!isQuickHousePickerOpen || !shouldUseLegacyQuickData || !quickQrHouses.length) return;
 
     let cancelled = false;
     const loadAllQuickStatuses = async () => {
@@ -634,74 +744,13 @@ const HubView = ({
     return () => {
       cancelled = true;
     };
-  }, [quickQrHouseIdsKey, viewDate, roomsByHouse, metersByHouse, billsByHouse]);
+  }, [quickQrHouseIdsKey, viewDate, roomsByHouse, metersByHouse, billsByHouse, isQuickHousePickerOpen, quickQrHouses, shouldUseLegacyQuickData]);
 
   React.useEffect(() => {
-    if (!houses.length) {
-      setHubMonthlyStats(null);
-      return;
-    }
-
-    let cancelled = false;
-    const targetDate = viewDate || new Date();
-    const month = targetDate.getMonth() + 1;
-    const year = targetDate.getFullYear();
-
-    const loadMonthlyStats = async () => {
-      const transactionGroups = await Promise.all(houses.map(house => (
-        api.get(`/transaction/${house.id}?type=all`).catch(() => [])
-      )));
-
-      if (cancelled) return;
-
-      const nextStats = transactionGroups.reduce((acc, transactions, index) => {
-        const house = houses[index];
-        const fixedCosts = (Number(house?.rentPrice) || 0) + (Number(house?.internetFee) || 0) + (Number(house?.otherFees) || 0);
-        const monthlyTransactions = summarizeTransactions(Array.isArray(transactions) ? transactions : [], year, month);
-
-        acc.revenue += monthlyTransactions.revenue;
-        acc.txExp += monthlyTransactions.txExp;
-        acc.fixedCosts += fixedCosts;
-        acc.expense += fixedCosts + monthlyTransactions.txExp;
-        acc.profit += monthlyTransactions.revenue - fixedCosts - monthlyTransactions.txExp;
-
-        return acc;
-      }, { revenue: 0, expense: 0, fixedCosts: 0, txExp: 0, profit: 0 });
-
-      setHubMonthlyStats(nextStats);
-    };
-
-    loadMonthlyStats();
-    return () => {
-      cancelled = true;
-    };
-  }, [houses, viewDate]);
-
-  React.useEffect(() => {
-    let cancelled = false;
-
-    const loadHubMoneyBooks = async () => {
-      try {
-        const [fundsData, savingsData] = await Promise.all([
-          api.get('/funds').catch(() => []),
-          api.get('/saving').catch(() => []),
-        ]);
-        if (cancelled) return;
-        setHubFunds(Array.isArray(fundsData) ? fundsData : []);
-        setHubSavings(Array.isArray(savingsData) ? savingsData : []);
-      } catch {
-        if (!cancelled) {
-          setHubFunds([]);
-          setHubSavings([]);
-        }
-      }
-    };
-
-    loadHubMoneyBooks();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    if (!usingHubQuickActionsApi || !showAllQuickRooms || !selectedQuickHouse?.id) return;
+    if (selectedQuickHouseDetail?.rooms?.length) return;
+    ensureHouseDetail(selectedQuickHouse.id, { silent: false });
+  }, [ensureHouseDetail, selectedQuickHouse?.id, selectedQuickHouseDetail?.rooms?.length, showAllQuickRooms, usingHubQuickActionsApi]);
 
   const saveMeterLink = (roomId, result) => {
     const fullUrl = resolvePublicLink(result);
@@ -987,13 +1036,23 @@ const HubView = ({
   };
 
   const downloadAllHouseQr = async () => {
-    if (!quickRooms.length || !selectedQuickHouse) return;
+    if (!selectedQuickHouse) return;
 
     try {
       setIsDownloadingHouseQr(true);
       const houseLabel = getHouseLabel(selectedQuickHouse);
+      const roomsToDownload = usingHubQuickActionsApi
+        ? ((selectedQuickHouseDetail?.rooms?.length
+          ? selectedQuickHouseDetail.rooms
+          : (await ensureHouseDetail(selectedQuickHouse.id, { silent: false }))?.rooms) || [])
+        : quickRooms;
 
-      for (const room of quickRooms) {
+      if (!roomsToDownload.length) {
+        showToast?.('Cơ sở này chưa có phòng để tải QR.', 'error');
+        return;
+      }
+
+      for (const room of roomsToDownload) {
         const roomLabel = getRoomCode(room);
         const link = await getMeterReadingLink(room);
         const { cardDataUrl } = await buildMeterReadingQrCardDataUrl({
@@ -1006,7 +1065,7 @@ const HubView = ({
         await new Promise(resolve => setTimeout(resolve, 180));
       }
 
-      showToast?.(`Đã tải ${quickRooms.length} QR của ${houseLabel || 'cơ sở'}.`, 'success');
+      showToast?.(`Đã tải ${roomsToDownload.length} QR của ${houseLabel || 'cơ sở'}.`, 'success');
     } catch (error) {
       showToast?.(error.message || 'Không tải được toàn bộ QR của cơ sở.', 'error');
     } finally {
@@ -1068,7 +1127,7 @@ const HubView = ({
       setSelectedHouse(null);
       if (setHighlightedItemId) setHighlightedItemId(warning.savingId || warning.targetId || warning.id);
     } else if (warning.houseId) {
-      const house = houses.find(h => h.id === warning.houseId);
+      const house = displayHouses.find(h => h.id === warning.houseId);
       if (house) {
         setSelectedHouse(house);
         setConfig({ ...house });
@@ -1094,6 +1153,29 @@ const HubView = ({
     }
   };
 
+  const ensureWarningsLoaded = React.useCallback(async () => {
+    if (warningsRequestRef.current) return warningsRequestRef.current;
+    if (warningsLoadedRef.current && loadWarnings) return null;
+
+    warningsLoadedRef.current = true;
+    if (!loadWarnings) return null;
+
+    setIsWarningsLoading(true);
+    const request = Promise.resolve(loadWarnings())
+      .catch(() => null)
+      .finally(() => {
+        warningsRequestRef.current = null;
+        setIsWarningsLoading(false);
+      });
+
+    warningsRequestRef.current = request;
+    return request;
+  }, [loadWarnings]);
+
+  React.useEffect(() => {
+    ensureWarningsLoaded();
+  }, [ensureWarningsLoaded]);
+
   const toggleQuickQrExpanded = () => {
     setIsQuickHousePickerOpen(false);
     setIsQuickQrExpanded(prev => {
@@ -1110,6 +1192,7 @@ const HubView = ({
     setIsWarningsExpanded(prev => {
       const next = !prev;
       if (next) {
+        ensureWarningsLoaded();
         setIsQuickQrExpanded(false);
         setIsQuickHousePickerOpen(false);
         setIsRecentHousesExpanded(false);
@@ -1148,6 +1231,7 @@ const HubView = ({
     ? 'from-rose-50 via-red-50 to-white text-rose-700 ring-rose-100'
     : 'from-indigo-50 via-blue-50 to-white text-indigo-700 ring-indigo-100';
   const HubGreetingIcon = dashboardWarnings.length > 0 ? Frown : Smile;
+  const shouldShowWarningsSection = warningsLoadedRef.current || isWarningsLoading || dashboardWarnings.length > 0;
 
   return (
     <div className="h-screen bg-slate-100 text-slate-700 font-sans flex flex-col max-w-lg mx-auto w-full relative border-x border-slate-200 shadow-2xl overflow-hidden">
@@ -1168,7 +1252,7 @@ const HubView = ({
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <NotificationBell
-              houses={houses}
+              houses={displayHouses}
               setSelectedHouse={setSelectedHouse}
               setConfig={setConfig}
               setIsHubMode={setIsHubMode}
@@ -1256,8 +1340,8 @@ const HubView = ({
           <div className="space-y-2.5 p-3">
             <div>
               <div className="flex items-center justify-between text-[9px] font-black uppercase text-slate-400">
-                <span>{rentedRooms}/{hubStats.totalRooms} phòng đang thuê</span>
-                <span>{hubStats.emptyRooms} trống</span>
+                <span>{rentedRooms}/{summaryOverview?.totalRooms ?? hubStats.totalRooms} phòng đang thuê</span>
+                <span>{summaryOverview?.emptyRooms ?? hubStats.emptyRooms} trống</span>
               </div>
               <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-slate-100">
                 <div className="h-full rounded-full bg-emerald-500" style={{ width: `${occupancyRate}%` }} />
@@ -1290,7 +1374,7 @@ const HubView = ({
           </div>
         </section>
 
-        {hubStats.totalHouses === 0 && (
+        {(summaryOverview?.totalHouses ?? hubStats.totalHouses) === 0 && (
           <section className="bg-white rounded-xl border border-blue-100 shadow-sm overflow-hidden">
             <div className="p-4 border-b border-slate-100">
               <div className="flex items-center gap-3">
@@ -1316,9 +1400,9 @@ const HubView = ({
 
         <section className="grid grid-cols-2 gap-2">
           {[
-            { label: 'Quản lý cơ sở', desc: `${hubStats.totalHouses} cơ sở`, icon: Building2, tone: 'border-blue-200 bg-blue-50 text-blue-800 shadow-blue-100/70', iconTone: 'bg-blue-600 text-white shadow-blue-200', action: () => { setIsHubMode(false); setActiveTab('dashboard'); } },
-            { label: 'Sổ chi tiêu', desc: hubFunds.length ? `${formatN(hubFundTotal)} đ` : 'Quản lý sổ quỹ', icon: CircleDollarSign, tone: 'border-amber-200 bg-amber-50 text-amber-900 shadow-amber-100/70', iconTone: 'bg-amber-500 text-white shadow-amber-200', action: () => { setIsHubMode(false); setActiveTab('fund'); setSelectedHouse(null); } },
-            { label: 'Sổ tiết kiệm', desc: hubSavings.length ? (isSavingTotalVisible ? `${formatN(hubSavingTotal)} đ` : '••••••••') : 'Theo dõi tiền gửi', icon: PiggyBank, tone: 'border-emerald-200 bg-emerald-50 text-emerald-800 shadow-emerald-100/70', iconTone: 'bg-emerald-500 text-white shadow-emerald-200', isPrivate: hubSavings.length > 0, action: () => { setIsHubMode(false); setActiveTab('savings'); setSelectedHouse(null); } },
+            { label: 'Quản lý cơ sở', desc: `${summaryOverview?.totalHouses ?? hubStats.totalHouses} cơ sở`, icon: Building2, tone: 'border-blue-200 bg-blue-50 text-blue-800 shadow-blue-100/70', iconTone: 'bg-blue-600 text-white shadow-blue-200', action: () => { setIsHubMode(false); setActiveTab('dashboard'); } },
+            { label: 'Sổ chi tiêu', desc: usingHubSummaryApi ? `${formatN(hubFundTotal)} đ` : 'Quản lý sổ quỹ', icon: CircleDollarSign, tone: 'border-amber-200 bg-amber-50 text-amber-900 shadow-amber-100/70', iconTone: 'bg-amber-500 text-white shadow-amber-200', action: () => { setIsHubMode(false); setActiveTab('fund'); setSelectedHouse(null); } },
+            { label: 'Sổ tiết kiệm', desc: usingHubSummaryApi ? (isSavingTotalVisible ? `${formatN(hubSavingTotal)} đ` : '••••••••') : 'Theo dõi tiền gửi', icon: PiggyBank, tone: 'border-emerald-200 bg-emerald-50 text-emerald-800 shadow-emerald-100/70', iconTone: 'bg-emerald-500 text-white shadow-emerald-200', isPrivate: usingHubSummaryApi, action: () => { setIsHubMode(false); setActiveTab('savings'); setSelectedHouse(null); } },
             { label: 'AI Chat', desc: 'Hỗ trợ thao tác', icon: Sparkles, tone: 'border-indigo-200 bg-indigo-50 text-indigo-800 shadow-indigo-100/70', iconTone: 'bg-indigo-500 text-white shadow-indigo-200', action: () => { setIsHubMode(false); setActiveTab('ai'); setSelectedHouse(null); } }
           ].map(item => (
             <div
@@ -1427,7 +1511,7 @@ const HubView = ({
                       )}
                     </div>
                     {(hasQuickRoomsToProcess || showAllQuickRooms) && (
-                      <p className={`shrink-0 text-[8px] font-bold ${hasQuickRoomsToProcess ? 'text-rose-400' : 'text-emerald-500'}`}>{visibleQuickRooms.length}/{quickRooms.length}</p>
+                      <p className={`shrink-0 text-[8px] font-bold ${hasQuickRoomsToProcess ? 'text-rose-400' : 'text-emerald-500'}`}>{visibleQuickRooms.length}/{quickRoomTotalCount}</p>
                     )}
                   </div>
                   <button
@@ -1526,19 +1610,19 @@ const HubView = ({
                   <button
                     type="button"
                     onClick={downloadAllHouseQr}
-                    disabled={!quickRooms.length || isDownloadingHouseQr || roomsLoadingHouseId === selectedQuickHouse?.id}
+                    disabled={!selectedQuickHouse || quickRoomTotalCount <= 0 || isDownloadingHouseQr || roomsLoadingHouseId === selectedQuickHouse?.id || loadingHouseDetailId === selectedQuickHouse?.id}
                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-100 bg-emerald-50 text-emerald-700 active:scale-95 disabled:opacity-50"
                     aria-label="Tải toàn bộ QR"
                     title="Tải toàn bộ QR"
                   >
-                    {isDownloadingHouseQr || roomsLoadingHouseId === selectedQuickHouse?.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                    {isDownloadingHouseQr || roomsLoadingHouseId === selectedQuickHouse?.id || loadingHouseDetailId === selectedQuickHouse?.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                   </button>
                 </div>
               </div>}
             </div>
 
             {isQuickQrExpanded && <div className="max-h-[240px] overflow-y-auto divide-y divide-slate-200 no-scrollbar">
-              {roomsLoadingHouseId === selectedQuickHouse?.id && visibleQuickRooms.length === 0 ? (
+              {(roomsLoadingHouseId === selectedQuickHouse?.id || loadingHouseDetailId === selectedQuickHouse?.id) && visibleQuickRooms.length === 0 ? (
                 <div className="flex items-center justify-center gap-2 p-5 text-xs font-bold text-slate-400">
                   <Loader2 className="h-4 w-4 animate-spin" />
                   Đang tải phòng
@@ -1547,7 +1631,7 @@ const HubView = ({
                 <div className="p-5 text-center">
                   <QrCode className="mx-auto mb-2 h-8 w-8 text-slate-300" />
                   <p className="text-xs font-bold text-slate-500">
-                    {quickRooms.length === 0 ? 'Cơ sở này chưa có phòng.' : showAllQuickRooms ? 'Cơ sở này chưa có phòng.' : 'Không còn phòng cần xử lý.'}
+                    {quickRoomTotalCount === 0 ? 'Cơ sở này chưa có phòng.' : showAllQuickRooms ? 'Cơ sở này chưa có phòng.' : 'Không còn phòng cần xử lý.'}
                   </p>
                 </div>
               ) : (
@@ -1586,7 +1670,7 @@ const HubView = ({
                           </div>
                         </div>
                       </button>
-                      {hasUnpaidQuickBill && quickBillCanPay ? (
+                      {hasUnpaidQuickBill && quickBillCanPay && roomBill?.id ? (
                         <button
                           type="button"
                           onClick={(event) => {
@@ -1640,7 +1724,7 @@ const HubView = ({
           </section>
         )}
 
-        {dashboardWarnings.length > 0 && (
+        {shouldShowWarningsSection && (
           <section className="overflow-hidden rounded-xl border border-rose-200 bg-white shadow-md shadow-rose-100/60 animate-in zoom-in-95 duration-300">
             <div
               role="button"
@@ -1666,11 +1750,25 @@ const HubView = ({
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center justify-end gap-2">
-                  <span className="rounded-md bg-rose-500 px-2 py-0.5 text-[10px] font-black leading-none text-white shadow-sm">{dashboardWarnings.length} cảnh báo</span>
+                  <span className="rounded-md bg-rose-500 px-2 py-0.5 text-[10px] font-black leading-none text-white shadow-sm">
+                    {isWarningsLoading && dashboardWarnings.length === 0 ? 'Đang tải' : `${dashboardWarnings.length} cảnh báo`}
+                  </span>
                 </div>
               </div>
             </div>
             {isWarningsExpanded && <div className="divide-y divide-rose-100/80 max-h-[300px] overflow-y-auto no-scrollbar">
+              {isWarningsLoading && dashboardWarnings.length === 0 && (
+                <div className="flex items-center justify-center gap-2 p-5 text-xs font-bold text-rose-400">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Đang tải cảnh báo
+                </div>
+              )}
+              {!isWarningsLoading && dashboardWarnings.length === 0 && (
+                <div className="p-5 text-center">
+                  <CheckCircle2 className="mx-auto mb-2 h-8 w-8 text-emerald-400" />
+                  <p className="text-xs font-bold text-slate-600">Hiện chưa có cảnh báo nào cần xử lý.</p>
+                </div>
+              )}
               {dashboardWarnings.map((w, idx) => {
                 const config = getWarningConfig(w.type);
                 const Icon = config.icon;
@@ -1716,19 +1814,19 @@ const HubView = ({
                 </div>
               </div>
               <div className="flex shrink-0 items-center justify-end gap-2">
-                <span className="rounded-md bg-blue-600 px-2 py-0.5 text-[10px] font-black leading-none text-white shadow-sm">{houses.length} cơ sở</span>
+                <span className="rounded-md bg-blue-600 px-2 py-0.5 text-[10px] font-black leading-none text-white shadow-sm">{displayHouses.length} cơ sở</span>
               </div>
             </div>
           </div>
           {isRecentHousesExpanded && <div className="max-h-[340px] divide-y divide-slate-200 overflow-y-auto no-scrollbar">
-            {houses.length === 0 && (
+            {displayHouses.length === 0 && (
               <div className="p-5 text-center">
                 <Building2 className="w-10 h-10 mx-auto text-slate-300 mb-3" />
                 <p className="text-xs font-bold text-slate-500">Bạn chưa có cơ sở nào.</p>
                 <button type="button" onClick={() => { setActiveTab('dashboard'); setIsHubMode(false); setEditingHouse(null); setIsAiCreateHouseOpen(true); }} className="mt-4 px-4 py-2.5 rounded-xl bg-blue-600 text-white text-[10px] font-black uppercase">Tạo cơ sở đầu tiên</button>
               </div>
             )}
-            {houses.map(h => (
+            {displayHouses.map(h => (
               <button key={h.id} type="button" onClick={() => { setSelectedHouse(h); setConfig({ ...h }); setIsHubMode(false); setActiveTab('dashboard'); setSearchQuery(''); }} className="w-full border-b border-slate-200/80 p-3.5 flex items-center gap-3 text-left active:bg-slate-50 transition-colors last:border-b-0">
                 <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0"><Building2 className="w-5 h-5" /></div>
                 <div className="flex-1 min-w-0"><div className="flex items-center gap-2"><h4 className="text-[13px] font-black text-blue-800 uppercase truncate">{h.name}</h4><span className="text-[7px] font-black px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 uppercase shrink-0">{h.userRole || user?.role}</span></div><p className="text-[10px] font-semibold text-slate-500 mt-0.5 truncate">{h.address || 'Chưa cập nhật địa chỉ'}</p></div>

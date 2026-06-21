@@ -8,6 +8,9 @@ const CURRENT_BUILD_DATE = import.meta.env.VITE_APP_BUILD_DATE || '';
 const UPDATE_RELEASE_API_URL = import.meta.env.VITE_APP_UPDATE_RELEASE_API_URL
   || 'https://api.github.com/repos/Khatvongtre/lucky-home-app/releases/tags/android-latest';
 
+let releaseCache = null;
+let releaseInFlight = null;
+
 const formatBuildDate = (value) => {
   if (!value) return '';
   const date = new Date(value);
@@ -54,6 +57,36 @@ const buildManifestFromRelease = (releaseData) => {
   };
 };
 
+const requestLatestRelease = async ({ force = false } = {}) => {
+  if (!force && releaseCache) return releaseCache;
+  if (releaseInFlight) return releaseInFlight;
+
+  const request = (async () => {
+    const separator = UPDATE_RELEASE_API_URL.includes('?') ? '&' : '?';
+    const response = await fetch(`${UPDATE_RELEASE_API_URL}${separator}t=${Date.now()}`, {
+      cache: 'no-store',
+      headers: {
+        Accept: 'application/vnd.github+json',
+      },
+    });
+    if (!response.ok) throw new Error(`Không tải được thông tin cập nhật (${response.status}).`);
+
+    const releaseData = await response.json();
+    const manifest = buildManifestFromRelease(releaseData);
+    const release = manifest?.variants?.[APP_VARIANT];
+    if (!release?.downloadUrl) throw new Error('Chưa có file APK cho bản app này.');
+
+    const nextValue = { manifest, release };
+    releaseCache = nextValue;
+    return nextValue;
+  })().finally(() => {
+    releaseInFlight = null;
+  });
+
+  releaseInFlight = request;
+  return request;
+};
+
 const AppUpdatePanel = () => {
   const [state, setState] = React.useState({
     status: 'checking',
@@ -62,41 +95,40 @@ const AppUpdatePanel = () => {
     error: '',
   });
 
-  const checkForUpdate = React.useCallback(async () => {
+  const checkForUpdate = React.useCallback(async ({ force = false } = {}) => {
+    if (!force && releaseCache) {
+      setState({
+        status: 'ready',
+        manifest: releaseCache.manifest,
+        release: releaseCache.release,
+        error: '',
+      });
+      return releaseCache;
+    }
+
     setState(prev => ({ ...prev, status: 'checking', error: '' }));
 
     try {
-      const separator = UPDATE_RELEASE_API_URL.includes('?') ? '&' : '?';
-      const response = await fetch(`${UPDATE_RELEASE_API_URL}${separator}t=${Date.now()}`, {
-        cache: 'no-store',
-        headers: {
-          Accept: 'application/vnd.github+json',
-        },
-      });
-      if (!response.ok) throw new Error(`Không tải được thông tin cập nhật (${response.status}).`);
-
-      const releaseData = await response.json();
-      const manifest = buildManifestFromRelease(releaseData);
-      const release = manifest?.variants?.[APP_VARIANT];
-      if (!release?.downloadUrl) throw new Error('Chưa có file APK cho bản app này.');
-
+      const nextValue = await requestLatestRelease({ force });
       setState({
         status: 'ready',
-        manifest,
-        release,
+        manifest: nextValue.manifest,
+        release: nextValue.release,
         error: '',
       });
+      return nextValue;
     } catch (error) {
       setState(prev => ({
         ...prev,
         status: 'error',
         error: error?.message || 'Không kiểm tra được cập nhật.',
       }));
+      return null;
     }
   }, []);
 
   React.useEffect(() => {
-    checkForUpdate();
+    void checkForUpdate();
   }, [checkForUpdate]);
 
   const latestBuildNumber = Number(state.manifest?.buildNumber || 0);
@@ -129,7 +161,7 @@ const AppUpdatePanel = () => {
         </div>
         <button
           type="button"
-          onClick={checkForUpdate}
+          onClick={() => checkForUpdate({ force: true })}
           disabled={state.status === 'checking'}
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/10 text-white active:scale-95 disabled:opacity-60"
           aria-label="Kiểm tra cập nhật"

@@ -11,6 +11,8 @@ import {
 } from '../../services/notificationFlow';
 
 const NOTIFICATION_PAGE_SIZE = 20;
+const notificationCache = new Map();
+const notificationInFlight = new Map();
 
 const resolveBackendAssetUrl = (src) => {
   if (!src || typeof src !== 'string') return src;
@@ -57,6 +59,24 @@ const buildNotificationQuery = ({ houseId, unreadOnly, take, skip }) => {
   return `/notifications${query ? `?${query}` : ''}`;
 };
 
+const loadNotificationResource = async ({ cacheKey, force = false, loader }) => {
+  if (!force && notificationCache.has(cacheKey)) return notificationCache.get(cacheKey);
+  if (!force && notificationInFlight.has(cacheKey)) return notificationInFlight.get(cacheKey);
+
+  const request = (async () => {
+    try {
+      const result = await loader();
+      notificationCache.set(cacheKey, result || null);
+      return result || null;
+    } finally {
+      notificationInFlight.delete(cacheKey);
+    }
+  })();
+
+  notificationInFlight.set(cacheKey, request);
+  return request;
+};
+
 const NotificationBell = ({
   selectedHouse,
   houses = [],
@@ -96,12 +116,18 @@ const NotificationBell = ({
         setIsLoading(true);
       }
       setError('');
-      const result = await api.get(buildNotificationQuery({
+      const query = buildNotificationQuery({
         houseId,
         unreadOnly: false,
         take: NOTIFICATION_PAGE_SIZE,
         skip,
-      }));
+      });
+      const cacheKey = `${query}|append=${append ? 1 : 0}`;
+      const result = await loadNotificationResource({
+        cacheKey,
+        force: append || skip > 0 || !silent,
+        loader: () => api.get(query),
+      });
       const nextNotifications = Array.isArray(result?.notifications) ? result.notifications : [];
       const existingIds = new Set(notificationsRef.current.map(item => String(item.id)));
       const uniqueNext = append
@@ -236,7 +262,7 @@ const NotificationBell = ({
             <div className="flex items-center gap-1">
               <button
                 type="button"
-                onClick={() => loadNotifications()}
+                onClick={() => loadNotifications({ silent: false })}
                 className="p-2 rounded-lg text-slate-400 hover:bg-slate-50 hover:text-blue-600 active:scale-95"
                 aria-label="Tải lại thông báo"
               >
