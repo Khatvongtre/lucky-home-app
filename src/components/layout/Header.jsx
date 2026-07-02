@@ -27,6 +27,7 @@ const Header = ({
     setActiveTab,
     setConfig,
     houses,
+    loadHouses,
     setHighlightedItemId,
     setViewDate,
     goBack
@@ -57,6 +58,7 @@ const Header = ({
                 <NotificationBell
                     selectedHouse={selectedHouse}
                     houses={houses}
+                    loadHouses={loadHouses}
                     setSelectedHouse={setSelectedHouse}
                     setConfig={setConfig}
                     setIsHubMode={setIsHubMode}

@@ -157,6 +157,7 @@ const MainApp = () => {
     isLoggedIn,
     houses,
     selectedHouse,
+    loadHouses,
     setSelectedHouse,
     setConfig,
     setIsHubMode,
@@ -557,6 +558,7 @@ const MainApp = () => {
         isGlobalTab={isGlobalTab}
         isOwnerOrAdmin={isOwnerOrAdmin}
         houses={houses}
+        loadHouses={loadHouses}
         setIsHubMode={setIsHubMode}
         setSelectedHouse={setSelectedHouse}
         setActiveTab={setActiveTab}
