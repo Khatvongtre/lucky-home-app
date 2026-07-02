@@ -80,6 +80,7 @@ const loadNotificationResource = async ({ cacheKey, force = false, loader }) => 
 const NotificationBell = ({
   selectedHouse,
   houses = [],
+  loadHouses,
   setSelectedHouse,
   setConfig,
   setIsHubMode,
@@ -171,18 +172,19 @@ const NotificationBell = ({
     };
   }, []);
 
-  const navigateFromNotification = useCallback((notification) => {
+  const navigateFromNotification = useCallback((notification) => (
     navigateToNotification(notification, {
       houses,
       selectedHouse,
+      loadHouses,
       setSelectedHouse,
       setConfig,
       setIsHubMode,
       setActiveTab,
       setHighlightedItemId,
       setViewDate,
-    });
-  }, [houses, selectedHouse, setActiveTab, setConfig, setHighlightedItemId, setIsHubMode, setSelectedHouse, setViewDate]);
+    })
+  ), [houses, loadHouses, selectedHouse, setActiveTab, setConfig, setHighlightedItemId, setIsHubMode, setSelectedHouse, setViewDate]);
 
   const handleToggle = async () => {
     const nextOpen = !isOpen;
@@ -207,7 +209,7 @@ const NotificationBell = ({
     const wasUnread = !notification.isRead;
     if (wasUnread) markReadLocally(notification.id);
     setIsOpen(false);
-    navigateFromNotification(notification);
+    await navigateFromNotification(notification);
 
     if (!wasUnread) return;
 

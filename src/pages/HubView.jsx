@@ -13,7 +13,7 @@ import { api } from '../services/api';
 import { getApiBaseUrl } from '../services/apiServer';
 import { shareElementImage } from '../utils/imageExport';
 import { applyBillAdjustments, buildBillUpdatePayload, extractBillFromResponse, isRefundBill, normalizeBill } from '../utils/bills';
-import { getMeterReadingDueState } from '../utils/date';
+import { getMeterReadingDay, getMeterReadingDueDateForMonth, getMeterReadingDueState } from '../utils/date';
 import UserAvatar from '../components/common/UserAvatar';
 import { useHubDashboard } from '../hooks/useHubDashboard';
 import { buildHubHouseDetailCacheKey } from '../utils/hub';
@@ -38,6 +38,70 @@ const getHouseLabel = (house) => (
   house?.houseName || house?.name || house?.title || ''
 );
 
+const parseObjectField = value => {
+  if (!value) return {};
+  if (typeof value === 'object') return value;
+  if (typeof value !== 'string') return {};
+
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+};
+
+const firstFilled = (...values) => values.find(value => (
+  value !== undefined && value !== null && String(value).trim() !== ''
+));
+
+const getHouseBankAcc = (house = {}) => {
+  const nestedConfig = parseObjectField(house.config);
+  const houseConfig = parseObjectField(house.houseConfig || house.settings);
+
+  return firstFilled(
+    house.bankAcc,
+    nestedConfig.bankAcc,
+    houseConfig.bankAcc,
+    house.bankAccount,
+    nestedConfig.bankAccount,
+    house.accountNumber,
+    nestedConfig.accountNumber
+  );
+};
+
+const buildQuickHouseBillConfig = (quickHouse, fullHouse) => {
+  if (!quickHouse && !fullHouse) return {};
+
+  const quickConfig = parseObjectField(quickHouse?.config);
+  const fullConfig = parseObjectField(fullHouse?.config);
+
+  return {
+    ...fullHouse,
+    ...quickHouse,
+    bankName: firstFilled(quickHouse?.bankName, quickConfig.bankName, fullHouse?.bankName, fullConfig.bankName),
+    bankBin: firstFilled(quickHouse?.bankBin, quickConfig.bankBin, fullHouse?.bankBin, fullConfig.bankBin),
+    bankAcc: firstFilled(
+      quickHouse?.bankAcc,
+      quickConfig.bankAcc,
+      quickHouse?.bankAccount,
+      quickConfig.bankAccount,
+      quickHouse?.accountNumber,
+      quickConfig.accountNumber,
+      fullHouse?.bankAcc,
+      fullConfig.bankAcc,
+      fullHouse?.bankAccount,
+      fullConfig.bankAccount,
+      fullHouse?.accountNumber,
+      fullConfig.accountNumber
+    ),
+    config: {
+      ...fullConfig,
+      ...quickConfig,
+    },
+  };
+};
+
 const normalizeWarningType = (type) => {
   switch (type) {
     case 'HOUSE_PAYMENT_DUE':
@@ -54,6 +118,21 @@ const getRoomCode = (room) => (
 );
 
 const isPaidStatus = (status) => ['paid', 'completed', 'done'].includes(String(status || '').toLowerCase());
+
+const formatMeterDueDateLabel = (dueDate) => {
+  if (!(dueDate instanceof Date) || Number.isNaN(dueDate.getTime())) return '';
+  return `${String(dueDate.getDate()).padStart(2, '0')}/${String(dueDate.getMonth() + 1).padStart(2, '0')}`;
+};
+
+const getMeterDueLabel = (room, house, dueDate) => {
+  const fullDateLabel = formatMeterDueDateLabel(dueDate);
+  if (fullDateLabel) return fullDateLabel;
+
+  const readingDay = getMeterReadingDay(room, house?.paymentDay);
+  if (!readingDay) return '';
+
+  return `ngày ${String(readingDay).padStart(2, '0')}`;
+};
 
 const getRoomLinkLabel = (room, house) => {
   const houseLabel = room.houseName || room.house?.name || getHouseLabel(house);
@@ -168,6 +247,7 @@ const HubView = ({
   setConfig, setSearchQuery, setEditingHouse, setIsAiCreateHouseOpen,
   setIsAiPromptModalOpen, setAiPrompt, setIsListening, showToast,
   handleLogout, toast, dashboardWarnings = [],
+  loadHouses,
   loadWarnings,
   setHighlightedItemId,
   setViewDate,
@@ -210,6 +290,7 @@ const HubView = ({
   const [quickMeterDrafts, setQuickMeterDrafts] = React.useState({});
   const [isQuickMeterSaving, setIsQuickMeterSaving] = React.useState(false);
   const [quickBillSheet, setQuickBillSheet] = React.useState(null);
+  const [quickBillHouseConfig, setQuickBillHouseConfig] = React.useState(null);
   const [qrLinkInfo, setQrLinkInfo] = React.useState(null);
   const [isSavingTotalVisible, setIsSavingTotalVisible] = React.useState(false);
   const [pullDistance, setPullDistance] = React.useState(0);
@@ -273,6 +354,10 @@ const HubView = ({
   const quickQrHouses = displayHouses.filter(canManageHouseQr);
   const quickQrHouseIdsKey = quickQrHouses.map(house => house.id).join('|');
   const selectedQuickHouse = quickQrHouses.find(h => String(h.id) === String(quickHouseId)) || quickQrHouses[0] || null;
+  const selectedQuickHouseFullConfig = selectedQuickHouse
+    ? houses.find(house => String(house.id) === String(selectedQuickHouse.id)) || null
+    : null;
+  const selectedQuickHouseBillConfig = buildQuickHouseBillConfig(selectedQuickHouse, selectedQuickHouseFullConfig);
   const selectedQuickHouseDetail = selectedQuickHouse
     ? hubHouseDetailsById[buildHubHouseDetailCacheKey(selectedQuickHouse.id, month)] || null
     : null;
@@ -439,17 +524,18 @@ const HubView = ({
   };
 
   const getQuickRoomMeterDueState = (room, bill, house = selectedQuickHouse) => {
+    const targetDate = viewDate || new Date();
     if (usingHubQuickActionsApi) {
       if (room?.daysFromDue === null || room?.daysFromDue === undefined) {
         return { isInWindow: false, daysFromDue: -999, dueDate: null };
       }
+      const apiDueDate = getMeterReadingDueDateForMonth(room, targetDate, house?.paymentDay);
       return {
         isInWindow: Number(room.daysFromDue) >= -5,
         daysFromDue: Number(room.daysFromDue),
-        dueDate: true,
+        dueDate: apiDueDate,
       };
     }
-    const targetDate = viewDate || new Date();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const isPaid = bill && isPaidStatus(bill.status);
@@ -472,7 +558,7 @@ const HubView = ({
     if (metersLoadingHouseId === selectedQuickHouse?.id) return 'border-slate-200 bg-slate-50 text-slate-400';
     if (!roomMeters.length) return 'border-slate-200 bg-slate-50 text-slate-400';
     const isPaid = bill && isPaidStatus(bill.status);
-    const hasMissingValue = roomMeters.some(meter => meter.newVal === null || meter.newVal === '' || meter.newVal === undefined) || isPaid;
+    const hasMissingValue = !isPaid && roomMeters.some(meter => meter.newVal === null || meter.newVal === '' || meter.newVal === undefined);
 
     if (hasMissingValue) {
       if (meterDueState && meterDueState.daysFromDue > 5) return 'border-rose-100 bg-rose-50 text-rose-700';
@@ -487,21 +573,25 @@ const HubView = ({
     const badges = [];
     const hasNoMeters = !roomMeters.length;
     const isPaid = bill && isPaidStatus(bill.status);
-    const hasMissingMeter = hasNoMeters || roomMeters.some(meter => meter.newVal === null || meter.newVal === '' || meter.newVal === undefined) || isPaid;
+    const hasMissingMeter = !isPaid && (hasNoMeters || roomMeters.some(meter => meter.newVal === null || meter.newVal === '' || meter.newVal === undefined));
     const meterDueState = getQuickRoomMeterDueState(room, bill, house);
 
     if (metersLoadingHouseId === selectedQuickHouse?.id) {
       badges.push({ label: 'Đang tải công tơ', className: 'bg-slate-100 text-slate-500' });
     } else if (hasNoMeters) {
       badges.push({ label: 'Chưa gắn công tơ', className: 'bg-slate-100 text-slate-500' });
-    } else if (hasMissingMeter && meterDueState.dueDate && meterDueState.daysFromDue >= -5 && meterDueState.daysFromDue <= 5) {
-      badges.push({ label: 'Chưa chốt điện', className: 'bg-amber-100 text-amber-700' });
-    } else if (hasMissingMeter && meterDueState.dueDate && meterDueState.daysFromDue > 5) {
+    } else if (hasMissingMeter && meterDueState.daysFromDue >= -5 && meterDueState.daysFromDue <= 5) {
+      const dueDateLabel = getMeterDueLabel(room, house, meterDueState.dueDate);
+      badges.push({
+        label: dueDateLabel ? `Chưa chốt điện ${dueDateLabel}` : 'Chưa chốt điện',
+        className: 'bg-amber-100 text-amber-700',
+      });
+    } else if (hasMissingMeter && meterDueState.daysFromDue > 5) {
       badges.push({
         label: `Quá hạn ${meterDueState.daysFromDue} ngày`,
         className: 'bg-rose-100 text-rose-700',
       });
-    } else if (hasMissingMeter && meterDueState.dueDate && meterDueState.daysFromDue < -5) {
+    } else if (hasMissingMeter && meterDueState.daysFromDue < -5) {
       badges.push({
         label: `Còn ${Math.abs(meterDueState.daysFromDue)} ngày chốt`,
         className: 'bg-slate-100 text-slate-500',
@@ -530,8 +620,11 @@ const HubView = ({
     const roomMeters = getQuickRoomMeters(room, metersByHouse[houseId] || quickMeters);
     const bill = getQuickRoomBill(room, billsByHouse[houseId] || quickBills);
     const meterDueState = getQuickRoomMeterDueState(room, bill, house);
-    const hasMissingMeter = !roomMeters.length
-      || roomMeters.some(meter => meter.newVal === null || meter.newVal === '' || meter.newVal === undefined);
+    const isPaid = bill && isPaidStatus(bill.status);
+    const hasMissingMeter = !isPaid && (
+      !roomMeters.length
+      || roomMeters.some(meter => meter.newVal === null || meter.newVal === '' || meter.newVal === undefined)
+    );
     const hasUnpaidBill = bill && !isPaidStatus(bill.status);
 
     const isMeterPending = hasMissingMeter && meterDueState.daysFromDue >= -5;
@@ -580,7 +673,7 @@ const HubView = ({
 
   const getQuickRoomStatusStyle = ({ roomMeters, bill, meterDueState }) => {
     const isPaid = bill && isPaidStatus(bill.status);
-    const hasMissingMeter = !roomMeters.length || roomMeters.some(meter => meter.newVal === null || meter.newVal === '' || meter.newVal === undefined) || isPaid;
+    const hasMissingMeter = !isPaid && (!roomMeters.length || roomMeters.some(meter => meter.newVal === null || meter.newVal === '' || meter.newVal === undefined));
 
     if (hasMissingMeter && meterDueState.daysFromDue >= -5) {
       if (meterDueState.daysFromDue > 5) {
@@ -943,6 +1036,18 @@ const HubView = ({
         return;
       }
 
+      let billHouseConfig = selectedQuickHouseBillConfig;
+      if (!getHouseBankAcc(billHouseConfig) && loadHouses) {
+        try {
+          const latestHouses = await loadHouses();
+          const latestHouse = (latestHouses || []).find(house => String(house.id) === String(selectedQuickHouse?.id));
+          billHouseConfig = buildQuickHouseBillConfig(selectedQuickHouse, latestHouse || selectedQuickHouseFullConfig);
+        } catch (error) {
+          console.warn('Không tải lại được cấu hình cơ sở cho hóa đơn nhanh:', error);
+        }
+      }
+
+      setQuickBillHouseConfig(billHouseConfig);
       setQuickBillSheet({ type: 'bill', data: { ...bill, roomId: roomCode, roomCode } });
     } finally {
       setBillLoadingRoomId(null);
@@ -1325,6 +1430,7 @@ const HubView = ({
           <div className="flex items-center gap-2 shrink-0">
             <NotificationBell
               houses={displayHouses}
+              loadHouses={loadHouses}
               setSelectedHouse={setSelectedHouse}
               setConfig={setConfig}
               setIsHubMode={setIsHubMode}
@@ -1763,7 +1869,7 @@ const HubView = ({
                           disabled={isLoading || isOpeningReading || isOpeningBill || isDownloadingHouseQr}
                           className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border active:scale-95 disabled:opacity-60 ${getQuickMeterButtonClass(roomMeters, meterDueState, roomBill)}`}
                           aria-label={`Ghi số điện phòng ${roomCode}`}
-                          title={!roomMeters.length ? 'Chưa gắn công tơ' : (roomMeters.some(meter => meter.newVal === null || meter.newVal === '' || meter.newVal === undefined) || (roomBill && isPaidStatus(roomBill.status))) ? 'Chưa nhập đủ chỉ số' : 'Đã nhập chỉ số'}
+                          title={!roomMeters.length ? 'Chưa gắn công tơ' : (roomBill && isPaidStatus(roomBill.status)) || !roomMeters.some(meter => meter.newVal === null || meter.newVal === '' || meter.newVal === undefined) ? 'Đã nhập chỉ số' : 'Chưa nhập đủ chỉ số'}
                         >
                           {isOpeningReading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
                         </button>
@@ -1930,7 +2036,7 @@ const HubView = ({
       <BillReceipt
         bottomSheet={quickBillSheet}
         setBottomSheet={setQuickBillSheet}
-        config={selectedQuickHouse || {}}
+        config={quickBillHouseConfig || selectedQuickHouseBillConfig}
         API_URL={API_URL}
         isManagerOrAbove={quickBillCanEdit}
         isOwnerOrAdmin={quickBillCanManage}

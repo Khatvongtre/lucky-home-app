@@ -46,6 +46,62 @@ const getMeterUsage = meter => {
     return Number.isFinite(oldValue) && Number.isFinite(newValue) ? newValue - oldValue : 0;
 };
 
+const parseObjectField = value => {
+    if (!value) return {};
+    if (typeof value === 'object') return value;
+    if (typeof value !== 'string') return {};
+
+    try {
+        const parsed = JSON.parse(value);
+        return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+        return {};
+    }
+};
+
+const firstFilled = (...values) => values.find(value => (
+    value !== undefined && value !== null && String(value).trim() !== ''
+));
+
+const getTransferConfig = (config = {}, bill = {}) => {
+    const nestedConfig = parseObjectField(config.config);
+    const houseConfig = parseObjectField(config.houseConfig || config.settings);
+    const billConfig = parseObjectField(bill.config || bill.houseConfig || bill.house?.config);
+
+    return {
+        bankName: firstFilled(
+            config.bankName,
+            nestedConfig.bankName,
+            houseConfig.bankName,
+            bill.bankName,
+            billConfig.bankName,
+            'MB BANK'
+        ),
+        bankBin: firstFilled(
+            config.bankBin,
+            nestedConfig.bankBin,
+            houseConfig.bankBin,
+            config.bankCode,
+            nestedConfig.bankCode,
+            bill.bankBin,
+            billConfig.bankBin,
+            '970422'
+        ),
+        bankAcc: firstFilled(
+            config.bankAcc,
+            nestedConfig.bankAcc,
+            houseConfig.bankAcc,
+            config.bankAccount,
+            nestedConfig.bankAccount,
+            config.accountNumber,
+            nestedConfig.accountNumber,
+            bill.bankAcc,
+            billConfig.bankAcc,
+            '0'
+        ),
+    };
+};
+
 const BillReceipt = ({
     bottomSheet,
     setBottomSheet,
@@ -137,8 +193,9 @@ const BillReceipt = ({
     );
     const meterImages = buildMeterImages(bill, API_URL)
         .filter(item => item.src && !failedMeterImages[item.src]);
-    const bankBin = config.bankBin || '970422';
-    const bankAcc = config.bankAcc || '0';
+    const transferConfig = getTransferConfig(config, bill);
+    const bankBin = transferConfig.bankBin;
+    const bankAcc = transferConfig.bankAcc;
     const qrAddInfo = `P${bill.roomId} ${bill.currentMonthFull}`;
     const qrFingerprint = [
         API_URL,
@@ -350,8 +407,8 @@ const BillReceipt = ({
 
                                     <div className="px-1">
                                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Thông tin chuyển khoản</p>
-                                        <p className="text-[15px] font-black text-purple-700 uppercase leading-tight truncate mt-5">{config.bankName || "MB BANK"}</p>
-                                        <p className="text-[20px] font-black text-blue-600 tracking-tighter leading-tight mt-1">{config.bankAcc || "0000"}</p>
+                                        <p className="text-[15px] font-black text-purple-700 uppercase leading-tight truncate mt-5">{transferConfig.bankName}</p>
+                                        <p className="text-[20px] font-black text-blue-600 tracking-tighter leading-tight mt-1">{bankAcc}</p>
                                     </div>
                                 </div>
                                 <div className="w-[100px] h-[100px] bg-white rounded-lg border border-slate-200 p-1 flex items-center justify-center shrink-0 shadow-sm self-end">

@@ -35,6 +35,7 @@ export const usePushNotificationFlow = ({
   isLoggedIn,
   houses,
   selectedHouse,
+  loadHouses,
   setSelectedHouse,
   setConfig,
   setIsHubMode,
@@ -47,19 +48,22 @@ export const usePushNotificationFlow = ({
   const openedNotificationKeyRef = useRef('');
 
   const openNotification = useCallback((notification) => {
-    navigateToNotification(notification, {
+    void navigateToNotification(notification, {
       houses,
       selectedHouse,
+      loadHouses,
       setSelectedHouse,
       setConfig,
       setIsHubMode,
       setActiveTab,
       setHighlightedItemId,
       setViewDate,
+    }).finally(() => {
+      void markNotificationRead(notification).catch(() => {});
     });
-    void markNotificationRead(notification).catch(() => {});
   }, [
     houses,
+    loadHouses,
     selectedHouse,
     setActiveTab,
     setConfig,
