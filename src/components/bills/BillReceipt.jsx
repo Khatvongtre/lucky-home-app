@@ -63,42 +63,39 @@ const firstFilled = (...values) => values.find(value => (
     value !== undefined && value !== null && String(value).trim() !== ''
 ));
 
+const firstField = (sources, keys) => firstFilled(
+    ...sources.flatMap(source => keys.map(key => source?.[key]))
+);
+
 const getTransferConfig = (config = {}, bill = {}) => {
-    const nestedConfig = parseObjectField(config.config);
-    const houseConfig = parseObjectField(config.houseConfig || config.settings);
-    const billConfig = parseObjectField(bill.config || bill.houseConfig || bill.house?.config);
+    const sources = [
+        config,
+        parseObjectField(config.config),
+        parseObjectField(config.houseConfig),
+        parseObjectField(config.settings),
+        bill,
+        parseObjectField(bill.config),
+        parseObjectField(bill.houseConfig),
+        parseObjectField(bill.house?.config),
+        bill.house || {},
+    ];
+
+    const bankAcc = firstField(sources, [
+        'bankAcc',
+        'bank_acc',
+        'bankAccount',
+        'bank_account',
+        'accountNumber',
+        'account_number',
+        'accountNo',
+        'account_no',
+        'acc',
+    ]);
 
     return {
-        bankName: firstFilled(
-            config.bankName,
-            nestedConfig.bankName,
-            houseConfig.bankName,
-            bill.bankName,
-            billConfig.bankName,
-            'MB BANK'
-        ),
-        bankBin: firstFilled(
-            config.bankBin,
-            nestedConfig.bankBin,
-            houseConfig.bankBin,
-            config.bankCode,
-            nestedConfig.bankCode,
-            bill.bankBin,
-            billConfig.bankBin,
-            '970422'
-        ),
-        bankAcc: firstFilled(
-            config.bankAcc,
-            nestedConfig.bankAcc,
-            houseConfig.bankAcc,
-            config.bankAccount,
-            nestedConfig.bankAccount,
-            config.accountNumber,
-            nestedConfig.accountNumber,
-            bill.bankAcc,
-            billConfig.bankAcc,
-            '0'
-        ),
+        bankName: firstField(sources, ['bankName', 'bank_name', 'bank']) || 'MB BANK',
+        bankBin: firstField(sources, ['bankBin', 'bank_bin', 'bankCode', 'bank_code', 'bin']) || '970422',
+        bankAcc: /^0+$/.test(String(bankAcc || '').trim()) ? '' : (bankAcc || ''),
     };
 };
 
@@ -195,7 +192,8 @@ const BillReceipt = ({
         .filter(item => item.src && !failedMeterImages[item.src]);
     const transferConfig = getTransferConfig(config, bill);
     const bankBin = transferConfig.bankBin;
-    const bankAcc = transferConfig.bankAcc;
+    const bankAcc = String(transferConfig.bankAcc || '').trim();
+    const hasBankAcc = bankAcc.length > 0;
     const qrAddInfo = `P${bill.roomId} ${bill.currentMonthFull}`;
     const qrFingerprint = [
         API_URL,
@@ -209,7 +207,9 @@ const BillReceipt = ({
         savedAdditionalCost,
         localWaivedItems.join(',')
     ].join('|');
-    const qrSrc = `${API_URL}/vietqr/generate?bankBin=${bankBin}&bankAcc=${bankAcc}&amount=${Math.max(previewTotal, 0)}&addInfo=${encodeURIComponent(qrAddInfo)}&t=${encodeURIComponent(qrFingerprint)}`;
+    const qrSrc = hasBankAcc
+        ? `${API_URL}/vietqr/generate?bankBin=${bankBin}&bankAcc=${encodeURIComponent(bankAcc)}&amount=${Math.max(previewTotal, 0)}&addInfo=${encodeURIComponent(qrAddInfo)}&t=${encodeURIComponent(qrFingerprint)}`
+        : '';
 
     return (
         <div {...swipeBackHandlers} className="fixed inset-0 z-[600] flex items-center justify-center">
@@ -408,9 +408,12 @@ const BillReceipt = ({
                                     <div className="px-1">
                                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Thông tin chuyển khoản</p>
                                         <p className="text-[15px] font-black text-purple-700 uppercase leading-tight truncate mt-5">{transferConfig.bankName}</p>
-                                        <p className="text-[20px] font-black text-blue-600 tracking-tighter leading-tight mt-1">{bankAcc}</p>
+                                        <p className={`text-[20px] font-black tracking-tighter leading-tight mt-1 ${hasBankAcc ? 'text-blue-600' : 'text-rose-500'}`}>
+                                            {hasBankAcc ? bankAcc : 'Chưa cấu hình STK'}
+                                        </p>
                                     </div>
                                 </div>
+                                {hasBankAcc && (
                                 <div className="w-[100px] h-[100px] bg-white rounded-lg border border-slate-200 p-1 flex items-center justify-center shrink-0 shadow-sm self-end">
                                     <img
                                         key={`qr-${qrFingerprint}`}
@@ -420,6 +423,7 @@ const BillReceipt = ({
                                         crossOrigin="anonymous"
                                     />
                                 </div>
+                                )}
                             </div>}
                         </div>
 

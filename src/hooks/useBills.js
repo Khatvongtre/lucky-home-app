@@ -77,12 +77,17 @@ export const useBills = ({
       const paidBill = extractBillFromResponse(response, targetBill);
       const isRefund = isRefundBill(paidBill);
       setBills(prev => prev.map(bill => bill.id === billId ? paidBill : bill));
+      await Promise.all([
+        loadHouseData(selectedHouse?.id, 'bills'),
+        loadHouseData(selectedHouse?.id, 'dashboard'),
+        loadHouseData(selectedHouse?.id, 'finance'),
+      ]);
       showToast(isRefund ? 'Đã xác nhận trả cọc & ghi phiếu chi!' : 'Gạch nợ & ghi sổ thành công!', 'success');
       setBottomSheet(null);
     } catch (error) {
       showToast('Đã có lỗi xảy ra ! (' + error.message + ')', 'error');
     }
-  }, [bills, setBills, setBottomSheet, showToast]);
+  }, [bills, loadHouseData, selectedHouse?.id, setBills, setBottomSheet, showToast]);
 
   const handleDeleteBill = useCallback(async (billId) => {
     const confirmed = await requestConfirm({

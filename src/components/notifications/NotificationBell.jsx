@@ -14,6 +14,21 @@ const NOTIFICATION_PAGE_SIZE = 20;
 const notificationCache = new Map();
 const notificationInFlight = new Map();
 
+const clearNotificationCache = (prefix = '') => {
+  if (!prefix) {
+    notificationCache.clear();
+    notificationInFlight.clear();
+    return;
+  }
+
+  [...notificationCache.keys()].forEach(key => {
+    if (key.startsWith(prefix)) notificationCache.delete(key);
+  });
+  [...notificationInFlight.keys()].forEach(key => {
+    if (key.startsWith(prefix)) notificationInFlight.delete(key);
+  });
+};
+
 const resolveBackendAssetUrl = (src) => {
   if (!src || typeof src !== 'string') return src;
   if (src.startsWith('data:') || src.startsWith('blob:')) return src;
@@ -109,7 +124,7 @@ const NotificationBell = ({
     notificationsRef.current = notifications;
   }, [notifications]);
 
-  const loadNotifications = useCallback(async ({ silent = false, append = false, skip = 0 } = {}) => {
+  const loadNotifications = useCallback(async ({ silent = false, append = false, skip = 0, force = false } = {}) => {
     try {
       if (append) {
         setIsLoadingMore(true);
@@ -126,7 +141,7 @@ const NotificationBell = ({
       const cacheKey = `${query}|append=${append ? 1 : 0}`;
       const result = await loadNotificationResource({
         cacheKey,
-        force: append || skip > 0 || !silent,
+        force: force || append || skip > 0 || !silent,
         loader: () => api.get(query),
       });
       const nextNotifications = Array.isArray(result?.notifications) ? result.notifications : [];
@@ -151,10 +166,18 @@ const NotificationBell = ({
   }, [loadNotifications]);
 
   useEffect(() => {
-    const handleRefresh = () => loadNotifications({ silent: true });
+    const handleRefresh = () => {
+      clearNotificationCache(buildNotificationQuery({
+        houseId,
+        unreadOnly: false,
+        take: NOTIFICATION_PAGE_SIZE,
+        skip: 0,
+      }));
+      loadNotifications({ silent: true, force: true });
+    };
     window.addEventListener(NOTIFICATION_REFRESH_EVENT, handleRefresh);
     return () => window.removeEventListener(NOTIFICATION_REFRESH_EVENT, handleRefresh);
-  }, [loadNotifications]);
+  }, [houseId, loadNotifications]);
 
   useEffect(() => {
     const handlePointerDown = (event) => {
@@ -190,7 +213,7 @@ const NotificationBell = ({
     const nextOpen = !isOpen;
     setIsOpen(nextOpen);
     if (nextOpen && !hasLoaded) await loadNotifications();
-    if (nextOpen && hasLoaded) loadNotifications({ silent: true });
+    if (nextOpen && hasLoaded) loadNotifications({ silent: true, force: true });
   };
 
   const handleLoadMore = () => {
@@ -215,8 +238,9 @@ const NotificationBell = ({
 
     try {
       await markNotificationRead(notification);
+      await loadNotifications({ silent: true, force: true });
     } catch {
-      await loadNotifications({ silent: true });
+      await loadNotifications({ silent: true, force: true });
     }
   };
 
@@ -226,10 +250,16 @@ const NotificationBell = ({
       setUnreadCount(0);
       const query = houseId ? `?houseId=${encodeURIComponent(houseId)}` : '';
       await api.post(`/notifications/read-all${query}`);
-      await loadNotifications({ silent: true });
+      clearNotificationCache(buildNotificationQuery({
+        houseId,
+        unreadOnly: false,
+        take: NOTIFICATION_PAGE_SIZE,
+        skip: 0,
+      }));
+      await loadNotifications({ silent: true, force: true });
     } catch (markError) {
       setError(markError.message || 'Không đánh dấu được thông báo.');
-      await loadNotifications({ silent: true });
+      await loadNotifications({ silent: true, force: true });
     }
   };
 
