@@ -36,6 +36,7 @@ import { usePushNotificationFlow } from './hooks/usePushNotificationFlow';
 import { useNativePushNotifications } from './hooks/useNativePushNotifications';
 import ForegroundNotificationPopup from './components/notifications/ForegroundNotificationPopup';
 import PageLoading from './components/common/PageLoading';
+import { AppUpdateNotice } from './components/common/AppUpdatePanel';
 import { getApiBaseUrl } from './services/apiServer';
 
 const MeterReadingPublicView = lazy(() => import('./pages/MeterReadingPublicView'));
@@ -529,12 +530,14 @@ const MainApp = () => {
       onOpen={openForegroundNotification}
     />
   );
+  const appUpdateNotice = <AppUpdateNotice enabled={isLoggedIn && !isHuChiTieuVariant} />;
 
   if (!isLoggedIn || isHubMode || (!selectedHouse && !isGlobalTab) || activeTab === 'fast_input') {
     return (
       <>
         {entryRoute}
         {foregroundNotificationPopup}
+        {appUpdateNotice}
       </>
     );
   }
@@ -544,6 +547,7 @@ const MainApp = () => {
     <div ref={appShellRef} className="h-screen bg-slate-50 text-slate-900 font-sans flex flex-col max-w-lg mx-auto w-full relative border-x border-slate-100 shadow-2xl overflow-hidden">
       <ToastNotification toast={toast} />
       {foregroundNotificationPopup}
+      {appUpdateNotice}
       <ConfirmDialog
         dialog={confirmDialog}
         onCancel={() => closeConfirmDialog(false)}

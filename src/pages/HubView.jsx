@@ -306,6 +306,8 @@ const HubView = ({
     hasLoadedSummary,
     hasLoadedQuickActions,
     quickActionsError,
+    loadHubSummary,
+    loadHubQuickActions,
     ensureHouseDetail,
   } = useHubDashboard({ viewDate, showToast });
 
@@ -828,6 +830,21 @@ const HubView = ({
     return request;
   };
 
+  const refreshQuickHubData = async (houseId) => {
+    if (usingHubQuickActionsApi) {
+      await Promise.all([
+        loadHubSummary({ silent: true, force: true }),
+        loadHubQuickActions({ silent: true, force: true }),
+        houseId ? ensureHouseDetail(houseId, { silent: true, force: true, mode: 'all' }) : null,
+      ]);
+      return;
+    }
+
+    if (houseId) {
+      await loadQuickBills(houseId, true);
+    }
+  };
+
   React.useEffect(() => {
     if (!isQuickQrExpanded || !shouldUseLegacyQuickData || !selectedQuickHouse?.id || !quickRooms.length || billsByHouse[selectedQuickHouse.id]) return;
     loadQuickBills(selectedQuickHouse.id);
@@ -1115,16 +1132,26 @@ const HubView = ({
   };
 
   const handleQuickPayBill = async (billId) => {
-    const targetBill = quickBillSheet?.data;
+    const houseId = selectedQuickHouse?.id;
+    const targetBill = quickBillSheet?.data
+      || (billsByHouse[houseId] || []).find(bill => String(bill.id) === String(billId))
+      || (selectedQuickHouse?.pendingRooms || [])
+        .map(room => getQuickRoomBill(room))
+        .find(bill => String(bill?.id) === String(billId));
     try {
       const response = await api.post(`/bill/pay/${billId}`);
-      const paidBill = extractBillFromResponse(response, targetBill);
+      const savedBill = extractBillFromResponse(response, targetBill);
+      const paidBill = {
+        ...savedBill,
+        id: savedBill?.id || billId,
+        status: 'paid',
+      };
       const isRefund = isRefundBill(paidBill);
-      const houseId = selectedQuickHouse?.id;
       setBillsByHouse(prev => ({
         ...prev,
-        [houseId]: (prev[houseId] || []).map(bill => bill.id === billId ? paidBill : bill),
+        [houseId]: (prev[houseId] || []).map(bill => String(bill.id) === String(billId) ? paidBill : bill),
       }));
+      await refreshQuickHubData(houseId);
       showToast?.(isRefund ? 'Đã xác nhận trả cọc & ghi phiếu chi.' : 'Gạch nợ & ghi sổ thành công.', 'success');
       setQuickBillSheet(null);
     } catch (error) {
@@ -1141,7 +1168,7 @@ const HubView = ({
 
     try {
       await api.delete(`/bill/${billId}`);
-      await loadQuickBills(selectedQuickHouse?.id, true);
+      await refreshQuickHubData(selectedQuickHouse?.id);
       showToast?.('Đã xóa hóa đơn thành công.', 'success');
       setQuickBillSheet(null);
     } catch (error) {
