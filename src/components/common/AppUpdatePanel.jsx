@@ -1,6 +1,6 @@
 import React from 'react';
 import { Capacitor } from '@capacitor/core';
-import { Download, Loader2, RefreshCw, Smartphone } from 'lucide-react';
+import { Download, Loader2, RefreshCw, Smartphone, X } from 'lucide-react';
 
 const APP_VARIANT = import.meta.env.VITE_APP_VARIANT || 'home';
 const CURRENT_BUILD_NUMBER = Number(import.meta.env.VITE_APP_BUILD_NUMBER || 0);
@@ -87,6 +87,116 @@ const requestLatestRelease = async ({ force = false } = {}) => {
   return request;
 };
 
+const getUpdateAvailability = ({ manifest } = {}) => {
+  const latestBuildNumber = Number(manifest?.buildNumber || 0);
+  const isBuildKnown = CURRENT_BUILD_NUMBER > 0;
+  const hasPublishedBuild = latestBuildNumber > 0;
+  const hasNewerBuild = hasPublishedBuild && (!isBuildKnown || latestBuildNumber > CURRENT_BUILD_NUMBER);
+
+  return {
+    latestBuildNumber,
+    isBuildKnown,
+    hasPublishedBuild,
+    hasNewerBuild,
+  };
+};
+
+export const AppUpdateNotice = ({ enabled = true }) => {
+  const [notice, setNotice] = React.useState({
+    visible: false,
+    checking: false,
+    manifest: null,
+    release: null,
+  });
+  const isNativeAndroid = Capacitor.getPlatform() === 'android';
+
+  React.useEffect(() => {
+    if (!enabled || !isNativeAndroid) return undefined;
+
+    let cancelled = false;
+    setNotice(prev => ({ ...prev, checking: true }));
+
+    requestLatestRelease()
+      .then(nextValue => {
+        if (cancelled) return;
+        const availability = getUpdateAvailability({ manifest: nextValue?.manifest });
+        setNotice({
+          visible: Boolean(availability.hasNewerBuild && nextValue?.release?.downloadUrl),
+          checking: false,
+          manifest: nextValue?.manifest || null,
+          release: nextValue?.release || null,
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setNotice(prev => ({ ...prev, checking: false }));
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled, isNativeAndroid]);
+
+  if (!enabled || !isNativeAndroid || !notice.visible) return null;
+
+  const { latestBuildNumber } = getUpdateAvailability({ manifest: notice.manifest });
+  const latestBuildDate = formatBuildDate(notice.manifest?.generatedAt);
+
+  return (
+    <div className="fixed inset-0 z-[900] flex items-end justify-center bg-slate-950/45 px-4 pb-6 backdrop-blur-sm sm:items-center sm:pb-0">
+      <section className="w-full max-w-sm overflow-hidden rounded-2xl border border-emerald-100 bg-white shadow-2xl">
+        <div className="flex items-center justify-between gap-3 border-b border-emerald-100 bg-emerald-600 px-4 py-3 text-white">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/15">
+              <Smartphone className="h-4.5 w-4.5" />
+            </span>
+            <div className="min-w-0">
+              <h3 className="truncate text-[12px] font-black uppercase tracking-wide">Có bản cập nhật mới</h3>
+              <p className="mt-0.5 truncate text-[9px] font-bold text-emerald-50">{notice.release?.label || 'Lucky Home'}</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setNotice(prev => ({ ...prev, visible: false }))}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 active:scale-95"
+            aria-label="Để sau"
+            title="Để sau"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="space-y-3 p-4">
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-3 text-emerald-900">
+            <p className="text-[12px] font-black">Đã có bản cập nhật mới, vui lòng cập nhật.</p>
+            <p className="mt-1 text-[10px] font-bold text-emerald-700">
+              Build hiện tại {CURRENT_BUILD_NUMBER || 'thủ công'} → build {latestBuildNumber || 'mới'}
+              {latestBuildDate ? `, phát hành ${latestBuildDate}` : ''}
+            </p>
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setNotice(prev => ({ ...prev, visible: false }))}
+              className="flex h-11 flex-1 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-[10px] font-black uppercase text-slate-600 active:scale-[0.98]"
+            >
+              Để sau
+            </button>
+            <button
+              type="button"
+              onClick={() => openDownload(notice.release.downloadUrl)}
+              className="flex h-11 flex-[1.4] items-center justify-center gap-2 rounded-xl bg-emerald-600 text-[10px] font-black uppercase text-white shadow-sm shadow-emerald-200 active:scale-[0.98]"
+            >
+              <Download className="h-4 w-4" />
+              Cập nhật ngay
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+};
+
 const AppUpdatePanel = () => {
   const [state, setState] = React.useState({
     status: 'checking',
@@ -131,10 +241,12 @@ const AppUpdatePanel = () => {
     void checkForUpdate();
   }, [checkForUpdate]);
 
-  const latestBuildNumber = Number(state.manifest?.buildNumber || 0);
-  const isBuildKnown = CURRENT_BUILD_NUMBER > 0;
-  const hasPublishedBuild = latestBuildNumber > 0;
-  const hasNewerBuild = hasPublishedBuild && (!isBuildKnown || latestBuildNumber > CURRENT_BUILD_NUMBER);
+  const {
+    latestBuildNumber,
+    isBuildKnown,
+    hasPublishedBuild,
+    hasNewerBuild,
+  } = getUpdateAvailability({ manifest: state.manifest });
   const isNativeAndroid = Capacitor.getPlatform() === 'android';
   const latestBuildDate = formatBuildDate(state.manifest?.generatedAt);
   const currentBuildDate = formatBuildDate(CURRENT_BUILD_DATE);
