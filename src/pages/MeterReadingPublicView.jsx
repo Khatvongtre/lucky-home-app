@@ -35,7 +35,7 @@ const currentPeriod = () => {
 const looksLikeTechnicalId = (value = '') =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
   || /^[0-9a-f]{24}$/i.test(value)
-  || value.length > 18;
+  || (value.length > 18 && !/\s/.test(value));
 
 const isPaidStatus = (status) => ['paid', 'completed', 'done'].includes(String(status || '').toLowerCase());
 
@@ -269,11 +269,11 @@ const PublicInvoiceReceipt = ({
         WebkitFontSmoothing: 'antialiased',
       }}
     >
-      <div className="p-4 space-y-3">
-        <div className="bg-blue-50/50 border border-blue-100 p-3 rounded-xl flex justify-between items-center">
+      <div className="p-3 space-y-3">
+        <div className="bg-blue-50/50 border border-blue-100 p-2.5 rounded-xl flex justify-between items-center">
           <div>
             <p className="text-[9px] font-bold text-blue-500 uppercase mb-0.5 tracking-widest">Phòng</p>
-            <p className="text-xl font-black text-blue-700 leading-none">{bill.roomId}</p>
+            <p className={`font-black text-blue-700 leading-tight ${String(bill.roomId || '').length > 10 ? 'text-sm' : 'text-xl leading-none'}`}>{bill.roomId}</p>
           </div>
           <div className="text-right">
             <p className="text-[9px] font-bold text-blue-500 uppercase mb-0.5 tracking-widest">Kỳ thanh toán</p>
@@ -282,13 +282,13 @@ const PublicInvoiceReceipt = ({
         </div>
 
         {isMultiMonthBill && (
-          <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-3">
+          <div className="grid grid-cols-3 gap-1.5">
+            <div className="col-span-2 rounded-xl border border-indigo-100 bg-indigo-50 p-2.5">
               <p className="text-[8px] font-black uppercase tracking-widest text-indigo-500">Kỳ hóa đơn</p>
-              <p className="mt-1 text-[12px] font-black text-indigo-700">{bill.details.periodFrom} - {bill.details.periodTo}</p>
+              <p className="mt-1 whitespace-nowrap text-[11px] font-black text-indigo-700">{bill.details.periodFrom} - {bill.details.periodTo}</p>
             </div>
-            <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-3 text-right">
-              <p className="text-[8px] font-black uppercase tracking-widest text-indigo-500">Chu kỳ thanh toán</p>
+            <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-2.5 text-right">
+              <p className="text-[8px] font-black uppercase tracking-widest text-indigo-500">Chu kỳ</p>
               <p className="mt-1 text-[12px] font-black text-indigo-700">{periodMonths} tháng</p>
             </div>
           </div>
@@ -572,7 +572,9 @@ const MeterReadingPublicView = () => {
   const completedCount = session?.meters?.filter(meter => meter.hasFreshImage && meter.newVal !== '' && meter.newVal !== null).length || 0;
   const allDone = session?.meters?.length > 0 && completedCount === session.meters.length;
   const invoicePreview = session?.invoice || null;
-  const roomDisplayName = session?.room?.roomCode ? `P.${session.room.roomCode}` : 'Phòng cần ghi điện';
+  const roomDisplayName = session?.room?.roomCode
+    ? (/\s/.test(session.room.roomCode) ? session.room.roomCode : `P.${session.room.roomCode}`)
+    : 'Phòng cần ghi điện';
   const currentDone = Boolean(activeMeter?.hasFreshImage && activeMeter?.newVal !== '' && activeMeter?.newVal !== null);
   const activeUsage = activeMeter
     ? Math.max(parseN(String(activeMeter.newVal || 0)) - parseN(String(activeMeter.oldVal || 0)), 0)
@@ -1002,7 +1004,7 @@ const MeterReadingPublicView = () => {
         button { -webkit-appearance: none; appearance: none; }
       `}</style>
       <div className="mx-auto flex h-screen w-full max-w-lg flex-col overflow-hidden bg-[#f6f8fb] shadow-2xl">
-        <header className="relative z-30 shrink-0 bg-[#f6f8fb] px-4 pt-3 pb-1.5">
+        <header className="relative z-30 shrink-0 bg-[#f6f8fb] px-2.5 pt-3 pb-1.5">
           <div className="relative overflow-hidden rounded-[20px] bg-gradient-to-br from-blue-800 via-blue-600 to-sky-400 px-4 py-4 text-white shadow-xl shadow-blue-900/20">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(255,255,255,0.24),transparent_26%),radial-gradient(circle_at_85%_15%,rgba(14,165,233,0.28),transparent_30%)]" />
             <div className="relative flex min-h-[76px] items-center">
@@ -1033,7 +1035,7 @@ const MeterReadingPublicView = () => {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto px-4 pb-32 pt-1.5 space-y-2 no-scrollbar">
+        <main className="flex-1 overflow-y-auto px-2.5 pb-32 pt-1.5 space-y-2 no-scrollbar">
           {!invoicePreview && (
             <section className="rounded-xl border border-slate-200/80 bg-white px-3 py-2 shadow-sm">
               <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
