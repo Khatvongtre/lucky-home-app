@@ -347,7 +347,14 @@ const PublicInvoiceReceipt = ({
 
           {hasMonthlyFee && (
             <div className="flex justify-between items-center py-2.5 border-b border-dashed border-slate-200 last:border-0">
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Phí DV Hàng tháng (MBKD)</span>
+              <div className="flex flex-col">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Phí DV Hàng tháng (MBKD)</span>
+                {isMultiMonthBill ? (
+                  <p className="text-[9px] text-blue-500 font-semibold leading-tight mt-0.5">
+                    {formatN(bill.details.monthlyFee / periodMonths)} x {periodMonths} tháng = {formatN(bill.details.monthlyFee)}
+                  </p>
+                ) : null}
+              </div>
               {feeAmount('monthlyFee', bill.details.monthlyFee)}
             </div>
           )}
