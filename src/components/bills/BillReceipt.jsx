@@ -244,7 +244,7 @@ const BillReceipt = ({
                             <div className="bg-blue-50/50 border border-blue-100 p-3 rounded-xl flex justify-between items-center">
                                 <div>
                                     <p className="text-[9px] font-bold text-blue-500 uppercase mb-0.5 tracking-widest">Phòng</p>
-                                    <p className="text-xl font-black text-blue-700 leading-none">{bottomSheet.data.roomId}</p>
+                                    <p className={`font-black text-blue-700 leading-tight ${String(bottomSheet.data.roomId || '').length > 10 ? 'text-sm' : 'text-xl leading-none'}`}>{bottomSheet.data.roomId}</p>
                                 </div>
                                 <div className="text-right">
                                     <p className="text-[9px] font-bold text-blue-500 uppercase mb-0.5 tracking-widest">Kỳ thanh toán</p>
