@@ -324,7 +324,14 @@ const BillReceipt = ({
 
                                 {hasMonthlyFee && (
                                     <button type="button" onClick={() => toggleWaivedItem('monthlyFee')} className={`${feeRowClass('monthlyFee')} last:border-0`}>
-                                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Phí DV Hàng tháng (MBKD)</span>
+                                        <div className="flex flex-col">
+                                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Phí DV Hàng tháng (MBKD)</span>
+                                            {isMultiMonthBill ? (
+                                                <p className="text-[9px] text-blue-500 font-semibold leading-tight mt-0.5">
+                                                    {formatN(details.monthlyFee / periodMonths)} x {periodMonths} tháng = {formatN(details.monthlyFee)}
+                                                </p>
+                                            ) : null}
+                                        </div>
                                         {feeAmount('monthlyFee', details.monthlyFee)}
                                     </button>
                                 )}
