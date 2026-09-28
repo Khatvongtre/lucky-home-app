@@ -93,6 +93,15 @@ const normalizeSearchText = (value = '') => String(value)
   .replace(/[\u0300-\u036f]/g, '')
   .toLowerCase();
 
+const buildTransferNote = (roomId, period) => `P${roomId || ''} ${period || ''}`
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/[Đđ]/g, 'D')
+  .replace(/[^a-zA-Z0-9 ]/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim()
+  .slice(0, 50);
+
 const getFriendlyRoomCode = (room = {}) => {
   const roomCode = room.roomCode || room.code || room.name || '';
   return roomCode && !looksLikeTechnicalId(String(roomCode)) ? roomCode : '';
@@ -302,7 +311,7 @@ const PublicInvoiceReceipt = ({
   const bankBin = config.bankBin || '970422';
   const bankAcc = config.bankAcc || '0';
   const bankName = config.bankName || 'MB BANK';
-  const qrAddInfo = `P${bill.roomId} ${bill.currentMonthFull}`;
+  const qrAddInfo = buildTransferNote(bill.roomId, bill.currentMonthFull);
   const qrFingerprint = [
     API_URL,
     bankBin,
@@ -317,6 +326,8 @@ const PublicInvoiceReceipt = ({
   const [bankApps, setBankApps] = useState(FALLBACK_BANK_APPS);
   const [bankSearch, setBankSearch] = useState('');
   const [showQrFallback, setShowQrFallback] = useState(false);
+  const [pendingBankApp, setPendingBankApp] = useState(null);
+  const [isPreparingBankApp, setIsPreparingBankApp] = useState(false);
   const [preferredBankAppId, setPreferredBankAppId] = useState(getStoredBankAppId);
   const [recipientBankCode, setRecipientBankCode] = useState(
     () => BANK_CODE_BY_BIN[String(bankBin)] || String(bankBin),
@@ -392,6 +403,29 @@ const PublicInvoiceReceipt = ({
     if (accountName) params.set('bn', accountName);
 
     window.location.assign(`https://dl.vietqr.io/pay?${params.toString()}`);
+  };
+
+  const selectBankApp = (app) => {
+    if (Number(app?.autofill) === 1) {
+      openBankApp(app);
+      return;
+    }
+
+    setPendingBankApp(app);
+  };
+
+  const confirmOpenBankApp = async () => {
+    if (!pendingBankApp || isPreparingBankApp) return;
+
+    setIsPreparingBankApp(true);
+    const didDownload = await onDownloadQr?.({
+      qrSrc,
+      roomId: bill.roomId,
+      period: bill.currentMonthFull,
+    });
+    setIsPreparingBankApp(false);
+
+    if (didDownload) openBankApp(pendingBankApp);
   };
 
   return (
@@ -542,6 +576,7 @@ const PublicInvoiceReceipt = ({
             onClick={() => {
               setBankSearch('');
               setShowQrFallback(false);
+              setPendingBankApp(null);
               onTransferClick?.();
             }}
             className="flex items-center justify-center gap-2 rounded-xl bg-blue-700 py-3 text-[10px] font-black uppercase text-white shadow-sm active:scale-95"
@@ -574,7 +609,7 @@ const PublicInvoiceReceipt = ({
               <div>
                 <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">Chuyển khoản</p>
                 <h2 className="mt-1 text-lg font-black text-slate-950">
-                  {showQrFallback ? 'Quét QR thanh toán' : 'Chọn ứng dụng ngân hàng'}
+                  {pendingBankApp ? 'Tải QR để thanh toán' : showQrFallback ? 'Quét QR thanh toán' : 'Chọn ứng dụng ngân hàng'}
                 </h2>
               </div>
               <button
@@ -587,7 +622,51 @@ const PublicInvoiceReceipt = ({
               </button>
             </div>
 
-            {showQrFallback ? (
+            {pendingBankApp ? (
+              <div className="overflow-y-auto p-4">
+                <div className="mx-auto flex h-40 w-40 items-center justify-center rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
+                  <img
+                    src={qrSrc}
+                    alt="QR chuyển khoản"
+                    className="h-full w-full object-contain"
+                    crossOrigin="anonymous"
+                  />
+                </div>
+
+                <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-center">
+                  <p className="text-sm font-black text-amber-900">Vui lòng tải QR trước khi mở ứng dụng</p>
+                  <p className="mt-1 text-xs font-semibold leading-relaxed text-amber-700">
+                    Sau khi mở {pendingBankApp.appName}, hãy chọn quét QR từ thư viện ảnh.
+                  </p>
+                </div>
+
+                {transferCopyMessage ? (
+                  <p className="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-center text-[11px] font-bold text-rose-700">
+                    {transferCopyMessage}
+                  </p>
+                ) : null}
+
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPendingBankApp(null)}
+                    disabled={isPreparingBankApp}
+                    className="rounded-xl border border-slate-200 bg-slate-50 py-3 text-[11px] font-black uppercase text-slate-700 active:scale-95 disabled:opacity-60"
+                  >
+                    Quay lại
+                  </button>
+                  <button
+                    type="button"
+                    onClick={confirmOpenBankApp}
+                    disabled={isPreparingBankApp}
+                    className="flex items-center justify-center gap-2 rounded-xl bg-blue-700 py-3 text-[11px] font-black uppercase text-white shadow-sm active:scale-95 disabled:opacity-60"
+                  >
+                    {isPreparingBankApp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                    {isPreparingBankApp ? 'Đang tải QR' : 'OK'}
+                  </button>
+                </div>
+              </div>
+            ) : showQrFallback ? (
               <div className="overflow-y-auto p-4">
                 <div className="mx-auto flex h-56 w-56 items-center justify-center rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
                   <img
@@ -706,7 +785,7 @@ const PublicInvoiceReceipt = ({
                       <button
                         key={app.appId}
                         type="button"
-                        onClick={() => openBankApp(app)}
+                        onClick={() => selectBankApp(app)}
                         className="flex w-full items-center gap-3 py-3 text-left active:bg-slate-50"
                       >
                         <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white text-xs font-black uppercase text-blue-700 shadow-sm">
@@ -845,8 +924,10 @@ const MeterReadingPublicView = () => {
       link.remove();
       URL.revokeObjectURL(url);
       setTransferCopyMessage('Đã lưu ảnh QR.');
+      return true;
     } catch {
       setTransferCopyMessage('Không lưu được QR. Bạn có thể chụp màn hình QR để thanh toán.');
+      return false;
     }
   }, []);
 
