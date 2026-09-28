@@ -327,7 +327,9 @@ const PublicInvoiceReceipt = ({
   const [bankSearch, setBankSearch] = useState('');
   const [showQrFallback, setShowQrFallback] = useState(false);
   const [pendingBankApp, setPendingBankApp] = useState(null);
-  const [isPreparingBankApp, setIsPreparingBankApp] = useState(false);
+  const [isQrDownloadReady, setIsQrDownloadReady] = useState(false);
+  const [qrPrepareError, setQrPrepareError] = useState('');
+  const preparedQrUrlRef = useRef('');
   const [preferredBankAppId, setPreferredBankAppId] = useState(getStoredBankAppId);
   const [recipientBankCode, setRecipientBankCode] = useState(
     () => BANK_CODE_BY_BIN[String(bankBin)] || String(bankBin),
@@ -371,6 +373,37 @@ const PublicInvoiceReceipt = ({
     };
   }, [bankBin, isTransferOpen]);
 
+  useEffect(() => {
+    if (!isTransferOpen || !pendingBankApp) return undefined;
+
+    let isActive = true;
+    let objectUrl = '';
+
+    fetch(qrSrc)
+      .then(response => {
+        if (!response.ok) throw new Error('Không tải được mã QR.');
+        return response.blob();
+      })
+      .then(blob => {
+        objectUrl = URL.createObjectURL(blob);
+        if (!isActive) {
+          URL.revokeObjectURL(objectUrl);
+          return;
+        }
+        preparedQrUrlRef.current = objectUrl;
+        setIsQrDownloadReady(true);
+      })
+      .catch(() => {
+        if (isActive) setQrPrepareError('Không chuẩn bị được ảnh QR. Vui lòng thử lại.');
+      });
+
+    return () => {
+      isActive = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      preparedQrUrlRef.current = '';
+    };
+  }, [isTransferOpen, pendingBankApp, qrSrc]);
+
   const visibleBankApps = useMemo(() => {
     const query = normalizeSearchText(bankSearch.trim());
     return bankApps
@@ -411,21 +444,22 @@ const PublicInvoiceReceipt = ({
       return;
     }
 
+    setIsQrDownloadReady(false);
+    setQrPrepareError('');
     setPendingBankApp(app);
   };
 
-  const confirmOpenBankApp = async () => {
-    if (!pendingBankApp || isPreparingBankApp) return;
+  const confirmOpenBankApp = () => {
+    if (!pendingBankApp || !isQrDownloadReady || !preparedQrUrlRef.current) return;
 
-    setIsPreparingBankApp(true);
-    const didDownload = await onDownloadQr?.({
-      qrSrc,
-      roomId: bill.roomId,
-      period: bill.currentMonthFull,
-    });
-    setIsPreparingBankApp(false);
+    const link = document.createElement('a');
+    link.href = preparedQrUrlRef.current;
+    link.download = `QR-P${bill.roomId}-${String(bill.currentMonthFull || '').replace('/', '-')}.png`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
 
-    if (didDownload) openBankApp(pendingBankApp);
+    openBankApp(pendingBankApp);
   };
 
   return (
@@ -577,6 +611,8 @@ const PublicInvoiceReceipt = ({
               setBankSearch('');
               setShowQrFallback(false);
               setPendingBankApp(null);
+              setIsQrDownloadReady(false);
+              setQrPrepareError('');
               onTransferClick?.();
             }}
             className="flex items-center justify-center gap-2 rounded-xl bg-blue-700 py-3 text-[10px] font-black uppercase text-white shadow-sm active:scale-95"
@@ -640,9 +676,9 @@ const PublicInvoiceReceipt = ({
                   </p>
                 </div>
 
-                {transferCopyMessage ? (
+                {qrPrepareError ? (
                   <p className="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-center text-[11px] font-bold text-rose-700">
-                    {transferCopyMessage}
+                    {qrPrepareError}
                   </p>
                 ) : null}
 
@@ -650,19 +686,18 @@ const PublicInvoiceReceipt = ({
                   <button
                     type="button"
                     onClick={() => setPendingBankApp(null)}
-                    disabled={isPreparingBankApp}
-                    className="rounded-xl border border-slate-200 bg-slate-50 py-3 text-[11px] font-black uppercase text-slate-700 active:scale-95 disabled:opacity-60"
+                    className="rounded-xl border border-slate-200 bg-slate-50 py-3 text-[11px] font-black uppercase text-slate-700 active:scale-95"
                   >
                     Quay lại
                   </button>
                   <button
                     type="button"
                     onClick={confirmOpenBankApp}
-                    disabled={isPreparingBankApp}
+                    disabled={!isQrDownloadReady}
                     className="flex items-center justify-center gap-2 rounded-xl bg-blue-700 py-3 text-[11px] font-black uppercase text-white shadow-sm active:scale-95 disabled:opacity-60"
                   >
-                    {isPreparingBankApp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                    {isPreparingBankApp ? 'Đang tải QR' : 'OK'}
+                    {!isQrDownloadReady && !qrPrepareError ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                    {!isQrDownloadReady && !qrPrepareError ? 'Đang chuẩn bị' : 'OK'}
                   </button>
                 </div>
               </div>
