@@ -10,6 +10,7 @@ import {
   Image as ImageIcon,
   Loader2,
   RotateCcw,
+  Search,
   Send,
   Upload,
   WalletCards,
@@ -38,6 +39,59 @@ const looksLikeTechnicalId = (value = '') =>
   || (value.length > 18 && !/\s/.test(value));
 
 const isPaidStatus = (status) => ['paid', 'completed', 'done'].includes(String(status || '').toLowerCase());
+
+const VIETQR_BANK_APP_STORAGE_KEY = 'lucky-home-preferred-bank-app';
+const VIETQR_APP_LIST_URL = 'https://api.vietqr.io/v2';
+
+const FALLBACK_BANK_APPS = [
+  { appId: 'mb', appName: 'MB Bank', bankName: 'Ngân hàng TMCP Quân đội', autofill: 1 },
+  { appId: 'vcb', appName: 'Vietcombank', bankName: 'Ngân hàng TMCP Ngoại thương Việt Nam', autofill: 0 },
+  { appId: 'bidv', appName: 'BIDV SmartBanking', bankName: 'Ngân hàng TMCP Đầu tư và Phát triển Việt Nam', autofill: 1 },
+  { appId: 'icb', appName: 'VietinBank iPay', bankName: 'Ngân hàng TMCP Công thương Việt Nam', autofill: 1 },
+  { appId: 'acb', appName: 'ACB One', bankName: 'Ngân hàng TMCP Á Châu', autofill: 1 },
+  { appId: 'ocb', appName: 'OCB OMNI', bankName: 'Ngân hàng TMCP Phương Đông', autofill: 1 },
+  { appId: 'tcb', appName: 'Techcombank Mobile', bankName: 'Ngân hàng TMCP Kỹ thương Việt Nam', autofill: 0 },
+  { appId: 'vpb', appName: 'VPBank NEO', bankName: 'Ngân hàng TMCP Việt Nam Thịnh Vượng', autofill: 0 },
+  { appId: 'vba', appName: 'Agribank E-Mobile Banking', bankName: 'Ngân hàng Nông nghiệp và Phát triển Nông thôn Việt Nam', autofill: 0 },
+  { appId: 'tpb', appName: 'TPBank Mobile', bankName: 'Ngân hàng TMCP Tiên Phong', autofill: 0 },
+];
+
+const BANK_CODE_BY_BIN = {
+  970403: 'stb',
+  970405: 'vba',
+  970407: 'tcb',
+  970415: 'icb',
+  970416: 'acb',
+  970418: 'bidv',
+  970422: 'mb',
+  970423: 'tpb',
+  970432: 'vpb',
+  970436: 'vcb',
+  970437: 'hdb',
+  970441: 'vib',
+  970443: 'shb',
+  970448: 'ocb',
+  970449: 'lpb',
+};
+
+const getBankAppListUrl = () => {
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  return `${VIETQR_APP_LIST_URL}/${isIOS ? 'ios' : 'android'}-app-deeplinks`;
+};
+
+const getStoredBankAppId = () => {
+  try {
+    return window.localStorage.getItem(VIETQR_BANK_APP_STORAGE_KEY) || '';
+  } catch {
+    return '';
+  }
+};
+
+const normalizeSearchText = (value = '') => String(value)
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .toLowerCase();
 
 const getFriendlyRoomCode = (room = {}) => {
   const roomCode = room.roomCode || room.code || room.name || '';
@@ -260,6 +314,85 @@ const PublicInvoiceReceipt = ({
     bill.details.discount || 0,
   ].join('|');
   const qrSrc = `${API_URL}/vietqr/generate?bankBin=${bankBin}&bankAcc=${bankAcc}&amount=${Math.max(bill.total, 0)}&addInfo=${encodeURIComponent(qrAddInfo)}&t=${encodeURIComponent(qrFingerprint)}`;
+  const [bankApps, setBankApps] = useState(FALLBACK_BANK_APPS);
+  const [bankSearch, setBankSearch] = useState('');
+  const [showQrFallback, setShowQrFallback] = useState(false);
+  const [preferredBankAppId, setPreferredBankAppId] = useState(getStoredBankAppId);
+  const [recipientBankCode, setRecipientBankCode] = useState(
+    () => BANK_CODE_BY_BIN[String(bankBin)] || String(bankBin),
+  );
+
+  useEffect(() => {
+    if (!isTransferOpen) return undefined;
+
+    let isActive = true;
+
+    const loadBankData = async () => {
+      const [appsResult, banksResult] = await Promise.allSettled([
+        fetch(getBankAppListUrl(), { cache: 'force-cache' }).then(response => {
+          if (!response.ok) throw new Error('Không tải được danh sách ứng dụng ngân hàng.');
+          return response.json();
+        }),
+        fetch(`${VIETQR_APP_LIST_URL}/banks`, { cache: 'force-cache' }).then(response => {
+          if (!response.ok) throw new Error('Không tải được danh sách ngân hàng.');
+          return response.json();
+        }),
+      ]);
+
+      if (!isActive) return;
+
+      if (appsResult.status === 'fulfilled' && Array.isArray(appsResult.value?.apps)) {
+        const validApps = appsResult.value.apps.filter(app => app?.appId && app?.appName);
+        if (validApps.length > 0) setBankApps(validApps);
+      }
+
+      if (banksResult.status === 'fulfilled' && Array.isArray(banksResult.value?.data)) {
+        const receivingBank = banksResult.value.data.find(bank => String(bank?.bin) === String(bankBin));
+        if (receivingBank?.code) setRecipientBankCode(String(receivingBank.code).toLowerCase());
+      }
+
+    };
+
+    loadBankData().catch(() => undefined);
+
+    return () => {
+      isActive = false;
+    };
+  }, [bankBin, isTransferOpen]);
+
+  const visibleBankApps = useMemo(() => {
+    const query = normalizeSearchText(bankSearch.trim());
+    return bankApps
+      .filter(app => !query || normalizeSearchText(`${app.appName} ${app.bankName}`).includes(query))
+      .sort((left, right) => {
+        if (left.appId === preferredBankAppId) return -1;
+        if (right.appId === preferredBankAppId) return 1;
+        return Number(right.monthlyInstall || 0) - Number(left.monthlyInstall || 0);
+      });
+  }, [bankApps, bankSearch, preferredBankAppId]);
+
+  const openBankApp = (app) => {
+    if (!app?.appId) return;
+
+    try {
+      window.localStorage.setItem(VIETQR_BANK_APP_STORAGE_KEY, app.appId);
+    } catch {
+      // The payment flow still works when storage is unavailable.
+    }
+    setPreferredBankAppId(app.appId);
+
+    const params = new URLSearchParams({
+      app: app.appId,
+      ba: `${String(bankAcc).trim()}@${recipientBankCode || bankBin}`,
+      am: String(Math.max(Math.round(Number(bill.total) || 0), 0)),
+      tn: qrAddInfo,
+      url: window.location.href,
+    });
+    const accountName = config.bankAccountName || config.bankAccName || config.accountName || config.bankOwner;
+    if (accountName) params.set('bn', accountName);
+
+    window.location.assign(`https://dl.vietqr.io/pay?${params.toString()}`);
+  };
 
   return (
     <div
@@ -406,7 +539,11 @@ const PublicInvoiceReceipt = ({
         {!isRefund && <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
-            onClick={onTransferClick}
+            onClick={() => {
+              setBankSearch('');
+              setShowQrFallback(false);
+              onTransferClick?.();
+            }}
             className="flex items-center justify-center gap-2 rounded-xl bg-blue-700 py-3 text-[10px] font-black uppercase text-white shadow-sm active:scale-95"
           >
             <WalletCards className="h-4 w-4" />
@@ -431,12 +568,14 @@ const PublicInvoiceReceipt = ({
       </div>
 
       {isTransferOpen ? (
-        <div className="fixed inset-0 z-[900] flex items-end justify-center bg-slate-950/55 px-4 pb-4 backdrop-blur-sm">
-          <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl animate-in slide-in-from-bottom-4 duration-200">
+        <div className="fixed inset-0 z-[900] flex items-end justify-center bg-slate-950/55 px-3 pb-3 backdrop-blur-sm">
+          <div className="flex max-h-[90dvh] w-full max-w-sm flex-col overflow-hidden rounded-2xl bg-white shadow-2xl animate-in slide-in-from-bottom-4 duration-200">
             <div className="flex items-start justify-between gap-3 border-b border-slate-100 p-4">
               <div>
                 <p className="text-[10px] font-black uppercase tracking-widest text-blue-600">Chuyển khoản</p>
-                <h2 className="mt-1 text-lg font-black text-slate-950">Quét QR thanh toán</h2>
+                <h2 className="mt-1 text-lg font-black text-slate-950">
+                  {showQrFallback ? 'Quét QR thanh toán' : 'Chọn ứng dụng ngân hàng'}
+                </h2>
               </div>
               <button
                 type="button"
@@ -448,87 +587,170 @@ const PublicInvoiceReceipt = ({
               </button>
             </div>
 
-            <div className="p-4">
-              <div className="mx-auto flex h-56 w-56 items-center justify-center rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
-                <img
-                  src={qrSrc}
-                  alt="QR chuyển khoản"
-                  className="h-full w-full object-contain"
-                  crossOrigin="anonymous"
-                />
-              </div>
-
-              <div className="mt-4 space-y-2 rounded-xl bg-slate-50 p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-[10px] font-black uppercase text-slate-400">Ngân hàng</span>
-                  <span className="max-w-[190px] truncate text-sm font-black uppercase text-purple-700">{bankName}</span>
+            {showQrFallback ? (
+              <div className="overflow-y-auto p-4">
+                <div className="mx-auto flex h-56 w-56 items-center justify-center rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+                  <img
+                    src={qrSrc}
+                    alt="QR chuyển khoản"
+                    className="h-full w-full object-contain"
+                    crossOrigin="anonymous"
+                  />
                 </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-[10px] font-black uppercase text-slate-400">STK</span>
-                  <span className="text-sm font-black text-blue-700">{bankAcc}</span>
+
+                <div className="mt-4 space-y-2 rounded-xl bg-slate-50 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[10px] font-black uppercase text-slate-400">Ngân hàng</span>
+                    <span className="max-w-[190px] truncate text-sm font-black uppercase text-purple-700">{bankName}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[10px] font-black uppercase text-slate-400">STK</span>
+                    <span className="text-sm font-black text-blue-700">{bankAcc}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[10px] font-black uppercase text-slate-400">Số tiền</span>
+                    <span className="text-sm font-black text-emerald-700">{formatN(bill.total)} đ</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[10px] font-black uppercase text-slate-400">Nội dung</span>
+                    <span className="text-sm font-black text-slate-900">{qrAddInfo}</span>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-[10px] font-black uppercase text-slate-400">Số tiền</span>
-                  <span className="text-sm font-black text-emerald-700">{formatN(bill.total)} đ</span>
+
+                {transferCopyMessage ? (
+                  <p className="mt-3 rounded-xl bg-emerald-50 px-3 py-2 text-center text-[11px] font-bold text-emerald-700">
+                    {transferCopyMessage}
+                  </p>
+                ) : null}
+
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onCopyTransfer?.('stk', bankAcc)}
+                    className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 py-2.5 text-[10px] font-black uppercase text-slate-700 active:scale-95"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    STK
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onCopyTransfer?.('amount', String(bill.total))}
+                    className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 py-2.5 text-[10px] font-black uppercase text-slate-700 active:scale-95"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    Số tiền
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onCopyTransfer?.('content', qrAddInfo)}
+                    className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 py-2.5 text-[10px] font-black uppercase text-slate-700 active:scale-95"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    Nội dung
+                  </button>
                 </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-[10px] font-black uppercase text-slate-400">Nội dung</span>
-                  <span className="text-sm font-black text-slate-900">{qrAddInfo}</span>
+
+                <button
+                  type="button"
+                  onClick={() => setShowQrFallback(false)}
+                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl bg-blue-700 py-3 text-[10px] font-black uppercase text-white shadow-sm active:scale-95"
+                >
+                  <WalletCards className="h-4 w-4" />
+                  Chọn ứng dụng ngân hàng
+                </button>
+
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onCopyTransfer?.('all', { bankName, bankAcc, amount: bill.total, addInfo: qrAddInfo })}
+                    className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 py-3 text-[10px] font-black uppercase text-slate-700 active:scale-95"
+                  >
+                    <Copy className="h-4 w-4" />
+                    Copy tất cả
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDownloadQr?.({ qrSrc, roomId: bill.roomId, period: bill.currentMonthFull })}
+                    className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-[10px] font-black uppercase text-white shadow-sm active:scale-95"
+                  >
+                    <Download className="h-4 w-4" />
+                    Lưu QR
+                  </button>
                 </div>
               </div>
+            ) : (
+              <div className="flex min-h-0 flex-1 flex-col">
+                <div className="border-b border-slate-100 px-4 py-3">
+                  <div className="flex items-center justify-between gap-3 rounded-xl bg-blue-50 px-3 py-2.5">
+                    <div className="min-w-0">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-blue-500">Thanh toán hóa đơn</p>
+                      <p className="mt-0.5 truncate text-xs font-bold text-slate-600">{qrAddInfo}</p>
+                    </div>
+                    <p className="shrink-0 text-base font-black text-blue-700">{formatN(bill.total)} đ</p>
+                  </div>
+                  <div className="relative mt-3">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="search"
+                      value={bankSearch}
+                      onChange={event => setBankSearch(event.target.value)}
+                      placeholder="Tìm ngân hàng"
+                      className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm font-semibold text-slate-800 outline-none focus:border-blue-500 focus:bg-white"
+                    />
+                  </div>
+                </div>
 
-              {transferCopyMessage ? (
-                <p className="mt-3 rounded-xl bg-emerald-50 px-3 py-2 text-center text-[11px] font-bold text-emerald-700">
-                  {transferCopyMessage}
-                </p>
-              ) : null}
+                <div className="min-h-0 flex-1 overflow-y-auto px-4 py-2">
+                  <div className="divide-y divide-slate-100">
+                    {visibleBankApps.map(app => (
+                      <button
+                        key={app.appId}
+                        type="button"
+                        onClick={() => openBankApp(app)}
+                        className="flex w-full items-center gap-3 py-3 text-left active:bg-slate-50"
+                      >
+                        <div className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white text-xs font-black uppercase text-blue-700 shadow-sm">
+                          <span>{String(app.appName || app.appId).slice(0, 2)}</span>
+                          {app.appLogo ? (
+                            <img
+                              src={app.appLogo}
+                              alt=""
+                              className="absolute inset-0 h-full w-full object-cover"
+                              onError={event => { event.currentTarget.style.display = 'none'; }}
+                            />
+                          ) : null}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="truncate text-sm font-black text-slate-900">{app.appName}</p>
+                            {Number(app.autofill) === 1 ? (
+                              <span className="shrink-0 rounded bg-emerald-50 px-1.5 py-0.5 text-[8px] font-black uppercase text-emerald-700">Tự điền</span>
+                            ) : null}
+                          </div>
+                          <p className="mt-0.5 truncate text-[10px] font-semibold text-slate-400">{app.bankName}</p>
+                        </div>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
+                      </button>
+                    ))}
+                  </div>
 
-              <div className="mt-3 grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => onCopyTransfer?.('stk', bankAcc)}
-                  className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 py-2.5 text-[10px] font-black uppercase text-slate-700 active:scale-95"
-                >
-                  <Copy className="h-3.5 w-3.5" />
-                  STK
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onCopyTransfer?.('amount', String(bill.total))}
-                  className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 py-2.5 text-[10px] font-black uppercase text-slate-700 active:scale-95"
-                >
-                  <Copy className="h-3.5 w-3.5" />
-                  Số tiền
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onCopyTransfer?.('content', qrAddInfo)}
-                  className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 py-2.5 text-[10px] font-black uppercase text-slate-700 active:scale-95"
-                >
-                  <Copy className="h-3.5 w-3.5" />
-                  Nội dung
-                </button>
+                  {visibleBankApps.length === 0 ? (
+                    <p className="py-8 text-center text-xs font-bold text-slate-500">Không tìm thấy ngân hàng phù hợp.</p>
+                  ) : null}
+                </div>
+
+                <div className="border-t border-slate-100 p-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowQrFallback(true)}
+                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 py-3 text-[10px] font-black uppercase text-slate-700 active:scale-95"
+                  >
+                    <ImageIcon className="h-4 w-4" />
+                    Dùng mã QR có sẵn
+                  </button>
+                </div>
               </div>
-
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => onCopyTransfer?.('all', { bankName, bankAcc, amount: bill.total, addInfo: qrAddInfo })}
-                  className="flex items-center justify-center gap-2 rounded-xl bg-blue-700 py-3 text-[10px] font-black uppercase text-white shadow-sm active:scale-95"
-                >
-                  <Copy className="h-4 w-4" />
-                  Copy tất cả
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onDownloadQr?.({ qrSrc, roomId: bill.roomId, period: bill.currentMonthFull })}
-                  className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-[10px] font-black uppercase text-white shadow-sm active:scale-95"
-                >
-                  <Download className="h-4 w-4" />
-                  Lưu QR
-                </button>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       ) : null}
