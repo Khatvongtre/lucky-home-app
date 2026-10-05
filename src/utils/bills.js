@@ -43,11 +43,20 @@ const parseBillMeters = (bill = {}) => {
 
 export const getBillElectricMeters = (bill = {}) => {
   const meters = parseBillMeters(bill).filter(meter => (
-    !['heater', 'water_heater', 'bnl'].includes(String(meter?.type || '').toLowerCase())
+    !['heater', 'water_heater', 'bnl', 'water'].includes(String(meter?.type || '').toLowerCase())
   ));
 
   if (meters.length > 0) return meters;
   return bill.meter && !Array.isArray(bill.meter) && Object.keys(bill.meter).length > 0 ? [bill.meter] : [];
+};
+
+export const getBillWaterMeters = (bill = {}) => {
+  const meters = parseBillMeters(bill).filter(meter => String(meter?.type || '').toLowerCase() === 'water');
+  if (meters.length > 0) return meters;
+
+  const details = parseJsonField(bill.details, parseJsonField(bill.detailsJson, {}));
+  const snapshot = bill.waterMeter || details.waterMeter || details.waterMeterSnapshot;
+  return snapshot && typeof snapshot === 'object' ? [snapshot] : [];
 };
 
 export const getBillAdditionalCost = (details = {}) =>

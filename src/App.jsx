@@ -195,9 +195,13 @@ const MainApp = () => {
     handleUploadQR,
   } = useSettings({
     houseId: selectedHouse?.id,
+    selectedHouse,
+    setSelectedHouse,
     setConfig,
     config,
     showToast,
+    requestConfirm,
+    loadHouses,
   });
 
   const { loadHouseData } = useAppDataLoader({
@@ -335,6 +339,7 @@ const MainApp = () => {
     rooms,
     setMeters,
     houseId: selectedHouse?.id,
+    config,
     viewDate,
     loadHouseData,
     showToast,

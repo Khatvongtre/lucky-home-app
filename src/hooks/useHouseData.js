@@ -9,8 +9,13 @@ const emptyBillStats = {
     totalAmountPaids: 0,
 };
 
-const parseMeters = (metersData = []) =>
-    metersData.map(m => ({ ...m, roomIds: JSON.parse(m.roomIdsJson || "[]") }));
+const parseMeters = (metersData = []) => metersData.map(m => {
+    let roomIds = Array.isArray(m.roomIds) ? m.roomIds : [];
+    if (!roomIds.length && m.roomIdsJson) {
+        try { roomIds = JSON.parse(m.roomIdsJson); } catch { roomIds = []; }
+    }
+    return { ...m, status: m.status || 'active', roomIds: Array.isArray(roomIds) ? roomIds : [] };
+});
 
 const parseBills = (billsData = []) => billsData.map(normalizeBill);
 

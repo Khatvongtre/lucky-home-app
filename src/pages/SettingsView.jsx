@@ -96,6 +96,7 @@ const SettingsView = ({
               </select>
             </div>
             <ConfigInput label="Giá Nước" value={formatN(config[waterPriceKey])} onChange={e => setConfigValue(waterPriceKey, parseN(e.target.value))} />
+            <ConfigInput label="Áp dụng từ kỳ" type="month" value={config.waterMethodEffectiveFrom} onChange={e => setConfigValue('waterMethodEffectiveFrom', e.target.value)} />
             <ConfigInput label="Phí Dịch Vụ" value={formatN(config.priceService)} onChange={e => setConfigValue('priceService', parseN(e.target.value))} />
             <ConfigInput label="Internet" value={formatN(config.priceNet)} onChange={e => setConfigValue('priceNet', parseN(e.target.value))} />
             <ConfigInput label="Xe máy điện" value={formatN(config.priceEBike)} onChange={e => setConfigValue('priceEBike', parseN(e.target.value))} />

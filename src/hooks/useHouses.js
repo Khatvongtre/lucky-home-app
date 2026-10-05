@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { api } from '../services/api';
 import { parseN } from '../utils/formatters';
 
-const buildHousePayload = (form) => ({
+const buildHousePayload = (form, currentHouse) => ({
   name: form.get('name'),
   address: form.get('address'),
   rentPrice: parseN(form.get('rentPrice')),
@@ -14,6 +14,7 @@ const buildHousePayload = (form) => ({
   internetFee: parseN(form.get('internetFee')),
   otherFees: parseN(form.get('otherFees')),
   notes: form.get('notes'),
+  waterCalcMethod: currentHouse?.waterCalcMethod || 'person',
 });
 
 export const useHouses = ({
@@ -53,7 +54,7 @@ export const useHouses = ({
 
   const handleAddHouse = useCallback(async (e) => {
     e.preventDefault();
-    const houseData = buildHousePayload(new FormData(e.target));
+    const houseData = buildHousePayload(new FormData(e.target), editingHouse);
 
     try {
       if (editingHouse) {

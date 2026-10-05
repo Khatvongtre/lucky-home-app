@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Loader2, Image as ImageIcon, Trash2, CheckCircle2, X } from 'lucide-react';
 import { formatN, parseN } from '../../utils/formatters';
 import { useSwipeBack } from '../../hooks/useSwipeBack';
-import { applyBillAdjustments, getBillAdditionalCost, getBillElectricMeters, getBillWaivedItems } from '../../utils/bills';
+import { applyBillAdjustments, getBillAdditionalCost, getBillElectricMeters, getBillWaterMeters, getBillWaivedItems } from '../../utils/bills';
 
 const resolveBackendAssetUrl = (src, API_URL) => {
     if (!src || typeof src !== 'string') return src;
@@ -41,8 +41,8 @@ const getMeterUsage = meter => {
     const usage = Number(meter?.usage);
     if (Number.isFinite(usage)) return usage;
 
-    const oldValue = Number(meter?.old);
-    const newValue = Number(meter?.new);
+    const oldValue = Number(meter?.old ?? meter?.oldVal);
+    const newValue = Number(meter?.new ?? meter?.newVal);
     return Number.isFinite(oldValue) && Number.isFinite(newValue) ? newValue - oldValue : 0;
 };
 
@@ -156,7 +156,6 @@ const BillReceipt = ({
     const isMultiMonthBill = periodMonths > 1;
     const hasMonthlyFee = Number(details.monthlyFee) > 0;
     const feeItems = hasMonthlyFee ? [] : [
-        { key: 'water', label: "Tiền nước", val: details.water },
         { key: 'service', label: "Phí dịch vụ", val: details.service || 0 },
         { key: 'internet', label: "Internet", val: details.internet || 0 },
         { key: 'ebikes', label: "Xe điện", val: details.ebikes || 0 }
@@ -166,6 +165,8 @@ const BillReceipt = ({
     const canToggleFee = canEditPendingBill && isManagerOrAbove && !isGeneratingImage;
     const isWaived = key => localWaivedItems.includes(key);
     const electricMeters = getBillElectricMeters(bill);
+    const waterMeters = getBillWaterMeters(bill);
+    const waterCalcMethod = details.waterCalcMethod || details.waterMethod || 'person';
     const toggleWaivedItem = async key => {
         if (!canToggleFee) return;
         const nextWaivedItems = isWaived(key)
@@ -314,6 +315,21 @@ const BillReceipt = ({
                                         {feeAmount('heater', details.heater)}
                                     </button>
                                 )}
+
+                                <button type="button" onClick={() => toggleWaivedItem('water')} className={feeRowClass('water')}>
+                                    <div className="flex min-w-0 flex-col pr-2">
+                                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Tiền nước</span>
+                                        {waterCalcMethod === 'm3' && waterMeters.map((meter, index) => (
+                                            <p key={meter.id || meter.name || index} className="mt-0.5 text-[9px] font-semibold leading-tight text-sky-600">
+                                                {waterMeters.length > 1 && <span className="block font-black">{meter.name || `Công tơ nước ${index + 1}`}:</span>}
+                                                Chỉ số: {meter.old ?? meter.oldVal} → {meter.new ?? meter.newVal} ({getMeterUsage(meter)} m³)
+                                                {Number(meter.unitPrice ?? details.priceWaterM3 ?? details.waterUnitPrice) > 0 && <> · {formatN(meter.unitPrice ?? details.priceWaterM3 ?? details.waterUnitPrice)} đ/m³</>}
+                                            </p>
+                                        ))}
+                                        {waterCalcMethod !== 'm3' && <p className="mt-0.5 text-[9px] font-semibold text-sky-600">Tính theo đầu người</p>}
+                                    </div>
+                                    {feeAmount('water', details.water)}
+                                </button>
 
                                 {feeItems.map(item => (
                                     <button type="button" onClick={() => toggleWaivedItem(item.key)} key={item.key} className={`${feeRowClass(item.key)} last:border-0`}>

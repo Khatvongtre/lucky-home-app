@@ -6,7 +6,7 @@ import UserAvatar from '../common/UserAvatar';
 const TAB_TITLES = {
     dashboard: 'Trang chủ',
     rooms: 'Phòng',
-    meters_list: 'Chốt số điện',
+    meters_list: 'Công tơ điện nước',
     bills: 'Hóa đơn',
     finance: 'Thu chi',
     fund: 'Sổ chi tiêu',

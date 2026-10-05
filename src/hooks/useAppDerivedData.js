@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import { parseN } from '../utils/formatters';
 import { getSavingMaturityDate, isMeterReadingDueNear } from '../utils/date';
 
 export const monthLabels = {
@@ -145,29 +144,38 @@ export const useAppDerivedData = ({
   });
 
   const meterSummary = useMemo(() => {
-    if (!currentMeters || currentMeters.length === 0) return { kwh: 0, heater: 0, money: 0 };
+    if (!currentMeters || currentMeters.length === 0) return { kwh: 0, heater: 0, waterM3: 0, electricMoney: 0, waterMoney: 0, money: 0 };
 
     let totalKwh = 0;
     let totalHeater = 0;
+    let totalWaterM3 = 0;
 
     currentMeters.forEach(meter => {
+      if (meter.status && String(meter.status).toLowerCase() !== 'active') return;
       const isOldEmpty = meter.oldVal === null || meter.oldVal === '';
       const isNewEmpty = meter.newVal === null || meter.newVal === '';
       if (isOldEmpty || isNewEmpty) return;
 
-      const oldValue = parseN(meter.oldVal);
-      const newValue = parseN(meter.newVal);
+      const oldValue = Number(meter.oldVal);
+      const newValue = Number(meter.newVal);
       const diff = newValue >= oldValue ? newValue - oldValue : 0;
-      totalKwh += diff;
+      if (meter.type === 'water') {
+        if (config?.waterCalcMethod === 'm3') totalWaterM3 += diff;
+      } else {
+        totalKwh += diff;
+      }
       if (meter.type === 'heater') totalHeater += diff;
     });
 
     return {
       kwh: totalKwh,
       heater: totalHeater,
-      money: totalKwh * (config?.priceElec || 3500),
+      waterM3: totalWaterM3,
+      electricMoney: totalKwh * (config?.priceElec || 3500),
+      waterMoney: totalWaterM3 * (config?.priceWaterM3 || 0),
+      money: totalKwh * (config?.priceElec || 3500) + totalWaterM3 * (config?.priceWaterM3 || 0),
     };
-  }, [currentMeters, config?.priceElec]);
+  }, [currentMeters, config?.priceElec, config?.priceWaterM3, config?.waterCalcMethod]);
 
   return {
     currentRooms,

@@ -17,8 +17,9 @@ import {
   X,
   Zap,
 } from 'lucide-react';
-import { formatN, parseN } from '../utils/formatters';
+import { formatN } from '../utils/formatters';
 import { getBillElectricMeters } from '../utils/bills';
+import { getMeterTypeLabel, getMeterUnit } from '../utils/meters';
 import { authStorage } from '../services/authStorage';
 import { fetchFromApi, getApiBaseUrl } from '../services/apiServer';
 
@@ -39,6 +40,8 @@ const looksLikeTechnicalId = (value = '') =>
   || (value.length > 18 && !/\s/.test(value));
 
 const isPaidStatus = (status) => ['paid', 'completed', 'done'].includes(String(status || '').toLowerCase());
+const toMeterReading = value => Number(value);
+const isValidMeterReading = value => Number.isInteger(toMeterReading(value)) && toMeterReading(value) >= 0;
 
 const VIETQR_BANK_APP_STORAGE_KEY = 'lucky-home-preferred-bank-app';
 const VIETQR_APP_LIST_URL = 'https://api.vietqr.io/v2';
@@ -913,7 +916,7 @@ const MeterReadingPublicView = () => {
     : 'Phòng cần ghi điện';
   const currentDone = Boolean(activeMeter?.hasFreshImage && activeMeter?.newVal !== '' && activeMeter?.newVal !== null);
   const activeUsage = activeMeter
-    ? Math.max(parseN(String(activeMeter.newVal || 0)) - parseN(String(activeMeter.oldVal || 0)), 0)
+    ? Math.max(toMeterReading(activeMeter.newVal || 0) - toMeterReading(activeMeter.oldVal || 0), 0)
     : 0;
   const isSubmitted = session?.status === 'submitted';
   const statusLabel = invoicePreview || isSubmitted ? 'Đã gửi' : 'Đang ghi';
@@ -1055,7 +1058,7 @@ const MeterReadingPublicView = () => {
         `/meter-reading/session/${encodeURIComponent(roomToken)}/meters/${encodeURIComponent(meter.id)}/ocr`,
         {
           method: 'POST',
-          body: JSON.stringify({ imageDataUrl }),
+          body: JSON.stringify({ imageDataUrl, meterType: meter.type, unit: getMeterUnit(meter.type) }),
         },
       );
       updateMeter(meter.id, {
@@ -1143,7 +1146,7 @@ const MeterReadingPublicView = () => {
         `/meter-reading/session/${encodeURIComponent(roomToken)}/meters/${encodeURIComponent(activeMeter.id)}/ocr`,
         {
           method: 'POST',
-          body: JSON.stringify({ imageDataUrl: activeMeter.imageDataUrl }),
+          body: JSON.stringify({ imageDataUrl: activeMeter.imageDataUrl, meterType: activeMeter.type, unit: getMeterUnit(activeMeter.type) }),
         },
       );
       updateMeter(activeMeter.id, {
@@ -1173,7 +1176,15 @@ const MeterReadingPublicView = () => {
       return;
     }
 
-    const invalidMeter = session.meters.find(meter => parseN(String(meter.newVal)) < parseN(String(meter.oldVal)));
+    const nonIntegerMeter = session.meters.find(meter => (
+      !isValidMeterReading(meter.oldVal) || !isValidMeterReading(meter.newVal)
+    ));
+    if (nonIntegerMeter) {
+      setError(`${nonIntegerMeter.name}: chỉ số phải là số nguyên không âm.`);
+      return;
+    }
+
+    const invalidMeter = session.meters.find(meter => toMeterReading(meter.newVal) < toMeterReading(meter.oldVal));
     if (invalidMeter) {
       setError(`${invalidMeter.name}: chỉ số mới đang nhỏ hơn chỉ số cũ.`);
       return;
@@ -1191,8 +1202,8 @@ const MeterReadingPublicView = () => {
           id: meter.id,
           name: meter.name,
           type: meter.type,
-          oldVal: parseN(String(meter.oldVal || 0)),
-          newVal: parseN(String(meter.newVal || 0)),
+          oldVal: toMeterReading(meter.oldVal || 0),
+          newVal: toMeterReading(meter.newVal || 0),
           confidence: meter.confidence,
           imageUrl: meter.imageUrl || '',
           imageDataUrl: meter.imageUrl ? undefined : meter.imageDataUrl,
@@ -1412,6 +1423,7 @@ const MeterReadingPublicView = () => {
                   <div className="min-w-0 flex-1">
                     <p className="text-[9px] font-black uppercase tracking-widest text-blue-600">Bước {activeIndex + 1} / {session.meters.length}</p>
                     <h2 className="mt-0.5 truncate text-sm font-black text-slate-950">{activeMeter.name}</h2>
+                    <p className="text-[9px] font-bold text-sky-600">{getMeterTypeLabel(activeMeter.type)} · {getMeterUnit(activeMeter.type)}</p>
                   </div>
                   <div className="w-[112px] shrink-0 rounded-lg bg-white px-2 py-1.5 text-right shadow-sm ring-1 ring-blue-100">
                     <p className="text-[8px] font-black uppercase tracking-wider text-blue-400">Tiêu thụ</p>
@@ -1521,6 +1533,8 @@ const MeterReadingPublicView = () => {
                   <input
                     type="number"
                     inputMode="numeric"
+                    min="0"
+                    step="1"
                     value={activeMeter.newVal}
                     onChange={event => updateMeter(activeMeter.id, { newVal: event.target.value })}
                     className="w-full rounded-xl border-2 border-slate-200 bg-slate-50 px-4 py-4 text-center text-3xl font-black text-slate-950 outline-none transition-all focus:border-blue-500 focus:bg-white"
@@ -1530,8 +1544,8 @@ const MeterReadingPublicView = () => {
                     <span className="font-semibold text-slate-500">
                       OCR: {activeMeter.confidence === null ? 'đang xử lý' : activeMeter.confidence ? `${Math.round(activeMeter.confidence * 100)}%` : 'chưa có'}
                     </span>
-                    <span className={`font-black ${parseN(String(activeMeter.newVal || 0)) < parseN(String(activeMeter.oldVal || 0)) ? 'text-red-600' : 'text-emerald-600'}`}>
-                      {currentDone ? `${formatN(activeUsage)} kWh` : 'Chưa nhập'}
+                    <span className={`font-black ${toMeterReading(activeMeter.newVal || 0) < toMeterReading(activeMeter.oldVal || 0) ? 'text-red-600' : 'text-emerald-600'}`}>
+                      {currentDone ? `${formatN(activeUsage)} ${getMeterUnit(activeMeter.type)}` : 'Chưa nhập'}
                     </span>
                   </div>
                   {activeMeter.warnings?.length > 0 && (
@@ -1677,8 +1691,8 @@ const MeterReadingPublicView = () => {
               <div className="max-h-[42vh] overflow-y-auto p-4 no-scrollbar">
                 <div className="space-y-2">
                   {session.meters.map(meter => {
-                    const oldValue = parseN(String(meter.oldVal || 0));
-                    const newValue = parseN(String(meter.newVal || 0));
+                    const oldValue = toMeterReading(meter.oldVal || 0);
+                    const newValue = toMeterReading(meter.newVal || 0);
                     const usage = Math.max(newValue - oldValue, 0);
 
                     return (
@@ -1692,7 +1706,7 @@ const MeterReadingPublicView = () => {
                           </div>
                           <div className="rounded-lg bg-white px-3 py-2 text-right shadow-sm">
                             <p className="text-[9px] font-black uppercase text-slate-400">Tiêu thụ</p>
-                            <p className="mt-0.5 text-sm font-black text-blue-700">{formatN(usage)} kWh</p>
+                            <p className="mt-0.5 text-sm font-black text-blue-700">{formatN(usage)} {getMeterUnit(meter.type)}</p>
                           </div>
                         </div>
                       </div>

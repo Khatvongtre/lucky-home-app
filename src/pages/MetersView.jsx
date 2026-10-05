@@ -1,9 +1,10 @@
 import React, { useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Calendar, Flame, Zap, Edit, Boxes, Receipt, ZapOff, Loader2, QrCode } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, Flame, Zap, Edit, Boxes, Receipt, ZapOff, Loader2, QrCode, Droplets, AlertTriangle } from 'lucide-react';
 import { api } from '../services/api';
-import { formatN, parseN } from '../utils/formatters';
+import { formatN } from '../utils/formatters';
 import { getMeterReadingDueState } from '../utils/date';
 import MeterReadingLinkQrModal from '../components/common/MeterReadingLinkQrModal';
+import { getMeterTypeLabel, getMeterUnit, isActiveMeter } from '../utils/meters';
 
 const FE_BASE_URL = (import.meta.env.VITE_FE_URL || window.location.origin).replace(/\/+$/g, '');
 
@@ -50,6 +51,20 @@ const MetersView = ({
 }) => {
   const [copyingRoomId, setCopyingRoomId] = React.useState(null);
   const [qrLinkInfo, setQrLinkInfo] = React.useState(null);
+  const waterCalcMethod = String(config?.waterCalcMethod || 'person').toLowerCase();
+  const visibleMeters = (currentMeters || [])
+    .filter(meter => !(waterCalcMethod === 'person' && meter.type === 'water' && !isActiveMeter(meter)))
+    .sort((left, right) => {
+      const order = { electric: 0, water: 1, heater: 2 };
+      return (order[left.type] ?? 9) - (order[right.type] ?? 9);
+    });
+  const missingWaterRooms = waterCalcMethod === 'm3'
+    ? (rooms || []).filter(room => !(currentMeters || []).some(meter => (
+      meter.type === 'water'
+      && isActiveMeter(meter)
+      && (meter.roomIds || []).map(String).includes(String(room.id))
+    )))
+    : [];
 
   const resolvePublicLink = (result) => {
     const rawUrl = result?.url || result?.link || result?.publicUrl;
@@ -129,7 +144,7 @@ const MetersView = ({
         <div className="bg-white p-1 rounded-xl border border-slate-100 shadow-sm flex items-center">
           <button type="button" onClick={handlePrevMonth} className="p-3 hover:bg-slate-50 rounded-xl text-blue-600 active:scale-90 transition-all"><ChevronLeft className="w-5 h-5" /></button>
           <div className="flex-1 text-center">
-            <p className="text-[8px] font-black uppercase text-blue-600">Kỳ chốt số điện</p>
+            <p className="text-[8px] font-black uppercase text-blue-600">Kỳ chốt số điện nước</p>
             <div className="flex items-center justify-center gap-2 bg-blue-600 px-4 py-1.5 rounded-full w-fit mx-auto">
               <Calendar className="w-3.5 h-3.5 text-white" />
               <span className="text-xs font-black text-white uppercase">{monthDisplay}</span>
@@ -138,11 +153,17 @@ const MetersView = ({
           <button type="button" onClick={handleNextMonth} className="p-3 hover:bg-slate-50 rounded-xl text-blue-600 active:scale-90 transition-all"><ChevronRight className="w-5 h-5" /></button>
         </div>
 
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <div className="bg-white p-3 rounded-xl text-center">
             <p className="text-[7px] font-black text-rose-400 uppercase mb-1">Tổng điện</p>
             <div className="flex items-baseline gap-1 text-rose-600 justify-center">
               <span className="text-sm font-black">{formatN(summary.kwh)}</span><span className="text-[7px] font-bold">kWh</span>
+            </div>
+          </div>
+          <div className="bg-white p-3 rounded-xl text-center">
+            <p className="text-[7px] font-black text-sky-500 uppercase mb-1">Tổng nước</p>
+            <div className="flex items-baseline gap-1 text-sky-600 justify-center">
+              <span className="text-sm font-black">{formatN(summary.waterM3 || 0)}</span><span className="text-[7px] font-bold">m³</span>
             </div>
           </div>
           <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm text-center">
@@ -152,32 +173,44 @@ const MetersView = ({
             </div>
           </div>
           <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-sm text-center">
-            <p className="text-[7px] font-black text-emerald-500 uppercase mb-1">Tổng tiền</p>
+            <p className="text-[7px] font-black text-emerald-500 uppercase mb-1">Tiền điện / nước</p>
             <div className="flex items-baseline gap-0.5 text-emerald-600 justify-center">
-              <span className="text-sm font-black">{formatN(summary.money)}</span><span className="text-[7px] font-bold">đ</span>
+              <span className="text-sm font-black">{formatN(summary.electricMoney || 0)} / {formatN(summary.waterMoney || 0)}</span><span className="text-[7px] font-bold">đ</span>
             </div>
           </div>
         </div>
       </div>
 
+      {waterCalcMethod === 'person' && (
+        <div className="rounded-xl border border-sky-100 bg-sky-50 px-4 py-3 text-xs font-bold text-sky-800">
+          Nước đang tính theo đầu người; không yêu cầu ghi chỉ số nước.
+        </div>
+      )}
+      {missingWaterRooms.length > 0 && (
+        <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-bold text-amber-800">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{missingWaterRooms.length} phòng chưa có công tơ nước hoạt động: {missingWaterRooms.map(room => room.roomCode || room.code || room.name || room.id).join(', ')}.</span>
+        </div>
+      )}
+
       <div className="space-y-3 px-0.5">
-        {(!currentMeters || currentMeters.length === 0) && (
+        {visibleMeters.length === 0 && (
           <div className="py-20 text-center">
             <ZapOff className="w-8 h-8 text-slate-200 mx-auto mb-2" />
             <p className="text-xs text-slate-400 italic">Chưa có dữ liệu kỳ này.</p>
           </div>
         )}
-        {currentMeters?.map(m => {
+        {visibleMeters.map((m, meterIndex) => {
           const isOldEmpty = m.oldVal === null || m.oldVal === '';
           const isNewEmpty = m.newVal === null || m.newVal === '';
           let consumption = 0;
           let totalPrice = 0;
 
           if (!isOldEmpty && !isNewEmpty) {
-            const vOld = parseN(String(m.oldVal));
-            const vNew = parseN(String(m.newVal));
+            const vOld = Number(m.oldVal);
+            const vNew = Number(m.newVal);
             consumption = vNew >= vOld ? (vNew - vOld) : 0;
-            totalPrice = consumption * (config.priceElec || 0);
+            totalPrice = consumption * (m.type === 'water' ? (config.priceWaterM3 || 0) : (config.priceElec || 0));
           }
 
           let daysPastDue = 0;
@@ -204,12 +237,16 @@ const MetersView = ({
           else if (hasWarning) cardClasses += 'bg-white border-red-300';
           else cardClasses += 'bg-white border-slate-100';
 
+          const unit = getMeterUnit(m.type);
+          const showGroupTitle = meterIndex === 0 || visibleMeters[meterIndex - 1]?.type !== m.type;
           return (
-            <div id={`meter-card-${m.id}`} key={m.id} onClick={() => { if (isHighlighted && setHighlightedItemId) setHighlightedItemId(null); }} className={cardClasses}>
+            <React.Fragment key={m.id}>
+            {showGroupTitle && <div className="px-1 pt-2 text-[10px] font-black uppercase tracking-widest text-slate-500">{getMeterTypeLabel(m.type)}</div>}
+            <div id={`meter-card-${m.id}`} onClick={() => { if (isHighlighted && setHighlightedItemId) setHighlightedItemId(null); }} className={`${cardClasses} ${!isActiveMeter(m) ? 'opacity-60' : ''}`}>
               <div className="flex justify-between items-start mb-4">
                 <div className="flex items-center space-x-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${m.type === 'heater' ? (hasWarning || isHighlighted ? 'bg-red-100 text-red-600' : 'bg-orange-50 text-orange-500') : (hasWarning || isHighlighted ? 'bg-red-100 text-red-600' : 'bg-blue-50 text-blue-600')}`}>
-                    {m.type === 'heater' ? <Flame className="w-5 h-5" /> : <Zap className="w-5 h-5" />}
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${m.type === 'water' ? 'bg-sky-50 text-sky-600' : m.type === 'heater' ? (hasWarning || isHighlighted ? 'bg-red-100 text-red-600' : 'bg-orange-50 text-orange-500') : (hasWarning || isHighlighted ? 'bg-red-100 text-red-600' : 'bg-blue-50 text-blue-600')}`}>
+                    {m.type === 'water' ? <Droplets className="w-5 h-5" /> : m.type === 'heater' ? <Flame className="w-5 h-5" /> : <Zap className="w-5 h-5" />}
                   </div>
                   <div>
                     <div className="flex items-center gap-2 mb-1">
@@ -221,7 +258,8 @@ const MetersView = ({
                       )}
                     </div>
                     <p className="text-[8px] font-bold text-blue-400 mt-1">
-                      Tổng: {formatN(consumption)} số - Tiền: {formatN(totalPrice)} đ
+                      {getMeterTypeLabel(m.type)} · {isActiveMeter(m) ? 'Đang hoạt động' : 'Tạm ngưng'}<br />
+                      Tổng: {formatN(consumption)} {unit} - Tiền: {formatN(totalPrice)} đ
                     </p>
                   </div>
                 </div>
@@ -272,22 +310,23 @@ const MetersView = ({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-[8px] font-black text-slate-400 uppercase mb-1 block px-1">Số cũ</label>
-                  <input type="number" value={m.oldVal || ''} onChange={(e) => handleUpdateOldMeterUI(m.id, e.target.value)} onBlur={() => handleSaveMeterReading?.(m.id)} className="w-full bg-slate-50 border-2 border-transparent p-3 rounded-xl font-black text-slate-500 text-center text-sm outline-none focus:border-purple-200 transition-all shadow-inner" />
+                  <input type="number" min="0" step="1" inputMode="numeric" value={m.oldVal ?? ''} onChange={(e) => handleUpdateOldMeterUI(m.id, e.target.value)} onBlur={() => handleSaveMeterReading?.(m.id)} className="w-full bg-slate-50 border-2 border-transparent p-3 rounded-xl font-black text-slate-500 text-center text-sm outline-none focus:border-purple-200 transition-all shadow-inner" />
                 </div>
                 <div>
                   <label className="text-[8px] font-black text-rose-600 uppercase mb-1 block px-1">
                     Số mới
                     {savingMeterId === m.id && <span className="ml-2 text-blue-500">Đang lưu...</span>}
                   </label>
-                  <input type="number" value={m.newVal || ''} onChange={(e) => handleUpdateMeterUI(m.id, e.target.value)} onBlur={() => handleSaveMeterReading?.(m.id)} className="w-full bg-blue-50/50 border-2 border-transparent p-3 rounded-xl font-black text-red-600 text-center text-sm outline-none focus:border-red-200 transition-all shadow-inner" />
+                  <input type="number" min="0" step="1" inputMode="numeric" value={m.newVal ?? ''} onChange={(e) => handleUpdateMeterUI(m.id, e.target.value)} onBlur={() => handleSaveMeterReading?.(m.id)} className="w-full bg-blue-50/50 border-2 border-transparent p-3 rounded-xl font-black text-red-600 text-center text-sm outline-none focus:border-red-200 transition-all shadow-inner" />
                 </div>
               </div>
             </div>
+            </React.Fragment>
           );
         })}
       </div>
 
-      {currentMeters?.length > 0 && (
+      {visibleMeters.length > 0 && (
         <div className="fixed bottom-[4.5rem] left-1/2 -translate-x-1/2 w-full max-w-lg px-4 z-40">
           <button
             type="button"

@@ -1,18 +1,21 @@
 import { useCallback, useState } from 'react';
 import { api } from '../services/api';
-import { parseN } from '../utils/formatters';
+import { isActiveMeter } from '../utils/meters';
 
 const isPaidStatus = (status) => ['paid', 'completed', 'done'].includes(String(status || '').toLowerCase());
 
 const getBillRoomKey = (bill) => String(bill?.roomCode || bill?.roomId || '');
 
 const hasValue = (value) => value !== null && value !== '' && value !== undefined;
+const toMeterReading = value => Number(value);
+const isValidMeterReading = value => Number.isInteger(toMeterReading(value)) && toMeterReading(value) >= 0;
 
 export const useMeters = ({
   meters,
   rooms = [],
   setMeters,
   houseId,
+  config,
   viewDate,
   loadHouseData,
   showToast,
@@ -35,8 +38,9 @@ export const useMeters = ({
       houseId: meter.houseId || houseId,
       name: meter.name,
       type: meter.type,
-      oldVal: hasValue(meter.oldVal) ? parseN(String(meter.oldVal)) : null,
-      newVal: hasValue(meter.newVal) ? parseN(String(meter.newVal)) : null,
+      status: meter.status || 'active',
+      oldVal: hasValue(meter.oldVal) ? toMeterReading(meter.oldVal) : null,
+      newVal: hasValue(meter.newVal) ? toMeterReading(meter.newVal) : null,
       roomIdsJson: JSON.stringify(meter.roomIds || []),
       year: yearSelected,
       month: monthSelected,
@@ -57,7 +61,13 @@ export const useMeters = ({
     if (!meter || !dirtyMeterIds.has(meter.id)) return true;
     if (!hasValue(meter.oldVal) && !hasValue(meter.newVal)) return true;
 
-    if (hasValue(meter.oldVal) && hasValue(meter.newVal) && parseN(String(meter.newVal)) < parseN(String(meter.oldVal))) {
+    if ((hasValue(meter.oldVal) && !isValidMeterReading(meter.oldVal))
+      || (hasValue(meter.newVal) && !isValidMeterReading(meter.newVal))) {
+      showToast('Chỉ số công tơ phải là số nguyên không âm.', 'error');
+      return false;
+    }
+
+    if (hasValue(meter.oldVal) && hasValue(meter.newVal) && toMeterReading(meter.newVal) < toMeterReading(meter.oldVal)) {
       showToast('Chỉ số mới không được nhỏ hơn chỉ số cũ.', 'error');
       return false;
     }
@@ -102,7 +112,17 @@ export const useMeters = ({
       type: fd.get('type'),
       name: fd.get('name'),
       oldVal: Number(fd.get('val')),
+      status: fd.get('status') || editingMeter?.status || 'active',
     };
+
+    if (!['electric', 'water', 'heater'].includes(payload.type)) {
+      showToast('Loại công tơ không hợp lệ.', 'error');
+      return;
+    }
+    if (!Number.isInteger(payload.oldVal) || payload.oldVal < 0) {
+      showToast('Chỉ số đầu phải là số nguyên không âm.', 'error');
+      return;
+    }
 
     try {
       await api.post('/meter/save', payload);
@@ -117,21 +137,27 @@ export const useMeters = ({
 
   const handleDeleteMeter = useCallback(async (meterId) => {
     const confirmed = await requestConfirm({
-      title: 'Xóa công tơ',
-      message: 'Bạn có chắc muốn xóa công tơ này?',
+      title: 'Ngừng sử dụng công tơ',
+      message: 'Công tơ sẽ chuyển sang tạm ngưng; lịch sử chỉ số vẫn được giữ lại.',
     });
     if (!confirmed) return;
 
     try {
-      await api.delete(`/meter/${meterId}`);
+      const meter = meters.find(item => String(item.id) === String(meterId));
+      if (!meter) throw new Error('Không tìm thấy công tơ.');
+      await api.post('/meter/save', {
+        ...meter,
+        status: 'suspended',
+        roomIdsJson: JSON.stringify(meter.roomIds || []),
+      });
       await loadHouseData(houseId);
       setIsAddMeterModalOpen(false);
       setEditingMeter(null);
-      showToast('Đã xóa công tơ', 'success');
+      showToast('Đã tạm ngưng công tơ, lịch sử được giữ lại.', 'success');
     } catch (error) {
       showToast('Lỗi: ' + error.message, 'error');
     }
-  }, [houseId, loadHouseData, requestConfirm, showToast]);
+  }, [houseId, loadHouseData, meters, requestConfirm, showToast]);
 
   const handleSaveMeterMapping = useCallback(async () => {
     if (!mappingMeter) return;
@@ -174,7 +200,7 @@ export const useMeters = ({
       const invalidMeter = updatedMeters.find(meter => (
         hasValue(meter.newVal)
         && hasValue(meter.oldVal)
-        && parseN(String(meter.newVal)) < parseN(String(meter.oldVal))
+        && toMeterReading(meter.newVal) < toMeterReading(meter.oldVal)
       ));
 
       if (invalidMeter) {
@@ -189,6 +215,24 @@ export const useMeters = ({
       if (touchedRooms.length === 0) {
         showToast('Các công tơ chưa được gắn với phòng nào, chưa thể lập hóa đơn.', 'error');
         return;
+      }
+
+      const waterCalcMethod = String(config?.waterCalcMethod || 'person').toLowerCase();
+      if (waterCalcMethod === 'm3') {
+        const invalidWaterRoom = touchedRooms.find(room => {
+          const waterMeter = targetMeters.find(meter => (
+            meter.type === 'water'
+            && isActiveMeter(meter)
+            && (meter.roomIds || []).map(String).includes(String(room.id))
+          ));
+          return !waterMeter || !hasValue(waterMeter.oldVal) || !hasValue(waterMeter.newVal);
+        });
+
+        if (invalidWaterRoom) {
+          const roomLabel = invalidWaterRoom.roomCode || invalidWaterRoom.code || invalidWaterRoom.name || invalidWaterRoom.id;
+          showToast(`Phòng ${roomLabel} thiếu công tơ nước hoạt động hoặc chỉ số nước.`, 'error');
+          return;
+        }
       }
 
       const paidBill = await findPaidBill(touchedRooms, monthSelected, yearSelected);
@@ -232,7 +276,7 @@ export const useMeters = ({
       setIsSavingMeterReadings(false);
       setGeneratingRoomId(null);
     }
-  }, [findPaidBill, houseId, isSavingMeterReadings, loadHouseData, requestConfirm, saveDirtyMeters, showToast, viewDate]);
+  }, [config?.waterCalcMethod, findPaidBill, houseId, isSavingMeterReadings, loadHouseData, requestConfirm, saveDirtyMeters, showToast, viewDate]);
 
   const handleGenerateBills = useCallback(async () => {
     await generateBillsForRooms(rooms, meters);
