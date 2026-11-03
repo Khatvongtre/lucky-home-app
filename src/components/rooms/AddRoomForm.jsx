@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { CalendarDays, Gauge, Home, UsersRound } from 'lucide-react';
 import { formatN, parseN } from '../../utils/formatters';
 import { getSafeDate } from '../../utils/date';
+import RoomServicePrices from './RoomServicePrices';
 
 const getOptionalSafeDate = (date) => date ? getSafeDate(date) : '';
 
@@ -42,7 +43,7 @@ const SuffixNumberInput = ({ name, defaultValue, min = 1, max, suffix = 'tháng 
     </div>
 );
 
-const AddRoomForm = ({ onSave, onDelete, editingRoom, sharedHeaters }) => {
+const AddRoomForm = ({ onSave, onDelete, editingRoom, sharedHeaters, config }) => {
     const [heaterType, setHeaterType] = useState(editingRoom?.heaterMeterId ? 'shared' : 'private');
     const [status, setStatus] = useState(editingRoom?.status || 'full');
     const [roomType, setRoomType] = useState(editingRoom?.roomType || 'room');
@@ -146,6 +147,10 @@ const AddRoomForm = ({ onSave, onDelete, editingRoom, sharedHeaters }) => {
                         <input name="meterReadingStartDate" type="date" value={meterReadingStartDate} onChange={(event) => setMeterReadingStartDate(event.target.value)} className={inputClass} />
                     </Field>
                 </div>
+            </Section>
+
+            <Section icon={Home} title="Giá dịch vụ phòng">
+                <RoomServicePrices room={editingRoom} config={config} />
             </Section>
 
             <Section icon={Gauge} title="Công tơ bình nóng lạnh">

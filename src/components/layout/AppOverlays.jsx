@@ -135,6 +135,7 @@ const AppOverlays = ({
             onDelete={handleDeleteRoom}
             editingRoom={editingRoom}
             sharedHeaters={sharedHeaters}
+            config={config}
           />
         </Modal>
       )}
