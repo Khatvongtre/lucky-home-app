@@ -1,8 +1,9 @@
 {
   "ExpandedNodes": [
     "",
-    "\\src"
+    "\\src",
+    "\\src\\pages"
   ],
-  "SelectedNode": "\\src\\index.css",
+  "SelectedNode": "\\src\\pages\\MeterReadingPublicView.jsx",
   "PreviewInSolutionExplorer": false
 }

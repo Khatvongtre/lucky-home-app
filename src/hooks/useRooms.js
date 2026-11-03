@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { api } from '../services/api';
 import { parseN } from '../utils/formatters';
+import { readRoomServicePrices } from '../utils/roomServicePrices';
 
 const getContractEnd = (start, months) => {
   try {
@@ -49,7 +50,16 @@ export const useRooms = ({
       return;
     }
 
+    let servicePrices;
+    try {
+      servicePrices = readRoomServicePrices(fd);
+    } catch (error) {
+      showToast(error.message, 'error');
+      return;
+    }
+
     const payload = {
+      ...servicePrices,
       id: editingRoom ? editingRoom.id : crypto.randomUUID(),
       houseId,
       roomCode: fd.get('rid'),
