@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Calendar, Flame, Zap, Boxes, Receipt, ZapOff, Loader2, QrCode, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, Flame, Zap, Boxes, Receipt, ZapOff, Loader2, QrCode, X, Check } from 'lucide-react';
 import { api } from '../services/api';
 import { formatN, parseN } from '../utils/formatters';
 import { getMeterReadingDueState } from '../utils/date';
@@ -26,6 +26,7 @@ const getHouseLabel = (selectedHouse, config) => (
 );
 
 const MetersView = ({
+  onViewBill,
   bills = [],
   onViewRoom,
   handlePrevMonth,
@@ -57,13 +58,32 @@ const MetersView = ({
   const [qrLinkInfo, setQrLinkInfo] = React.useState(null);
   const [isRoomPickerOpen, setIsRoomPickerOpen] = React.useState(false);
   const [selectedRoomIds, setSelectedRoomIds] = React.useState([]);
+  const copyEstimate = async event => {
+    const content = event.currentTarget.innerText.split(/\r?\n/).map(line => line.trim()).filter(Boolean).join('\n');
+    try {
+      await navigator.clipboard.writeText(content);
+      showToast?.('Đã sao chép tạm tính!', 'success');
+    } catch {
+      showToast?.('Không thể sao chép. Vui lòng thử lại.', 'error');
+    }
+  };
+  const handleCopyEstimateKey = event => {
+    if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+      event.preventDefault();
+      copyEstimate(event);
+    }
+  };
   const selectableRooms = rooms || [];
-  const eligibleRooms = selectableRooms.filter(room => getRoomInvoiceStatus(room, bills) !== 'paid');
+  const eligibleRooms = selectableRooms.filter(room => room.status !== 'empty' && getRoomInvoiceStatus(room, bills) !== 'paid');
   const selectedRooms = eligibleRooms.filter(room => selectedRoomIds.includes(String(room.id)));
   const allRoomsSelected = eligibleRooms.length > 0 && selectedRooms.length === eligibleRooms.length;
   const invoiceBadge = room => {
     if (room.status === 'empty') return <span className="inline-flex shrink-0 items-center rounded-full bg-white px-2 py-1 text-[9px] font-bold text-slate-600 ring-1 ring-inset ring-slate-300">Phòng trống</span>;
     const status = getRoomInvoiceStatus(room, bills);
+    if (status === 'created' && onViewBill) {
+      const bill = bills.find(item => String(item.entityRoomId || item.roomId) === String(room.id) || String(item.roomCode || item.roomId) === String(room.roomCode || room.id));
+      return <button type="button" onClick={event => { event.stopPropagation(); onViewBill(bill); }} className="inline-flex shrink-0 items-center rounded-full bg-blue-50 px-2 py-1 text-[9px] font-bold text-blue-700 ring-1 ring-inset ring-blue-200 transition-colors hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400">Đã lập hóa đơn · Xem HĐ</button>;
+    }
     const style = status === 'paid' ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : status === 'created' ? 'bg-blue-50 text-blue-700 ring-blue-200' : 'bg-amber-50 text-amber-700 ring-amber-200';
     return <span className={`inline-flex shrink-0 items-center rounded-full px-2 py-1 text-[9px] font-bold ring-1 ring-inset ${style}`}>{status === 'paid' ? 'Đã thanh toán' : status === 'created' ? 'Đã lập hóa đơn' : 'Chưa lập hóa đơn'}</span>;
   };
@@ -141,8 +161,8 @@ const MetersView = ({
   }, [highlightedItemId, currentMeters]);
 
   return (
-    <div className="space-y-4 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="sticky top-0 z-30 bg-blue-600 rounded-xl border border-blue-600 backdrop-blur-md p-4 space-y-4">
+    <div className="space-y-2.5 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="sticky top-0 z-30 bg-blue-600 rounded-xl border border-blue-600 backdrop-blur-md p-3 space-y-2.5">
         <div className="bg-white p-1 rounded-xl border border-slate-100 shadow-sm flex items-center">
           <button type="button" onClick={handlePrevMonth} className="p-3 hover:bg-slate-50 rounded-xl text-blue-600 active:scale-90 transition-all"><ChevronLeft className="w-5 h-5" /></button>
           <div className="flex-1 text-center">
@@ -241,7 +261,7 @@ const MetersView = ({
             unmapped: 'bg-slate-50 text-slate-600 ring-slate-200',
           }[cardStatus];
 
-          let cardClasses = 'p-3 sm:p-5 rounded-xl border shadow-sm transition-all ';
+          let cardClasses = 'px-3 py-2.5 sm:px-4 sm:py-3 rounded-xl border shadow-sm transition-all ';
           if (isHighlighted) cardClasses += 'border-red-500 shadow-red-200 animate-pulse bg-red-50 ring-2 ring-red-200';
           else {
             const backgrounds = {
@@ -258,9 +278,9 @@ const MetersView = ({
 
           return (
             <div id={`meter-card-${m.id}`} key={m.id} onClick={() => { if (isHighlighted && setHighlightedItemId) setHighlightedItemId(null); }} className={cardClasses}>
-              <div className="flex justify-between items-center mb-3 sm:mb-4">
+              <div className="flex justify-between items-center mb-2">
                 <div className="flex items-center space-x-3">
-                  <div className={`h-10 w-10 shrink-0 rounded-xl flex items-center justify-center ring-1 ring-inset ${hasWarning || isHighlighted ? 'bg-red-50 text-red-600 ring-red-200' : accent}`}>
+                  <div className={`h-10 w-10 shrink-0 rounded-xl flex items-center justify-center ring-1 ring-inset ${m.type === 'heater' ? 'bg-orange-50 text-orange-600 ring-orange-200' : hasWarning || isHighlighted ? 'bg-red-50 text-red-600 ring-red-200' : accent}`}>
                     {m.type === 'heater' ? <Flame className="w-5 h-5" /> : <Zap className="w-5 h-5" />}
                   </div>
                   <div>
@@ -271,6 +291,9 @@ const MetersView = ({
                           {paidRoomCount === linkedRooms.length ? 'Đã thanh toán tất cả' : createdRoomCount === 0 ? 'Chưa lập hóa đơn' : `Đã lập ${createdRoomCount}/${linkedRooms.length} phòng${paidRoomCount ? ` · Đã TT ${paidRoomCount}` : ''}`}
                         </span>
                       ) : null}
+                      {linkedRooms.length > 1 && linkedRooms.filter(room => getRoomInvoiceStatus(room, bills) === 'created').map(room => (
+                        <span key={room.id} className="inline-flex flex-wrap items-center gap-1 text-[9px] font-bold text-slate-600">P.{room.roomCode || room.id}: {invoiceBadge(room)}</span>
+                      ))}
                       {hasWarning && (
                         <span className="text-[7px] sm:text-[8px] font-black text-white bg-red-500 px-1.5 py-0.5 rounded shadow-sm leading-none whitespace-nowrap">
                           Quá {daysPastDue} ngày
@@ -286,7 +309,7 @@ const MetersView = ({
               </div>
 
               <div>
-              {!showHeaterBreakdown && <div className="mb-4 flex w-full items-start justify-between gap-2 rounded-lg border border-slate-200/80 bg-white/90 px-2.5 py-2 text-[10px] font-black leading-relaxed text-slate-600 tabular-nums">
+              {!showHeaterBreakdown && <div role="button" tabIndex={0} title="Bấm để sao chép tạm tính" aria-label="Sao chép tạm tính" onClick={copyEstimate} onKeyDown={handleCopyEstimateKey} className="mb-2 flex w-full cursor-pointer items-start justify-between gap-2 rounded-lg border border-slate-200/80 bg-white/90 px-2.5 py-2 text-[10px] font-black leading-relaxed text-slate-600 tabular-nums transition-colors hover:border-blue-300 hover:bg-blue-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400">
                 <p className="min-w-0">
                 {linkedRoom && <><button type="button" disabled={!onViewRoom} onClick={(event) => { event.stopPropagation(); onViewRoom?.(linkedRoom); }} className="inline-flex items-center rounded-md border border-blue-200 bg-white px-2 py-0.5 font-black text-blue-700 shadow-sm transition-colors hover:border-blue-400 hover:bg-blue-50 active:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 disabled:opacity-60">P.{linkedRoom.roomCode || linkedRoom.id}</button>{' · '}</>}
                 {isReadingIncomplete ? (
@@ -302,20 +325,20 @@ const MetersView = ({
               </div>}
 
               {showHeaterBreakdown && (
-                <div className="mb-4 space-y-2 rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2.5 text-[10px] font-bold leading-relaxed text-slate-600 tabular-nums">
+                <div role="button" tabIndex={0} title="Bấm để sao chép chi tiết BNL" aria-label="Sao chép chi tiết tạm tính BNL" onClick={copyEstimate} onKeyDown={handleCopyEstimateKey} className="mb-2 cursor-pointer space-y-1.5 rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2 text-[10px] font-bold leading-relaxed text-slate-600 tabular-nums transition-colors hover:border-blue-300 hover:bg-blue-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400">
                   <p className="font-black">Tổng BNL: <span className="text-red-600">{formatN(consumption)} số · {heaterEstimate.people} người</span></p>
                   {heaterEstimate.items.map(item => (
                     <div key={item.room.id} className="flex items-start justify-between gap-2">
                       <p className="min-w-0"><button type="button" disabled={!onViewRoom} onClick={(event) => { event.stopPropagation(); onViewRoom?.(item.room); }} className="inline-flex items-center rounded-md border border-blue-200 bg-white px-2 py-0.5 font-black text-blue-700 shadow-sm transition-colors hover:border-blue-400 hover:bg-blue-50 active:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 disabled:opacity-60">P.{item.room.roomCode || item.room.id}</button> · {item.people} người: <span className="text-red-600">{displayNumber(item.quantity)} số × {displayNumber(item.price)} đ = {formatN(item.amount)} đ</span></p>
                     </div>
                   ))}
-                  <p className="border-t border-slate-200 pt-2 font-black">Tổng tiền: <span className="text-red-600">{formatN(heaterEstimate.total)} đ</span></p>
+                  <p className="border-t border-slate-200 pt-1.5 font-black">Tổng tiền: <span className="text-red-600">{formatN(heaterEstimate.total)} đ</span></p>
                   <p className="text-[9px] font-medium text-slate-500">Tạm tính theo số người tháng trước (chưa có thì dùng hiện tại), làm tròn xuống 1.000đ/phòng.</p>
                 </div>
               )}
 
               {linkedRooms.length > 0 && (
-                <div className="mb-4 flex flex-wrap justify-end gap-2">
+                <div className="mb-2 flex flex-wrap justify-end gap-2">
                   {linkedRooms.map(room => {
                     const roomLabel = room.roomCode || room.id;
                     const isCopying = copyingRoomId === room.id;
@@ -390,20 +413,31 @@ const MetersView = ({
       {isRoomPickerOpen && (
         <div className="fixed inset-0 z-[700] flex items-end justify-center bg-slate-950/50 p-2 sm:items-center" onClick={() => { if (!isSavingMeterReadings) setIsRoomPickerOpen(false); }}>
           <section role="dialog" aria-modal="true" aria-labelledby="bill-room-picker-title" className="flex max-h-[85dvh] w-full max-w-lg flex-col rounded-2xl bg-white shadow-xl" onClick={event => event.stopPropagation()}>
-            <div className="flex items-center justify-between border-b border-slate-100 p-4">
+            <div className="border-b border-slate-100 p-4">
+            <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 id="bill-room-picker-title" className="text-sm font-black text-slate-800">Chọn phòng lập hóa đơn</h2>
-                <p className="mt-1 text-xs text-slate-500">Kỳ {monthDisplay} · Đã chọn {selectedRooms.length}/{selectableRooms.length} phòng</p>
+                <p className="mt-1 text-[11px] font-medium text-slate-500">Kỳ hóa đơn · {monthDisplay}</p>
               </div>
               <button type="button" aria-label="Đóng" disabled={isSavingMeterReadings} onClick={() => setIsRoomPickerOpen(false)} className="rounded-lg p-2 text-slate-500 disabled:opacity-50"><X className="h-5 w-5" /></button>
             </div>
-            <label className="flex cursor-pointer items-center gap-3 border-b border-slate-100 px-4 py-3 text-xs font-bold text-blue-700">
-              <input type="checkbox" checked={allRoomsSelected} disabled={isSavingMeterReadings || !eligibleRooms.length} onChange={event => setSelectedRoomIds(event.target.checked ? eligibleRooms.map(room => String(room.id)) : [])} className="h-4 w-4 accent-blue-600" />Chọn tất cả phòng chưa thanh toán
-            </label>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {[
+                ['Tổng phòng', selectableRooms.length, 'border-slate-200 bg-slate-50 text-slate-700'],
+                ['Đã chọn', selectedRooms.length, 'border-blue-200 bg-blue-50 text-blue-700'],
+                ['Phòng trống', selectableRooms.filter(room => room.status === 'empty').length, 'border-slate-200 bg-white text-slate-500'],
+              ].map(([label, count, color]) => (
+                <div key={label} className={`rounded-lg border px-2 py-2 text-center ${color}`}>
+                  <p className="text-lg font-black leading-tight tabular-nums">{count}</p>
+                  <p className="mt-1 text-[10px] font-semibold">{label}</p>
+                </div>
+              ))}
+            </div>
+            </div>
             <div className="min-h-0 flex-1 space-y-2 overflow-y-auto bg-slate-50 p-3">
               {selectableRooms.map(room => (
-                <label key={room.id} className={`flex items-center gap-3 rounded-xl border p-3 text-xs font-bold text-slate-700 transition-colors ${getRoomInvoiceStatus(room, bills) === 'paid' ? 'cursor-default border-slate-200 bg-slate-100' : selectedRoomIds.includes(String(room.id)) ? 'cursor-pointer border-blue-400 bg-blue-50 shadow-sm' : 'cursor-pointer border-slate-200 bg-white hover:border-blue-300'}`}>
-                  <input type="checkbox" checked={selectedRooms.some(selected => selected.id === room.id)} disabled={isSavingMeterReadings || getRoomInvoiceStatus(room, bills) === 'paid'} onChange={event => setSelectedRoomIds(current => event.target.checked ? [...current, String(room.id)] : current.filter(id => id !== String(room.id)))} className="h-4 w-4 shrink-0 accent-blue-600" />
+                <label key={room.id} className={`flex items-center gap-3 rounded-xl border p-3 text-xs font-bold text-slate-700 transition-colors ${room.status === 'empty' || getRoomInvoiceStatus(room, bills) === 'paid' ? 'cursor-default border-slate-200 bg-slate-100' : selectedRoomIds.includes(String(room.id)) ? 'cursor-pointer border-blue-400 bg-blue-50 shadow-sm' : 'cursor-pointer border-slate-200 bg-white hover:border-blue-300'}`}>
+                  <input type="checkbox" checked={selectedRooms.some(selected => selected.id === room.id)} disabled={isSavingMeterReadings || room.status === 'empty' || getRoomInvoiceStatus(room, bills) === 'paid'} onChange={event => setSelectedRoomIds(current => event.target.checked ? [...current, String(room.id)] : current.filter(id => id !== String(room.id)))} className="h-4 w-4 shrink-0 accent-blue-600" />
                   <div className="min-w-0 flex-1"><p className="truncate text-sm font-black">P.{room.roomCode || room.id}</p><p className="mt-1 text-[10px] font-medium text-slate-500">{getRoomInvoiceStatus(room, bills) === 'paid' ? 'Hóa đơn đã thanh toán, không lập lại' : getRoomInvoiceStatus(room, bills) === 'created' ? 'Có thể cập nhật hóa đơn chưa thanh toán' : 'Chưa có hóa đơn trong kỳ này'}</p></div>
                   {invoiceBadge(room)}
                 </label>
@@ -411,7 +445,28 @@ const MetersView = ({
               {!selectableRooms.length && <p className="py-6 text-center text-xs text-slate-500">Chưa có phòng để lập hóa đơn.</p>}
             </div>
             <div className="space-y-3 border-t border-slate-100 p-4">
-              <p className="text-[11px] leading-relaxed text-slate-500">Chỉ lập cho phòng có công tơ đã nhập số mới. Phòng đã thanh toán không thể chọn; hóa đơn chưa thanh toán sẽ được cập nhật.</p>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                ['Chưa tạo HĐ', eligibleRooms.filter(room => getRoomInvoiceStatus(room, bills) === 'missing'), 'border-amber-300 bg-amber-100 text-amber-900 hover:bg-amber-200'],
+                ['Chưa thanh toán', eligibleRooms.filter(room => getRoomInvoiceStatus(room, bills) === 'created'), 'border-orange-300 bg-orange-100 text-orange-900 hover:bg-orange-200'],
+              ].map(([label, targets, color]) => {
+                const ids = targets.map(room => String(room.id));
+                const isSelected = ids.length > 0 && ids.every(id => selectedRoomIds.includes(id));
+                return (
+                  <button key={label} type="button" aria-pressed={isSelected} disabled={isSavingMeterReadings || !targets.length} onClick={() => setSelectedRoomIds(current => ids.every(id => current.includes(id)) ? current.filter(id => !ids.includes(id)) : [...new Set([...current, ...ids])])} className={`flex min-h-12 min-w-0 items-center justify-center gap-2 rounded-xl border px-2 py-3 text-center text-[11px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${color} ${isSelected ? 'ring-2 ring-current ring-inset shadow-sm' : ''} disabled:opacity-50`}>
+                    <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${isSelected ? 'border-current bg-white' : 'border-slate-300 bg-white'}`}>{isSelected && <Check className="h-3 w-3" strokeWidth={3} />}</span>
+                    <span>{label} <span className="tabular-nums">({targets.length})</span></span>
+                  </button>
+                );
+              })}
+              <div className="col-span-2">
+                <button type="button" aria-pressed={allRoomsSelected} disabled={isSavingMeterReadings || !eligibleRooms.length} onClick={() => setSelectedRoomIds(allRoomsSelected ? [] : eligibleRooms.map(room => String(room.id)))} className={`flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${allRoomsSelected ? 'border-blue-400 bg-blue-200 text-blue-900 ring-2 ring-blue-400 ring-inset' : 'border-blue-300 bg-blue-100 text-blue-800 hover:bg-blue-200'} disabled:opacity-40`}>
+                  <span className={`flex h-4 w-4 items-center justify-center rounded border ${allRoomsSelected ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300 bg-white'}`}>{allRoomsSelected && <Check className="h-3 w-3" strokeWidth={3} />}</span>
+                  <span>{allRoomsSelected ? 'Bỏ chọn tất cả' : 'Chọn tất cả'} <span className="tabular-nums">({eligibleRooms.length} phòng)</span></span>
+                </button>
+              </div>
+            </div>
+              <p className="text-[11px] leading-relaxed text-slate-500">Tự bỏ qua phòng trống và phòng đã thanh toán. “Chưa thanh toán” chọn phòng đã có hóa đơn chưa trả tiền. Chỉ lập cho phòng có công tơ đã nhập số mới.</p>
               <button type="button" disabled={!selectedRooms.length || isSavingMeterReadings} onClick={async () => {
                 const saved = await handleGenerateBills(selectedRooms.map(room => room.id));
                 if (saved) setIsRoomPickerOpen(false);
