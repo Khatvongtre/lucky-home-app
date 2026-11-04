@@ -98,6 +98,7 @@ const AppMainContent = ({
 
         {activeTab === 'meters_list' && (
           <MetersView
+            onViewBill={(bill) => billsState.setBottomSheet({ type: 'bill', data: bill })}
             bills={meterState.bills}
             onViewRoom={isManagerOrAbove ? (room) => {
               roomsState.setEditingRoom(room);
