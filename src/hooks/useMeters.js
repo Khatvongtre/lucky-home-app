@@ -226,6 +226,7 @@ export const useMeters = ({
       await loadHouseData(houseId, 'meters_list');
       await loadHouseData(houseId, 'bills');
       await loadHouseData(houseId, 'dashboard');
+      return true;
     } catch (error) {
       showToast(error.message || 'Không lập được hóa đơn.', 'error');
     } finally {
@@ -234,9 +235,17 @@ export const useMeters = ({
     }
   }, [findPaidBill, houseId, isSavingMeterReadings, loadHouseData, requestConfirm, saveDirtyMeters, showToast, viewDate]);
 
-  const handleGenerateBills = useCallback(async () => {
-    await generateBillsForRooms(rooms, meters);
-  }, [generateBillsForRooms, meters, rooms]);
+  const handleGenerateBills = useCallback(async (roomIds) => {
+    const selectedIds = Array.isArray(roomIds) ? new Set(roomIds.map(String)) : null;
+    const targetRooms = selectedIds ? rooms.filter(room => selectedIds.has(String(room.id))) : rooms;
+    if (!targetRooms.length) {
+      showToast('Vui lòng chọn ít nhất một phòng.', 'error');
+      return false;
+    }
+    const targetIds = new Set(targetRooms.map(room => String(room.id)));
+    const targetMeters = meters.filter(meter => (meter.roomIds || []).some(id => targetIds.has(String(id))));
+    return await generateBillsForRooms(targetRooms, targetMeters);
+  }, [generateBillsForRooms, meters, rooms, showToast]);
 
   const handleGenerateBillForRoom = useCallback(async (roomId) => {
     const targetRoom = rooms.find(room => String(room.id) === String(roomId));

@@ -612,6 +612,7 @@ const MainApp = () => {
           setHighlightedItemId,
         }}
         meterState={{
+          bills,
           meterSummary,
           config,
           currentMeters,

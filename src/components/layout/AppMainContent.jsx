@@ -55,7 +55,7 @@ const AppMainContent = ({
   } = monthState;
 
   return (
-    <main className="flex-1 w-full overflow-y-auto px-4 pt-2 pb-32 no-scrollbar scroll-smooth">
+    <main className={`flex-1 w-full overflow-y-auto ${activeTab === 'meters_list' ? 'px-2 sm:px-4' : 'px-4'} pt-2 pb-32 no-scrollbar scroll-smooth`}>
       <Suspense fallback={<PageLoading />}>
         {activeTab === 'dashboard' && (
           <DashboardView
@@ -98,6 +98,11 @@ const AppMainContent = ({
 
         {activeTab === 'meters_list' && (
           <MetersView
+            bills={meterState.bills}
+            onViewRoom={isManagerOrAbove ? (room) => {
+              roomsState.setEditingRoom(room);
+              roomsState.setIsAddRoomModalOpen(true);
+            } : undefined}
             handlePrevMonth={handlePrevMonth}
             handleNextMonth={handleNextMonth}
             monthDisplay={monthDisplay}
