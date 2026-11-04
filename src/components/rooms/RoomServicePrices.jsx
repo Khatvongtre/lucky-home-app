@@ -11,8 +11,8 @@ const formatPriceInput = (value) => {
 const ChoiceGroup = ({ label, value, options, onChange }) => (
   <div role="group" aria-label={label} className="flex gap-1 rounded-lg bg-slate-100 p-1">
     {options.map(option => (
-      <button key={option.value} type="button" aria-pressed={value === option.value} onClick={() => onChange(option.value)} className={`min-w-0 flex-1 rounded-md px-2 py-2 text-[10px] font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${value === option.value ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-200/80' : 'text-slate-500 hover:bg-white/60 hover:text-slate-700'}`}>
-        <span className={option.value === 'custom' ? 'text-red-600' : undefined}>{option.label}</span>
+      <button key={option.value} type="button" aria-pressed={value === option.value} onClick={() => onChange(option.value)} className={`min-w-0 flex-1 whitespace-nowrap rounded-md px-2 py-2 text-[10px] font-bold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${value === option.value ? 'bg-white text-blue-700 shadow-sm ring-1 ring-slate-200/80' : 'text-slate-500 hover:bg-white/60 hover:text-slate-700'}`}>
+        <span className={option.value === 'custom' ? (value === option.value ? 'text-red-600' : 'text-slate-500') : undefined}>{option.label}</span>
       </button>
     ))}
   </div>
@@ -33,7 +33,7 @@ export default function RoomServicePrices({ room, config = {} }) {
         <input type="hidden" name="waterCalcMethodOverride" value={waterMethod} />
         <span className="block text-[10px] text-slate-500">Áp dụng: {effectiveMethod === 'person' ? 'Theo người' : effectiveMethod === 'm3' ? 'Theo m³' : 'Chưa có cấu hình'}</span>
       </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,240px),1fr))] gap-3">
         {roomServicePriceFields.map(({ key, label, unit }) => {
           const value = values[key];
           const isOverride = value !== null;

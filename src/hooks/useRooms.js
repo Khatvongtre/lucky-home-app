@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { api } from '../services/api';
 import { parseN } from '../utils/formatters';
 import { readRoomServicePrices } from '../utils/roomServicePrices';
+import { readRoomBilling } from '../utils/roomBilling';
 
 const getContractEnd = (start, months) => {
   try {
@@ -52,7 +53,7 @@ export const useRooms = ({
 
     let servicePrices;
     try {
-      servicePrices = readRoomServicePrices(fd);
+      servicePrices = { ...readRoomServicePrices(fd), ...readRoomBilling(fd) };
     } catch (error) {
       showToast(error.message, 'error');
       return;

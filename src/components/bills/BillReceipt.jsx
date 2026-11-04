@@ -159,7 +159,8 @@ const BillReceipt = ({
         { key: 'water', label: "Tiền nước", val: details.water },
         { key: 'service', label: "Phí dịch vụ", val: details.service || 0 },
         { key: 'internet', label: "Internet", val: details.internet || 0 },
-        { key: 'ebikes', label: "Xe điện", val: details.ebikes || 0 }
+        ...(Number(details.ebikes) > 0 ? [{ key: 'ebikes', label: 'Xe điện', val: details.ebikes }] : []),
+        ...(Number(details.elevator) > 0 ? [{ key: 'elevator', label: 'Thang máy', val: details.elevator }] : [])
     ];
     const isBillPaid = ['paid', 'completed', 'done'].includes(String(bill.status || '').toLowerCase());
     const canEditPendingBill = !isBillPaid;

@@ -6,6 +6,32 @@ import RoomServicePrices from './RoomServicePrices';
 
 const getOptionalSafeDate = (date) => date ? getSafeDate(date) : '';
 
+const formatBillingAmount = value => {
+    const [integer, decimal] = String(value ?? '').replace(/,/g, '').split('.');
+    return integer.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (decimal === undefined ? '' : `.${decimal}`);
+};
+
+const BillingAmountInput = ({ name, defaultValue }) => {
+    const [value, setValue] = useState(() => formatBillingAmount(defaultValue));
+    return <input name={name} type="text" inputMode="decimal" required pattern="[0-9,]+(\.[0-9]+)?" value={value} onChange={event => {
+        const input = event.target;
+        const raw = input.value.replace(/,/g, '');
+        if (!/^\d*(\.\d*)?$/.test(raw)) return;
+        const prefixLength = input.value.slice(0, input.selectionStart).replace(/,/g, '').length;
+        const formatted = formatBillingAmount(raw);
+        setValue(formatted);
+        requestAnimationFrame(() => {
+            let position = 0;
+            let count = 0;
+            while (position < formatted.length && count < prefixLength) {
+                if (formatted[position] !== ',') count += 1;
+                position += 1;
+            }
+            input.setSelectionRange(position, position);
+        });
+    }} className={inputClass} />;
+};
+
 const inputClass = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-700 outline-none transition-all focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
 const labelClass = 'px-0.5 text-[9px] font-black uppercase tracking-wide text-slate-500';
 const sectionClass = 'rounded-xl border border-slate-200 bg-slate-50/70 p-3 shadow-sm';
@@ -109,10 +135,10 @@ const AddRoomForm = ({ onSave, onDelete, editingRoom, sharedHeaters, config }) =
                 <div className={`space-y-3 transition-all duration-300 ${disabledWhenEmpty}`}>
                     <div className="grid grid-cols-2 gap-3">
                         <Field label="Số cư dân">
-                            <input name="people" type="number" defaultValue={editingRoom?.peopleCount ?? editingRoom?.people ?? 2} className={inputClass} />
+                            <input name="people" type="number" min="0" step="1" defaultValue={editingRoom?.peopleCount ?? editingRoom?.people ?? 2} className={inputClass} />
                         </Field>
                         <Field label="Xe điện">
-                            <input name="ebikes" type="number" defaultValue={editingRoom?.eBikeCount ?? editingRoom?.eBikes ?? 0} className={inputClass} />
+                            <input name="ebikes" type="number" min="0" step="1" defaultValue={editingRoom?.eBikeCount ?? editingRoom?.eBikes ?? 0} className={inputClass} />
                         </Field>
                     </div>
 
@@ -129,6 +155,18 @@ const AddRoomForm = ({ onSave, onDelete, editingRoom, sharedHeaters, config }) =
                         </Field>
                     </div>
                 </div>
+            </Section>
+
+            <Section icon={UsersRound} title="Thông tin tính tiền phòng">
+                <div className="grid grid-cols-2 gap-3">
+                    <Field label="Số người tháng trước">
+                        <input name="previousPeopleCount" type="number" min="0" step="1" defaultValue={editingRoom?.previousPeopleCount ?? ''} placeholder="Theo số người hiện tại" className={inputClass} />
+                    </Field>
+                    <Field label="Tiền cọc (đ)">
+                        <BillingAmountInput name="deposit" defaultValue={editingRoom?.deposit ?? 0} />
+                    </Field>
+                </div>
+                <p className="mt-2 text-[10px] leading-relaxed text-slate-500">Số người tháng trước chỉ dùng chia điện BNL chung, kể cả phòng hiện đang trống. Cập nhật cho từng tháng sử dụng; để trống để dùng số người hiện tại. Khi tạo lại hóa đơn cũ, nhập số người của tháng tương ứng. Tiền cọc không cộng vào tiền tháng.</p>
             </Section>
 
             <Section icon={CalendarDays} title="Lịch thanh toán & chốt điện">
@@ -151,6 +189,21 @@ const AddRoomForm = ({ onSave, onDelete, editingRoom, sharedHeaters, config }) =
 
             <Section icon={Home} title="Giá dịch vụ phòng">
                 <RoomServicePrices room={editingRoom} config={config} />
+                <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
+                    <p className="mb-3 text-[10px] font-bold text-slate-600">Phí thang máy</p>
+                    <div className="grid grid-cols-2 gap-3">
+                        <Field label="Đơn giá (đ/tháng)">
+                            <BillingAmountInput name="priceElevator" defaultValue={editingRoom?.priceElevator ?? 0} />
+                        </Field>
+                        <Field label="Cách tính">
+                            <select name="elevatorCalcMethod" defaultValue={editingRoom?.elevatorCalcMethod ?? 'room'} className={inputClass}>
+                                <option value="room">Theo phòng</option>
+                                <option value="person">Theo người hiện tại</option>
+                            </select>
+                        </Field>
+                    </div>
+                    <p className="mt-2 text-[10px] leading-relaxed text-slate-500">Tính theo số tháng của kỳ thanh toán. Nhập 0 để miễn phí. MBKD có phí dịch vụ trọn gói đã bao gồm thang máy.</p>
+                </div>
             </Section>
 
             <Section icon={Gauge} title="Công tơ bình nóng lạnh">
