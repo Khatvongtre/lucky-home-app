@@ -199,6 +199,13 @@ const buildReceiptModel = (session, invoice) => {
       service: invoiceDetails.service || 0,
       internet: invoiceDetails.internet || 0,
       ebikes: invoiceDetails.ebikes || 0,
+      elevator: invoiceDetails.elevator,
+      priceElevator: invoiceDetails.priceElevator,
+      elevatorCalcMethod: invoiceDetails.elevatorCalcMethod,
+      peopleCount: invoiceDetails.peopleCount,
+      previousPeopleCount: invoiceDetails.previousPeopleCount,
+      deposit: invoiceDetails.deposit,
+      serviceItems: invoiceDetails.serviceItems,
       monthlyFee: invoiceDetails.monthlyFee || 0,
       discount: invoiceDetails.discount || 0,
       additionalCost: invoiceDetails.additionalCost || invoiceDetails.extraCost || invoiceDetails.surcharge || 0,
@@ -233,7 +240,8 @@ const PublicInvoiceReceipt = ({
     { key: 'water', label: 'Tiền nước', val: bill.details.water },
     { key: 'service', label: 'Phí dịch vụ', val: bill.details.service || 0 },
     { key: 'internet', label: 'Internet', val: bill.details.internet || 0 },
-    { key: 'ebikes', label: 'Xe điện', val: bill.details.ebikes || 0 },
+    ...(Number(bill.details.ebikes) > 0 ? [{ key: 'ebikes', label: 'Xe điện', val: bill.details.ebikes }] : []),
+    ...(Number(bill.details.elevator) > 0 ? [{ key: 'elevator', label: 'Thang máy', val: bill.details.elevator }] : []),
   ];
   const electricMeters = getBillElectricMeters(bill);
   const isWaived = key => bill.details.waivedItems.includes(key);

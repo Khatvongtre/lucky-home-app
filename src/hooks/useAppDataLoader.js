@@ -37,7 +37,10 @@ export const useAppDataLoader = ({
           await loadRoomsData(houseId);
           break;
         case 'meters_list':
-          await loadMetersData(houseId);
+          await Promise.all([
+            loadRoomsData(houseId),
+            loadMetersData(houseId),
+          ]);
           break;
         case 'bills':
           await loadBillsData(houseId);

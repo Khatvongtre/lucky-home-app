@@ -11,6 +11,7 @@ export const BILL_FEE_KEYS = [
   'service',
   'internet',
   'ebikes',
+  'elevator',
   'monthlyFee',
 ];
 

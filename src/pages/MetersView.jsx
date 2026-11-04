@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight, Calendar, Flame, Zap, Edit, Boxes, Receipt, 
 import { api } from '../services/api';
 import { formatN, parseN } from '../utils/formatters';
 import { getMeterReadingDueState } from '../utils/date';
+import { estimateHeater } from '../utils/heaterEstimate';
 import MeterReadingLinkQrModal from '../components/common/MeterReadingLinkQrModal';
 
 const FE_BASE_URL = (import.meta.env.VITE_FE_URL || window.location.origin).replace(/\/+$/g, '');
@@ -168,20 +169,29 @@ const MetersView = ({
           </div>
         )}
         {currentMeters?.map(m => {
-          const isOldEmpty = m.oldVal === null || m.oldVal === '';
-          const isNewEmpty = m.newVal === null || m.newVal === '';
+          const isOldEmpty = m.oldVal == null || m.oldVal === '';
+          const isNewEmpty = m.newVal == null || m.newVal === '';
           let consumption = 0;
           let totalPrice = 0;
+          const linkedRooms = rooms?.filter(r => m.roomIds?.includes(r.id)) || [];
+          const linkedRoom = linkedRooms.length === 1 ? linkedRooms[0] : null;
+          const electricityPrice = linkedRoom?.priceElecOverride ?? linkedRoom?.effectiveServicePrices?.priceElec ?? config.priceElec ?? 0;
 
           if (!isOldEmpty && !isNewEmpty) {
             const vOld = parseN(String(m.oldVal));
             const vNew = parseN(String(m.newVal));
             consumption = vNew >= vOld ? (vNew - vOld) : 0;
-            totalPrice = consumption * (config.priceElec || 0);
+            totalPrice = consumption * electricityPrice;
           }
 
+          const heaterEstimate = m.type === 'heater' ? estimateHeater(consumption, linkedRooms, config.priceElec ?? 0) : null;
+          const isUnchanged = !isOldEmpty && !isNewEmpty && Number(m.oldVal) === Number(m.newVal);
+          const isReadingIncomplete = isOldEmpty || isNewEmpty;
+          const isReadingInvalid = !isReadingIncomplete && Number(m.newVal) < Number(m.oldVal);
+          const showHeaterBreakdown = heaterEstimate && linkedRooms.length > 1 && !isUnchanged && !isReadingIncomplete && !isReadingInvalid;
+          if (heaterEstimate) totalPrice = heaterEstimate.total;
+          const displayNumber = value => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(value);
           let daysPastDue = 0;
-          const linkedRooms = rooms?.filter(r => m.roomIds?.includes(r.id)) || [];
           if (isNewEmpty && viewDate) {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
@@ -220,9 +230,17 @@ const MetersView = ({
                         </span>
                       )}
                     </div>
-                    <p className="text-[8px] font-bold text-blue-400 mt-1">
-                      Tổng: {formatN(consumption)} số - Tiền: {formatN(totalPrice)} đ
-                    </p>
+                    {!showHeaterBreakdown && <p className="mt-2 rounded-lg border border-rose-100 bg-rose-50 px-2.5 py-2 text-[10px] font-black leading-relaxed text-blue-500 tabular-nums">
+                      {isReadingIncomplete ? (
+                        <span className="text-slate-500">Chưa đủ chỉ số để tạm tính</span>
+                      ) : isReadingInvalid ? (
+                        <span className="text-red-600">Số mới nhỏ hơn số cũ · Vui lòng kiểm tra lại</span>
+                      ) : isUnchanged ? (
+                        <span className="text-slate-600">Chỉ số không thay đổi · Không phát sinh tiền điện</span>
+                      ) : (
+                        <>Tổng: <span className="text-red-600">{formatN(consumption)} số x {new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(electricityPrice)} đ = {formatN(totalPrice)} đ</span></>
+                      )}
+                    </p>}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -230,6 +248,19 @@ const MetersView = ({
                   <button type="button" onClick={() => setMappingMeter(m)} className="p-2 bg-slate-50 text-slate-400 rounded-xl active:bg-orange-50 active:text-orange-500 transition-all"><Boxes className="w-4 h-4" /></button>
                 </div>
               </div>
+
+              {showHeaterBreakdown && (
+                <div className="mb-4 space-y-2 rounded-lg border border-rose-100 bg-rose-50 px-3 py-2.5 text-[10px] font-bold leading-relaxed text-blue-500 tabular-nums">
+                  <p className="font-black">Tổng BNL: <span className="text-red-600">{formatN(consumption)} số · {heaterEstimate.people} người</span></p>
+                  {heaterEstimate.items.map(item => (
+                    <p key={item.room.id}>
+                      P.{item.room.roomCode || item.room.id} · {item.people} người: <span className="text-red-600">{displayNumber(item.quantity)} số × {displayNumber(item.price)} đ = {formatN(item.amount)} đ</span>
+                    </p>
+                  ))}
+                  <p className="border-t border-rose-200 pt-2 font-black">Tổng tiền: <span className="text-red-600">{formatN(heaterEstimate.total)} đ</span></p>
+                  <p className="text-[9px] font-medium text-slate-500">Tạm tính theo số người tháng trước (chưa có thì dùng hiện tại), làm tròn xuống 1.000đ/phòng.</p>
+                </div>
+              )}
 
               {linkedRooms.length > 0 && (
                 <div className="mb-4 flex flex-wrap gap-2">
@@ -272,14 +303,14 @@ const MetersView = ({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-[8px] font-black text-slate-400 uppercase mb-1 block px-1">Số cũ</label>
-                  <input type="number" value={m.oldVal || ''} onChange={(e) => handleUpdateOldMeterUI(m.id, e.target.value)} onBlur={() => handleSaveMeterReading?.(m.id)} className="w-full bg-slate-50 border-2 border-transparent p-3 rounded-xl font-black text-slate-500 text-center text-sm outline-none focus:border-purple-200 transition-all shadow-inner" />
+                  <input type="number" value={m.oldVal ?? ''} onChange={(e) => handleUpdateOldMeterUI(m.id, e.target.value)} onBlur={() => handleSaveMeterReading?.(m.id)} className="w-full bg-slate-50 border-2 border-transparent p-3 rounded-xl font-black text-slate-500 text-center text-sm outline-none focus:border-purple-200 transition-all shadow-inner" />
                 </div>
                 <div>
                   <label className="text-[8px] font-black text-rose-600 uppercase mb-1 block px-1">
                     Số mới
                     {savingMeterId === m.id && <span className="ml-2 text-blue-500">Đang lưu...</span>}
                   </label>
-                  <input type="number" value={m.newVal || ''} onChange={(e) => handleUpdateMeterUI(m.id, e.target.value)} onBlur={() => handleSaveMeterReading?.(m.id)} className="w-full bg-blue-50/50 border-2 border-transparent p-3 rounded-xl font-black text-red-600 text-center text-sm outline-none focus:border-red-200 transition-all shadow-inner" />
+                  <input type="number" value={m.newVal ?? ''} onChange={(e) => handleUpdateMeterUI(m.id, e.target.value)} onBlur={() => handleSaveMeterReading?.(m.id)} className="w-full bg-blue-50/50 border-2 border-transparent p-3 rounded-xl font-black text-red-600 text-center text-sm outline-none focus:border-red-200 transition-all shadow-inner" />
                 </div>
               </div>
             </div>
